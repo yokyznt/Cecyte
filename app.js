@@ -21,11 +21,83 @@ const timeSlots = [
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 let mobileActiveDay = 'Lunes'; // Dia mostrado en la vista de lista para celular
 
-// Live Clock updater
+// Live Clock updater + tarjeta "Estado Actual" (ambos con la hora real)
 setInterval(() => {
     const now = new Date();
     document.getElementById('live-clock').innerText = now.toLocaleTimeString('es-MX');
+    updateCurrentClassCard();
 }, 1000);
+
+// Pinta la tarjeta "Estado Actual" segun la hora real y el horario cargado del servidor
+function updateCurrentClassCard() {
+    const titleEl = document.getElementById('current-subject-title');
+    const teacherEl = document.getElementById('current-teacher-name');
+    const timeEl = document.getElementById('current-subject-time');
+    const percentEl = document.getElementById('progress-percent');
+    const barEl = document.getElementById('class-progress-bar');
+    const countdownEl = document.getElementById('countdown-timer');
+    const nextEl = document.getElementById('next-subject-name');
+    if (!titleEl) return; // la tarjeta no esta en pantalla todavia
+
+    const day = getCurrentDaySpanish();
+    const slot = day ? getCurrentSlot() : null;
+
+    if (!slot) {
+        titleEl.innerText = day ? 'Sin clase en este momento' : 'Hoy no hay clases';
+        teacherEl.innerHTML = '<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —';
+        timeEl.innerText = '—';
+        percentEl.innerText = '—';
+        barEl.style.width = '0%';
+        countdownEl.innerText = '--:--';
+        nextEl.innerText = findNextClassLabel(day) || 'Sin más clases';
+        return;
+    }
+
+    const currentClass = slot.receso ? null : findClass(day, slot.key);
+    const [startStr, endStr] = slot.key.split(' - ');
+    const start = timeToMinutes(startStr);
+    const end = timeToMinutes(endStr);
+    const now = new Date();
+    const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const startSeconds = start * 60;
+    const endSeconds = end * 60;
+    const totalSeconds = endSeconds - startSeconds;
+    const elapsedSeconds = Math.min(Math.max(nowSeconds - startSeconds, 0), totalSeconds);
+    const percent = totalSeconds > 0 ? Math.round((elapsedSeconds / totalSeconds) * 100) : 0;
+    const remainingSeconds = Math.max(endSeconds - nowSeconds, 0);
+    const remMin = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+    const remSec = String(remainingSeconds % 60).padStart(2, '0');
+
+    if (slot.receso) {
+        titleEl.innerText = 'Receso';
+        teacherEl.innerHTML = '<i class="fa-solid fa-mug-hot text-emerald-600"></i> Disfruta tu receso';
+    } else if (currentClass) {
+        titleEl.innerText = currentClass.subject;
+        teacherEl.innerHTML = `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> ${currentClass.teacher}`;
+    } else {
+        titleEl.innerText = 'Hora libre';
+        teacherEl.innerHTML = '<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —';
+    }
+
+    timeEl.innerText = `${slot.key} hrs`;
+    percentEl.innerText = `${percent}%`;
+    barEl.style.width = `${percent}%`;
+    countdownEl.innerText = `${remMin}:${remSec}`;
+    nextEl.innerText = findNextClassLabel(day, slot.key) || 'Sin más clases hoy';
+}
+
+// Busca la siguiente materia asignada despues del bloque actual (o desde el inicio si no hay bloque activo)
+function findNextClassLabel(day, afterSlotKey = null) {
+    if (!day) return null;
+    let index = afterSlotKey ? timeSlots.findIndex(s => s.key === afterSlotKey) + 1 : 0;
+    for (; index < timeSlots.length; index++) {
+        const slot = timeSlots[index];
+        if (slot.receso) continue;
+        const match = findClass(day, slot.key);
+        if (match) return `${match.subject} (${slot.key})`;
+    }
+    return null;
+}
 
 // ==================== Sincronizacion con el servidor ====================
 // Trae el horario guardado en el servidor y repinta ambas vistas.
@@ -460,11 +532,35 @@ function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
     renderAlertLog();
 }
 
+// Registra el Service Worker (necesario para que las notificaciones funcionen en Android/Chrome)
+let swRegistration = null;
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return null;
+    try {
+        swRegistration = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
+        return swRegistration;
+    } catch (err) {
+        console.error('No se pudo registrar el Service Worker:', err);
+        return null;
+    }
+}
+
 // Manda una notificacion real del sistema (banner fuera de la pagina), si hay permiso concedido.
-function sendSystemNotification(title, body) {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
+// Usa el Service Worker porque Chrome en Android NO deja usar "new Notification()" directo.
+async function sendSystemNotification(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    try {
+        if ('serviceWorker' in navigator) {
+            const reg = swRegistration || await navigator.serviceWorker.ready;
+            await reg.showNotification(title, { body, tag: 'cecyte-alerta', renotify: true });
+            return;
+        }
+        // Navegadores de escritorio viejos que no usan Service Worker para esto
         new Notification(title, { body });
+    } catch (err) {
+        console.error('No se pudo mostrar la notificación:', err);
     }
 }
 
@@ -473,13 +569,15 @@ function requestNotificationPermission() {
         updateNotificationStatus('No soportado en este navegador');
         return;
     }
-    Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-            updateNotificationStatus('Activado en este dispositivo');
-            showNotificationToast('Notificaciones Activadas', 'Este dispositivo recibirá avisos de cambio de clase.', 'success');
-        } else {
-            updateNotificationStatus('Permiso denegado');
-        }
+    registerServiceWorker().then(() => {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                updateNotificationStatus('Activado en este dispositivo');
+                showNotificationToast('Notificaciones Activadas', 'Este dispositivo recibirá avisos de cambio de clase.', 'success');
+            } else {
+                updateNotificationStatus('Permiso denegado');
+            }
+        });
     });
 }
 
@@ -546,12 +644,15 @@ function showNotificationToast(title, message, type, iconColor = 'bg-emerald-600
 // Initial render on load
 window.onload = async function() {
     await loadSchedule(); // trae el horario real del servidor
+    await registerServiceWorker();
 
     if ('Notification' in window && Notification.permission === 'granted') {
         updateNotificationStatus('Activado en este dispositivo');
     }
 
     checkScheduleAndNotify();
+    updateCurrentClassCard();
+    checkAdminSession(); // por si ya habia sesion abierta y refresca la pestaña
     setInterval(checkScheduleAndNotify, 20000); // revisa cambio de clase cada 20 segundos
     setInterval(loadSchedule, 15000); // refresca el horario cada 15 segundos por si otro admin hizo cambios
 }
