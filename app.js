@@ -510,6 +510,7 @@ function checkScheduleAndNotify() {
 function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
     const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
+    // Texto detallado, solo para el registro del panel de admin (ese si dice cual clase termino)
     const terminoTexto = prevClass ? `${prevClass.subject} — ${prevClass.teacher}` : 'Sin clase';
     let sigueTexto;
     if (nextSlot && nextSlot.receso) {
@@ -520,13 +521,26 @@ function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
         sigueTexto = 'Sin clase';
     }
 
+    // Mensaje que le llega al alumno: NO dice que materia termina, solo avisa que va a terminar
+    // y dice con detalle la materia que sigue y su profesor.
+    const avisoLineas = [];
+    if (prevClass) avisoLineas.push('La clase actual está por terminar.');
+    if (nextSlot && nextSlot.receso) {
+        avisoLineas.push('Sigue: Receso.');
+    } else if (nextClass) {
+        avisoLineas.push(`Comienza: ${nextClass.subject}, con el/la profesor(a) ${nextClass.teacher}.`);
+    } else if (!prevClass) {
+        avisoLineas.push('No hay más clases por el momento.');
+    }
+    const avisoTexto = avisoLineas.join('\n');
+
     // 1. Toast dentro de la pagina (para cuando la pestaña esta abierta y visible)
-    showNotificationToast('Cambio de Clase', `Termina: ${terminoTexto}\nSigue: ${sigueTexto}`, 'info');
+    showNotificationToast('Aviso de Clase', avisoTexto, 'info');
 
     // 2. Notificacion real del sistema operativo (si ya se dio permiso en este dispositivo)
-    sendSystemNotification('CECyTE Plantel 18', `Termina: ${terminoTexto}\nSigue: ${sigueTexto}`);
+    sendSystemNotification('CECyTE Plantel 18', avisoTexto);
 
-    // 3. Registro para el panel de admin
+    // 3. Registro para el panel de admin (este si trae el detalle completo, incluida la que termino)
     alertLog.unshift({ time: now, termino: terminoTexto, sigue: sigueTexto });
     alertLog = alertLog.slice(0, 30);
     renderAlertLog();
