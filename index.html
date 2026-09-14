@@ -37,18 +37,17 @@
 
     <!-- Header Institucional -->
     <header class="bg-emerald-900 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center shadow-inner border border-emerald-600 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center shadow-inner border border-emerald-600">
                     <i class="fa-solid fa-graduation-cap text-emerald-200 text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-base sm:text-lg tracking-wide leading-tight whitespace-nowrap">CECyTE Plantel 18</h1>
-                    <p class="hidden sm:block text-xs text-emerald-300 font-medium">Sistema Inteligente de Horarios y Alertas</p>
+                    <h1 class="font-bold text-lg tracking-wide leading-tight">CECyTE Plantel 18</h1>
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
+            <div class="flex items-center space-x-4">
                 <!-- Live Clock -->
                 <div class="hidden sm:flex items-center space-x-2 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-800 text-xs font-mono">
                     <i class="fa-regular fa-clock text-emerald-400"></i>
@@ -57,13 +56,13 @@
                 
                 <!-- Role Switcher Tabs -->
                 <div class="bg-emerald-950 p-1 rounded-xl flex space-x-1 border border-emerald-800">
-                    <button onclick="switchView('student')" id="tab-student" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5 whitespace-nowrap">
+                    <button onclick="switchView('student')" id="tab-student" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5">
                         <i class="fa-solid fa-users"></i>
-                        <span>Alumnos</span>
+                        <span>Vista Alumnos</span>
                     </button>
-                    <button onclick="switchView('admin')" id="tab-admin" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-emerald-200 hover:text-white flex items-center space-x-1.5 whitespace-nowrap">
+                    <button onclick="switchView('admin')" id="tab-admin" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-emerald-200 hover:text-white flex items-center space-x-1.5">
                         <i class="fa-solid fa-gears"></i>
-                        <span>Admin</span>
+                        <span>Admin Horarios</span>
                     </button>
                 </div>
             </div>
