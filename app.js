@@ -208,6 +208,11 @@ function changeGroup(group) {
     renderStudentSchedule();
     updateCurrentClassCard();
     checkScheduleAndNotify();
+
+    // Si ya tenia notificaciones activadas, mueve la suscripcion push al grupo nuevo
+    if ('Notification' in window && Notification.permission === 'granted') {
+        subscribeToPush();
+    }
 }
 
 // Admin agrega un grupo nuevo
@@ -752,21 +757,65 @@ async function sendSystemNotification(title, body) {
     }
 }
 
+// Recuerda a que grupo esta suscrito este dispositivo (para poder moverlo si cambia de grupo)
+let lastSubscribedGroup = localStorage.getItem('cecyte_push_group') || null;
+
 function requestNotificationPermission() {
     if (!('Notification' in window)) {
         updateNotificationStatus('No soportado en este navegador');
         return;
     }
     registerServiceWorker().then(() => {
-        Notification.requestPermission().then(permission => {
+        Notification.requestPermission().then(async permission => {
             if (permission === 'granted') {
                 updateNotificationStatus('Activado en este dispositivo');
-                showNotificationToast('Notificaciones Activadas', 'Este dispositivo recibirá avisos de cambio de clase.', 'success');
+                showNotificationToast('Notificaciones Activadas', 'Este dispositivo recibirá avisos de cambio de clase, incluso con la página cerrada.', 'success');
+                await subscribeToPush();
             } else {
                 updateNotificationStatus('Permiso denegado');
             }
         });
     });
+}
+
+// Convierte la llave publica VAPID (texto) al formato que pide pushManager.subscribe
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+// Suscribe este dispositivo a notificaciones push reales (funcionan con la pagina cerrada)
+async function subscribeToPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!currentStudentGroup) return; // sin grupo elegido todavia, no hay a quien avisar
+
+    try {
+        const reg = swRegistration || await navigator.serviceWorker.ready;
+        const keyRes = await fetch('/api/push/public-key');
+        const { publicKey } = await keyRes.json();
+        if (!publicKey) return;
+
+        let subscription = await reg.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicKey)
+            });
+        }
+
+        await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group: currentStudentGroup, previousGroup: lastSubscribedGroup, subscription })
+        });
+
+        lastSubscribedGroup = currentStudentGroup;
+        localStorage.setItem('cecyte_push_group', currentStudentGroup);
+    } catch (err) {
+        console.error('No se pudo suscribir a notificaciones push:', err);
+    }
 }
 
 function updateNotificationStatus(text) {
@@ -940,6 +989,7 @@ window.onload = async function() {
 
     if ('Notification' in window && Notification.permission === 'granted') {
         updateNotificationStatus('Activado en este dispositivo');
+        subscribeToPush(); // refresca la suscripcion push por si acaso
     }
 
     checkScheduleAndNotify();

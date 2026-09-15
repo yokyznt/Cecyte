@@ -63,3 +63,44 @@ base de datos y las contraseñas configuradas.
   en Vercel y vuelve a desplegar (Redeploy). No hay que tocar código.
 - La sesión de admin dura 12 horas en el dispositivo donde entraste; después
   te vuelve a pedir la contraseña.
+
+## 7. Notificaciones push reales (con la página cerrada)
+
+Esto es aparte del resto — hace que las notificaciones lleguen aunque nadie
+tenga la página abierta en su celular.
+
+### Variables de entorno nuevas
+
+Agrega estas en Vercel (Settings → Environment Variables), igual que
+`ADMIN_PASSWORD`:
+
+| Nombre | Valor |
+|---|---|
+| `VAPID_PUBLIC_KEY` | `BD8vIRFQ1Z8tjXIbvDlRD5ht0CzEhAIKk80cLYBWDUapLC2sFMgD_OPwok3G7UD7R9FOcxzBmk0Ki7zfx2bBP4k` |
+| `VAPID_PRIVATE_KEY` | `Z1cTqOgMxJJeIkSOaNCDuZJ-C1qfly7KjDEppU7PUvU` |
+| `VAPID_SUBJECT` | `mailto:tu-correo@ejemplo.com` (pon un correo real tuyo) |
+| `CRON_SECRET` | `adceaa2162599e16a40fbf4b7e99d361cb2f143c507b7866` |
+
+Guarda y vuelve a desplegar (Redeploy) para que las tome.
+
+### Configura el "cron" externo gratis
+
+Vercel gratis solo deja correr sus propios cron jobs una vez al día, así que
+usamos un servicio externo que le toque la puerta a tu página cada rato:
+
+1. Entra a [cron-job.org](https://cron-job.org) y crea una cuenta gratis.
+2. Crea un cronjob nuevo con esta URL (cambia `tu-dominio` por el real de
+   Vercel, y deja el `secret` tal cual):
+   ```
+   https://tu-dominio.vercel.app/api/cron/check-schedule?secret=adceaa2162599e16a40fbf4b7e99d361cb2f143c507b7866
+   ```
+3. Ponle que se ejecute cada 10 minutos (o cada 5 si quieres más precisión).
+4. Guarda. Con eso, cada 10 minutos se revisa solo si cambió de clase y se
+   manda el push a quien lo tenga activado.
+
+### Cómo lo activan los alumnos
+
+Igual que antes: en la vista de Alumnos, botón "Activar Notificaciones".
+Ahora, además de pedir permiso, el celular se suscribe de verdad — por eso
+va a funcionar aunque cierren la página o apaguen la pantalla.
+
