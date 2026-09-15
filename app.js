@@ -824,12 +824,11 @@ function updateNotificationStatus(text) {
 }
 
 // Botón "Probar" del admin: manda una alerta de ejemplo sin esperar a que cambie la hora real.
+// Botón "Probar" del alumno: manda una notificación de prueba genérica, sin inventar clases falsas
 function testNotification() {
-    fireClassChangeAlert(
-        { subject: 'Cálculo Diferencial', teacher: 'Ing. Roberto Gómez' },
-        null,
-        { subject: 'Programación Orientada a Objetos', teacher: 'Lic. Javier Estrada' }
-    );
+    const mensaje = 'Esto es una notificación de prueba. Si la ves, ya quedó funcionando en este dispositivo.';
+    showNotificationToast('Notificación de Prueba', mensaje, 'info');
+    sendSystemNotification('CECyTE Plantel 18 (Prueba)', mensaje);
 }
 
 function renderAlertLog() {
