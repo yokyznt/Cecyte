@@ -276,6 +276,23 @@
                 </div>
             </div>
 
+            <!-- Importar Horario por codigo -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
+                    <i class="fa-solid fa-file-import text-emerald-600"></i> Importar Horario (pega el código)
+                </h4>
+                <p class="text-xs text-slate-500 mb-3 max-w-2xl">Mándame por chat una foto de un horario y te devuelvo un código para pegar aquí abajo. Le das "Importar y Guardar" y se agrega TODO junto a la base de datos, sin capturarlo materia por materia. Si mencionas un grupo que no existe todavía, se crea solo.</p>
+                <textarea id="import-json" rows="7" placeholder='[
+  { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
+]' class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                <div class="flex items-center justify-between gap-4 mt-3">
+                    <p id="import-status" class="text-xs text-slate-500"></p>
+                    <button type="button" onclick="importSchedule()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
+                        <i class="fa-solid fa-upload"></i> Importar y Guardar
+                    </button>
+                </div>
+            </div>
+
             <!-- Notificaciones Automaticas -->
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">

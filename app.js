@@ -811,6 +811,98 @@ function showNotificationToast(title, message, type, iconColor = 'bg-emerald-600
     }, 5000);
 }
 
+// ==================== Importar Horario por codigo (JSON) ====================
+// Recibe una lista de materias pegada en texto (la genero yo leyendo una foto
+// del horario que me mandes por chat) y las agrega todas de un jalón.
+async function importSchedule() {
+    const textarea = document.getElementById('import-json');
+    const statusEl = document.getElementById('import-status');
+    statusEl.className = 'text-xs text-slate-500';
+    statusEl.innerText = '';
+
+    let parsed;
+    try {
+        parsed = JSON.parse(textarea.value);
+    } catch (err) {
+        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.innerText = 'Eso no es un código válido — revisa que sea JSON correcto (llaves, comillas, comas).';
+        return;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.innerText = 'El código debe ser una lista de materias entre corchetes [ ].';
+        return;
+    }
+
+    const validTimeKeys = timeSlots.filter(s => !s.receso).map(s => s.key);
+    const errors = [];
+    parsed.forEach((item, i) => {
+        if (!item.group || !item.day || !item.time || !item.subject || !item.teacher) {
+            errors.push(`Fila ${i + 1}: le falta algún dato (group, day, time, subject o teacher).`);
+            return;
+        }
+        if (!daysOfWeek.includes(item.day)) errors.push(`Fila ${i + 1}: el día "${item.day}" no es válido.`);
+        if (!validTimeKeys.includes(item.time)) errors.push(`Fila ${i + 1}: la hora "${item.time}" no coincide con ningún bloque del horario.`);
+    });
+
+    if (errors.length > 0) {
+        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.innerHTML = errors.slice(0, 6).join('<br>');
+        return;
+    }
+
+    statusEl.className = 'text-xs text-slate-500';
+    statusEl.innerText = 'Importando...';
+
+    // Crea sobre la marcha los grupos mencionados que todavia no existan
+    const newGroups = [...new Set(parsed.map(i => i.group))].filter(g => !groupsList.includes(g));
+    for (const g of newGroups) {
+        try {
+            const res = await fetch('/api/groups', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ name: g })
+            });
+            const data = await res.json();
+            if (res.ok) groupsList = data.groups;
+        } catch (err) {
+            // seguimos aunque falle la creacion de un grupo suelto
+        }
+    }
+    populateGroupSelectors();
+    renderGroupsList();
+
+    // Agrega las materias nuevas con ids consecutivos
+    const previousState = scheduleDatabase;
+    let nextId = scheduleDatabase.length > 0 ? Math.max(...scheduleDatabase.map(i => i.id)) + 1 : 1;
+    const newItems = parsed.map(item => ({
+        id: nextId++,
+        group: item.group,
+        day: item.day,
+        time: item.time,
+        subject: item.subject,
+        teacher: item.teacher
+    }));
+    scheduleDatabase = [...scheduleDatabase, ...newItems];
+
+    const saved = await saveScheduleToServer();
+    if (!saved) {
+        scheduleDatabase = previousState;
+        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.innerText = 'No se pudo guardar en el servidor. Intenta de nuevo.';
+        return;
+    }
+
+    textarea.value = '';
+    statusEl.className = 'text-xs text-emerald-700 font-semibold';
+    statusEl.innerText = `Se importaron ${newItems.length} materias correctamente.`;
+    renderAdminTable();
+    renderStudentSchedule();
+    showNotificationToast('Horario Importado', `Se agregaron ${newItems.length} materias.`, 'success');
+}
+
 // Initial render on load
 window.onload = async function() {
     await loadGroups();   // trae la lista de grupos (necesaria para filtrar el horario)
