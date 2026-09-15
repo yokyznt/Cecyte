@@ -13,11 +13,11 @@ const SCHEDULE_KEY = 'cecyte_schedule';
 
 // Horario de ejemplo con el que arranca la primera vez (antes de que el admin guarde algo)
 const DEFAULT_SCHEDULE = [
-    { id: 1, day: 'Lunes', time: '07:00 - 08:00', subject: 'Cálculo Diferencial', teacher: 'Ing. Roberto Gómez' },
-    { id: 2, day: 'Lunes', time: '08:00 - 08:45', subject: 'Física II', teacher: 'Dra. Carmen Solís' },
-    { id: 3, day: 'Lunes', time: '09:15 - 10:00', subject: 'Programación Orientada a Objetos', teacher: 'Lic. Javier Estrada' },
-    { id: 4, day: 'Martes', time: '07:00 - 08:00', subject: 'Programación Orientada a Objetos', teacher: 'Lic. Javier Estrada' },
-    { id: 5, day: 'Martes', time: '08:00 - 08:45', subject: 'Inglés IV', teacher: 'Prof. Ana Luisa' }
+    { id: 1, group: '501 Programación', day: 'Lunes', time: '07:00 - 08:00', subject: 'Cálculo Diferencial', teacher: 'Ing. Roberto Gómez' },
+    { id: 2, group: '501 Programación', day: 'Lunes', time: '08:00 - 08:45', subject: 'Física II', teacher: 'Dra. Carmen Solís' },
+    { id: 3, group: '501 Programación', day: 'Lunes', time: '09:15 - 10:00', subject: 'Programación Orientada a Objetos', teacher: 'Lic. Javier Estrada' },
+    { id: 4, group: '501 Programación', day: 'Martes', time: '07:00 - 08:00', subject: 'Programación Orientada a Objetos', teacher: 'Lic. Javier Estrada' },
+    { id: 5, group: '501 Programación', day: 'Martes', time: '08:00 - 08:45', subject: 'Inglés IV', teacher: 'Prof. Ana Luisa' }
 ];
 
 export default async function handler(req, res) {

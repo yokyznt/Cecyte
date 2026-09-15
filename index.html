@@ -91,10 +91,17 @@
                     <p class="text-emerald-100 text-sm max-w-xl">Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
                 </div>
 
-                <!-- Grupo (unico) -->
+                <!-- Selector de Grupo -->
                 <div class="relative z-10 bg-emerald-950/80 p-4 rounded-xl border border-emerald-700/60 backdrop-blur-md shadow-lg min-w-[260px]">
-                    <span class="block text-xs font-medium text-emerald-300 mb-1.5 uppercase tracking-wider">Grupo:</span>
-                    <span class="block w-full bg-emerald-900 text-white text-sm font-semibold rounded-lg px-3 py-2.5 border border-emerald-700">501 Programación</span>
+                    <label for="group-selector" class="block text-xs font-medium text-emerald-300 mb-1.5 uppercase tracking-wider">Seleccionar Grupo:</label>
+                    <div class="relative">
+                        <select id="group-selector" onchange="changeGroup(this.value)" class="w-full bg-emerald-900 text-white text-sm font-semibold rounded-lg px-3 py-2.5 appearance-none border border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-10 cursor-pointer">
+                            <option value="">Cargando grupos...</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-300">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -250,6 +257,25 @@
                 </div>
             </div>
 
+            <!-- Gestion de Grupos -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
+                    <i class="fa-solid fa-users text-emerald-600"></i> Gestión de Grupos
+                </h4>
+                <p class="text-xs text-slate-500 mb-4 max-w-xl">Agrega grupos nuevos para próximos años, o borra los que ya no uses. Borrar un grupo también borra todas sus materias del horario.</p>
+
+                <form onsubmit="addGroup(event)" class="flex gap-2 mb-4">
+                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
+                        <i class="fa-solid fa-plus"></i> Agregar Grupo
+                    </button>
+                </form>
+
+                <div id="groups-list" class="flex flex-wrap gap-2">
+                    <!-- Injected by JavaScript -->
+                </div>
+            </div>
+
             <!-- Notificaciones Automaticas -->
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
@@ -283,6 +309,9 @@
                         </span>
                         <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
+                    <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="ALL">Todos los Grupos</option>
+                    </select>
                 </div>
                 <div class="text-xs text-slate-500">
                     Mostrando <span id="admin-count" class="font-bold text-slate-700">0</span> registros en base de datos
@@ -295,6 +324,7 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                <th class="py-3.5 px-4">Grupo</th>
                                 <th class="py-3.5 px-4">Día</th>
                                 <th class="py-3.5 px-4">Hora</th>
                                 <th class="py-3.5 px-4">Materia</th>
@@ -326,6 +356,12 @@
             </div>
             <form id="schedule-form" onsubmit="saveScheduleItem(event)" class="p-6 space-y-4">
                 <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Grupo:</label>
+                    <select id="form-group" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <!-- Injected by JavaScript -->
+                    </select>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Día de la Semana:</label>

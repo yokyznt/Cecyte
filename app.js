@@ -5,6 +5,11 @@
 // para que todos los que abran la pagina vean lo mismo.
 let scheduleDatabase = [];
 
+// Lista de grupos que existen (se administra desde el panel de admin, vive en /api/groups)
+let groupsList = [];
+// Grupo que esta viendo este alumno en este celular (se recuerda con localStorage)
+let currentStudentGroup = localStorage.getItem('cecyte_group') || '';
+
 // Bloques horarios. "key" es lo que se guarda en cada materia, "label" es lo que se muestra.
 // El bloque de receso no tiene materias: siempre queda en blanco.
 const timeSlots = [
@@ -53,7 +58,7 @@ function updateCurrentClassCard() {
         return;
     }
 
-    const currentClass = slot.receso ? null : findClass(day, slot.key);
+    const currentClass = slot.receso ? null : findClass(currentStudentGroup, day, slot.key);
     const [startStr, endStr] = slot.key.split(' - ');
     const start = timeToMinutes(startStr);
     const end = timeToMinutes(endStr);
@@ -93,7 +98,7 @@ function findNextClassLabel(day, afterSlotKey = null) {
     for (; index < timeSlots.length; index++) {
         const slot = timeSlots[index];
         if (slot.receso) continue;
-        const match = findClass(day, slot.key);
+        const match = findClass(currentStudentGroup, day, slot.key);
         if (match) return `${match.subject} (${slot.key})`;
     }
     return null;
@@ -129,6 +134,143 @@ async function saveScheduleToServer() {
         return false;
     }
     return res.ok;
+}
+
+// ==================== Grupos ====================
+// Trae la lista de grupos del servidor y actualiza los selectores en pantalla.
+async function loadGroups() {
+    try {
+        const res = await fetch('/api/groups');
+        if (!res.ok) return;
+        groupsList = await res.json();
+    } catch (err) {
+        console.error('No se pudieron cargar los grupos:', err);
+        groupsList = [];
+    }
+
+    // Si el grupo guardado en este celular ya no existe, o no hay ninguno guardado, usa el primero disponible
+    if (!groupsList.includes(currentStudentGroup)) {
+        currentStudentGroup = groupsList[0] || '';
+    }
+
+    populateGroupSelectors();
+    renderGroupsList();
+}
+
+// Llena el selector de la vista de alumnos, el filtro del admin y el select del formulario
+function populateGroupSelectors() {
+    const studentSelect = document.getElementById('group-selector');
+    if (studentSelect) {
+        studentSelect.innerHTML = groupsList.length
+            ? groupsList.map(g => `<option value="${g}" ${g === currentStudentGroup ? 'selected' : ''}>${g}</option>`).join('')
+            : '<option value="">Sin grupos todavía</option>';
+    }
+
+    const adminFilter = document.getElementById('admin-group-filter');
+    if (adminFilter) {
+        const current = adminFilter.value || 'ALL';
+        adminFilter.innerHTML = '<option value="ALL">Todos los Grupos</option>' +
+            groupsList.map(g => `<option value="${g}">${g}</option>`).join('');
+        adminFilter.value = groupsList.includes(current) || current === 'ALL' ? current : 'ALL';
+    }
+
+    const formGroup = document.getElementById('form-group');
+    if (formGroup) {
+        formGroup.innerHTML = groupsList.length
+            ? groupsList.map(g => `<option value="${g}">${g}</option>`).join('')
+            : '<option value="">Agrega un grupo primero</option>';
+    }
+}
+
+// El alumno cambia de grupo en su celular
+function changeGroup(group) {
+    currentStudentGroup = group;
+    localStorage.setItem('cecyte_group', group);
+    lastActiveSlotKey = undefined; // evita un aviso falso al cambiar de grupo a medio bloque
+    renderStudentSchedule();
+    updateCurrentClassCard();
+    checkScheduleAndNotify();
+}
+
+// Admin agrega un grupo nuevo
+async function addGroup(e) {
+    e.preventDefault();
+    const input = document.getElementById('new-group-name');
+    const name = input.value.trim();
+    if (!name) return;
+
+    try {
+        const res = await fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showNotificationToast('No se pudo agregar', data.error || 'Intenta de nuevo.', 'warning');
+            return;
+        }
+
+        groupsList = data.groups;
+        input.value = '';
+        populateGroupSelectors();
+        renderGroupsList();
+        showNotificationToast('Grupo Agregado', `Se agregó el grupo ${name}.`, 'success');
+    } catch (err) {
+        showNotificationToast('Error', 'No se pudo conectar con el servidor.', 'warning');
+    }
+}
+
+// Admin borra un grupo (y de paso todas sus materias)
+async function deleteGroup(name) {
+    if (!confirm(`¿Seguro que quieres eliminar el grupo "${name}"? También se van a borrar todas sus materias del horario.`)) return;
+
+    try {
+        const res = await fetch('/api/groups', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showNotificationToast('No se pudo eliminar', data.error || 'Intenta de nuevo.', 'warning');
+            return;
+        }
+
+        groupsList = data.groups;
+        scheduleDatabase = data.schedule;
+        populateGroupSelectors();
+        renderGroupsList();
+        renderAdminTable();
+        renderStudentSchedule();
+        showNotificationToast('Grupo Eliminado', `Se eliminó el grupo ${name} y sus materias.`, 'warning');
+    } catch (err) {
+        showNotificationToast('Error', 'No se pudo conectar con el servidor.', 'warning');
+    }
+}
+
+// Pinta los "chips" de grupos existentes en el panel de admin, con boton para borrar
+function renderGroupsList() {
+    const container = document.getElementById('groups-list');
+    if (!container) return;
+
+    if (groupsList.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic">Todavía no hay grupos. Agrega uno arriba.</p>';
+        return;
+    }
+
+    container.innerHTML = groupsList.map(g => `
+        <span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg pl-3 pr-2 py-1.5 text-xs font-semibold">
+            ${g}
+            <button type="button" onclick="deleteGroup('${g.replace(/'/g, "\\'")}')" class="text-emerald-400 hover:text-rose-600 transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </span>
+    `).join('');
 }
 
 // Switch between Student View and Admin View
@@ -181,6 +323,8 @@ function showAdminContent() {
     document.getElementById('admin-login').classList.add('hidden');
     document.getElementById('admin-content').classList.remove('hidden');
     document.getElementById('admin-content').classList.add('flex');
+    populateGroupSelectors();
+    renderGroupsList();
     renderAdminTable();
 }
 
@@ -236,7 +380,7 @@ function renderStudentSchedule() {
 
             // El receso siempre queda en blanco
             if (!slot.receso) {
-                const match = scheduleDatabase.find(i => i.day === day && i.time === slot.key);
+                const match = scheduleDatabase.find(i => i.group === currentStudentGroup && i.day === day && i.time === slot.key);
                 if (match) {
                     td.innerHTML = `
                         <div class="p-2 rounded-xl bg-emerald-50/80 border border-emerald-100 shadow-2xs">
@@ -302,7 +446,7 @@ function renderMobileSchedule() {
 
         // El receso siempre queda en blanco
         if (!slot.receso) {
-            const match = scheduleDatabase.find(i => i.day === mobileActiveDay && i.time === slot.key);
+            const match = scheduleDatabase.find(i => i.group === currentStudentGroup && i.day === mobileActiveDay && i.time === slot.key);
             if (match) {
                 contentCol.innerHTML = `
                     <div class="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100">
@@ -324,15 +468,19 @@ function renderAdminTable(filterQuery = '') {
     const tbody = document.getElementById('admin-table-body');
     tbody.innerHTML = '';
 
+    const groupFilter = document.getElementById('admin-group-filter')?.value || 'ALL';
+
     let filtered = scheduleDatabase.filter(item => {
-        return item.subject.toLowerCase().includes(filterQuery.toLowerCase()) ||
+        const matchesQuery = item.subject.toLowerCase().includes(filterQuery.toLowerCase()) ||
                item.teacher.toLowerCase().includes(filterQuery.toLowerCase());
+        const matchesGroup = groupFilter === 'ALL' || item.group === groupFilter;
+        return matchesQuery && matchesGroup;
     });
 
     document.getElementById('admin-count').innerText = filtered.length;
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 italic">No se encontraron registros en la base de datos.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 italic">No se encontraron registros en la base de datos.</td></tr>`;
         return;
     }
 
@@ -340,6 +488,7 @@ function renderAdminTable(filterQuery = '') {
         let tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition';
         tr.innerHTML = `
+            <td class="py-3 px-4 font-bold text-emerald-700">${item.group}</td>
             <td class="py-3 px-4">${item.day}</td>
             <td class="py-3 px-4 font-mono">${item.time}</td>
             <td class="py-3 px-4 font-bold text-slate-800">${item.subject}</td>
@@ -377,6 +526,7 @@ function editScheduleItem(id) {
 
     document.getElementById('modal-title').innerText = 'Editar Registro de Horario';
     document.getElementById('edit-id').value = item.id;
+    document.getElementById('form-group').value = item.group;
     document.getElementById('form-day').value = item.day;
     document.getElementById('form-time').value = item.time;
     document.getElementById('form-subject').value = item.subject;
@@ -389,10 +539,16 @@ function editScheduleItem(id) {
 async function saveScheduleItem(e) {
     e.preventDefault();
     const editId = document.getElementById('edit-id').value;
+    const group = document.getElementById('form-group').value;
     const day = document.getElementById('form-day').value;
     const time = document.getElementById('form-time').value;
     const subject = document.getElementById('form-subject').value;
     const teacher = document.getElementById('form-teacher').value;
+
+    if (!group) {
+        showNotificationToast('Falta el grupo', 'Agrega un grupo primero desde "Gestión de Grupos".', 'warning');
+        return;
+    }
 
     const previousState = scheduleDatabase; // por si hay que revertir
     let successMessage;
@@ -402,14 +558,14 @@ async function saveScheduleItem(e) {
         const index = scheduleDatabase.findIndex(i => i.id == editId);
         if (index !== -1) {
             scheduleDatabase = scheduleDatabase.map((item, i) =>
-                i === index ? { id: Number(editId), day, time, subject, teacher } : item
+                i === index ? { id: Number(editId), group, day, time, subject, teacher } : item
             );
             successMessage = `Se modificó correctamente la materia ${subject}`;
         }
     } else {
         // Insert
         const newId = scheduleDatabase.length > 0 ? Math.max(...scheduleDatabase.map(i => i.id)) + 1 : 1;
-        scheduleDatabase = [...scheduleDatabase, { id: newId, day, time, subject, teacher }];
+        scheduleDatabase = [...scheduleDatabase, { id: newId, group, day, time, subject, teacher }];
         successMessage = `Se agregó la materia ${subject}`;
     }
 
@@ -478,8 +634,8 @@ function getCurrentSlot() {
     return null;
 }
 
-function findClass(day, slotKey) {
-    return scheduleDatabase.find(i => i.day === day && i.time === slotKey);
+function findClass(group, day, slotKey) {
+    return scheduleDatabase.find(i => i.group === group && i.day === day && i.time === slotKey);
 }
 
 // Se ejecuta cada 20 segundos: detecta si cambiamos de bloque y, si aplica, dispara la alerta.
@@ -496,8 +652,8 @@ function checkScheduleAndNotify() {
 
     if (currentKey !== lastActiveSlotKey) {
         const prevSlot = timeSlots.find(s => s.key === lastActiveSlotKey);
-        const prevClass = (day && prevSlot && !prevSlot.receso) ? findClass(day, prevSlot.key) : null;
-        const nextClass = (day && slot && !slot.receso) ? findClass(day, slot.key) : null;
+        const prevClass = (day && prevSlot && !prevSlot.receso) ? findClass(currentStudentGroup, day, prevSlot.key) : null;
+        const nextClass = (day && slot && !slot.receso) ? findClass(currentStudentGroup, day, slot.key) : null;
 
         // Solo avisamos si de verdad hay algo que contar (una clase que termina o una que empieza).
         if (prevClass || nextClass || (slot && slot.receso)) {
@@ -657,6 +813,7 @@ function showNotificationToast(title, message, type, iconColor = 'bg-emerald-600
 
 // Initial render on load
 window.onload = async function() {
+    await loadGroups();   // trae la lista de grupos (necesaria para filtrar el horario)
     await loadSchedule(); // trae el horario real del servidor
     await registerServiceWorker();
 
@@ -669,4 +826,5 @@ window.onload = async function() {
     checkAdminSession(); // por si ya habia sesion abierta y refresca la pestaña
     setInterval(checkScheduleAndNotify, 20000); // revisa cambio de clase cada 20 segundos
     setInterval(loadSchedule, 15000); // refresca el horario cada 15 segundos por si otro admin hizo cambios
+    setInterval(loadGroups, 15000); // refresca la lista de grupos por si se agrego/borro alguno
 }
