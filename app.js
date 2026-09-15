@@ -24,7 +24,23 @@ const timeSlots = [
     { key: '14:00 - 15:00', label: '14:00 - 15:00', receso: false }
 ];
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-let mobileActiveDay = 'Lunes'; // Dia mostrado en la vista de lista para celular
+let mobileActiveDay = 'Lunes'; // Dia mostrado en la vista de lista para celular (se ajusta al real en window.onload)
+
+// Calcula que dia debe abrir por default la vista movil: el dia de hoy si es Lunes-Viernes,
+// Lunes si es Sabado/Domingo, y tambien Lunes si ya es Viernes despues de la ultima clase.
+function getDefaultMobileDay() {
+    const day = getCurrentDaySpanish();
+    if (!day) return 'Lunes'; // Sabado o Domingo
+
+    if (day === 'Viernes') {
+        const now = new Date();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const finDeClases = timeToMinutes('15:00'); // hora en que termina el ultimo bloque
+        if (nowMinutes >= finDeClases) return 'Lunes';
+    }
+
+    return day;
+}
 
 // Live Clock updater + tarjeta "Estado Actual" (ambos con la hora real)
 setInterval(() => {
@@ -78,7 +94,9 @@ function updateCurrentClassCard() {
         teacherEl.innerHTML = '<i class="fa-solid fa-mug-hot text-emerald-600"></i> Disfruta tu receso';
     } else if (currentClass) {
         titleEl.innerText = currentClass.subject;
-        teacherEl.innerHTML = `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> ${currentClass.teacher}`;
+        teacherEl.innerHTML = currentClass.teacher
+            ? `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> ${currentClass.teacher}`
+            : `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —`;
     } else {
         titleEl.innerText = 'Hora libre';
         teacherEl.innerHTML = '<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —';
@@ -385,7 +403,7 @@ function renderStudentSchedule() {
                     td.innerHTML = `
                         <div class="p-2 rounded-xl bg-emerald-50/80 border border-emerald-100 shadow-2xs">
                             <span class="font-bold text-emerald-900 block">${match.subject}</span>
-                            <span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>
+                            ${match.teacher ? `<span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>` : ''}
                         </div>
                     `;
                 }
@@ -451,7 +469,7 @@ function renderMobileSchedule() {
                 contentCol.innerHTML = `
                     <div class="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100">
                         <span class="font-bold text-emerald-900 text-xs block">${match.subject}</span>
-                        <span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>
+                        ${match.teacher ? `<span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>` : ''}
                     </div>
                 `;
             }
@@ -492,7 +510,7 @@ function renderAdminTable(filterQuery = '') {
             <td class="py-3 px-4">${item.day}</td>
             <td class="py-3 px-4 font-mono">${item.time}</td>
             <td class="py-3 px-4 font-bold text-slate-800">${item.subject}</td>
-            <td class="py-3 px-4 text-slate-600">${item.teacher}</td>
+            <td class="py-3 px-4 text-slate-600">${item.teacher || '—'}</td>
             <td class="py-3 px-4 text-right space-x-2">
                 <button onclick="editScheduleItem(${item.id})" class="p-1.5 text-slate-400 hover:text-emerald-600 transition bg-slate-100 hover:bg-emerald-50 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
                 <button onclick="deleteScheduleItem(${item.id})" class="p-1.5 text-slate-400 hover:text-rose-600 transition bg-slate-100 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash"></i></button>
@@ -838,8 +856,8 @@ async function importSchedule() {
     const validTimeKeys = timeSlots.filter(s => !s.receso).map(s => s.key);
     const errors = [];
     parsed.forEach((item, i) => {
-        if (!item.group || !item.day || !item.time || !item.subject || !item.teacher) {
-            errors.push(`Fila ${i + 1}: le falta algún dato (group, day, time, subject o teacher).`);
+        if (!item.group || !item.day || !item.time || !item.subject) {
+            errors.push(`Fila ${i + 1}: le falta algún dato (group, day, time o subject). El teacher sí puede venir vacío.`);
             return;
         }
         if (!daysOfWeek.includes(item.day)) errors.push(`Fila ${i + 1}: el día "${item.day}" no es válido.`);
@@ -874,18 +892,28 @@ async function importSchedule() {
     populateGroupSelectors();
     renderGroupsList();
 
-    // Agrega las materias nuevas con ids consecutivos
+    // Agrega materias nuevas y REEMPLAZA las que ya ocupaban el mismo grupo+dia+hora (evita duplicados encimados)
     const previousState = scheduleDatabase;
     let nextId = scheduleDatabase.length > 0 ? Math.max(...scheduleDatabase.map(i => i.id)) + 1 : 1;
-    const newItems = parsed.map(item => ({
-        id: nextId++,
-        group: item.group,
-        day: item.day,
-        time: item.time,
-        subject: item.subject,
-        teacher: item.teacher
-    }));
-    scheduleDatabase = [...scheduleDatabase, ...newItems];
+    let workingDatabase = scheduleDatabase;
+    let addedCount = 0;
+    let replacedCount = 0;
+
+    parsed.forEach(item => {
+        const clean = { group: item.group, day: item.day, time: item.time, subject: item.subject, teacher: item.teacher || '' };
+        const existingIndex = workingDatabase.findIndex(i => i.group === clean.group && i.day === clean.day && i.time === clean.time);
+
+        if (existingIndex !== -1) {
+            const existingId = workingDatabase[existingIndex].id;
+            workingDatabase = workingDatabase.map((i, idx) => idx === existingIndex ? { id: existingId, ...clean } : i);
+            replacedCount++;
+        } else {
+            workingDatabase = [...workingDatabase, { id: nextId++, ...clean }];
+            addedCount++;
+        }
+    });
+
+    scheduleDatabase = workingDatabase;
 
     const saved = await saveScheduleToServer();
     if (!saved) {
@@ -897,14 +925,15 @@ async function importSchedule() {
 
     textarea.value = '';
     statusEl.className = 'text-xs text-emerald-700 font-semibold';
-    statusEl.innerText = `Se importaron ${newItems.length} materias correctamente.`;
+    statusEl.innerText = `Listo: ${addedCount} materias nuevas agregadas` + (replacedCount ? `, ${replacedCount} reemplazadas (ya ocupaban ese horario).` : '.');
     renderAdminTable();
     renderStudentSchedule();
-    showNotificationToast('Horario Importado', `Se agregaron ${newItems.length} materias.`, 'success');
+    showNotificationToast('Horario Importado', `${addedCount} agregadas, ${replacedCount} reemplazadas.`, 'success');
 }
 
 // Initial render on load
 window.onload = async function() {
+    mobileActiveDay = getDefaultMobileDay(); // abre en el dia real de hoy
     await loadGroups();   // trae la lista de grupos (necesaria para filtrar el horario)
     await loadSchedule(); // trae el horario real del servidor
     await registerServiceWorker();
