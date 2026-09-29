@@ -1,481 +1,444 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f3d2b">
+    <meta name="description" content="Horario de clases del CECyTE Plantel 18: qué materia va ahora, cuál sigue y avisos de cambio de clase.">
     <title>CECyTE Plantel 18 - Control de Horarios y Notificaciones</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        cecyte: {
-                            primary: '#047857', // Emerald green representative of institutional green
-                            dark: '#065f46',
-                            light: '#10b981',
-                            accent: '#f59e0b',
-                            darkbg: '#0f172a',
-                            card: '#1e293b'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b93b'/%3E%3Cpath d='M16 7 4 13l12 6 12-6z' fill='%230f3d2b'/%3E%3Cpath d='M9 17v4c0 2 3 4 7 4s7-2 7-4v-4l-7 3.5z' fill='%230f3d2b'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-slate-50 text-slate-800 h-full flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
+<body>
 
-    <!-- Header Institucional -->
-    <header class="bg-emerald-900 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center shadow-inner border border-emerald-600">
-                    <i class="fa-solid fa-graduation-cap text-emerald-200 text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-wide leading-tight">CECyTE Plantel 18</h1>
-                </div>
+    <!-- Sprite de iconos (trazo uniforme de 2px) -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+        <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+        <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+        <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+        <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+        <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+    </svg>
+
+    <!-- Encabezado institucional -->
+    <header class="site-header">
+        <div class="container site-header__inner">
+            <div class="brand">
+                <div class="brand__mark"><svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg></div>
+                <h1 class="brand__name">CECyTE Plantel 18</h1>
             </div>
-            
-            <div class="flex items-center space-x-4">
-                <!-- Live Clock -->
-                <div class="hidden sm:flex items-center space-x-2 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-800 text-xs font-mono">
-                    <i class="fa-regular fa-clock text-emerald-400"></i>
+
+            <div class="header-tools">
+                <div class="clock" role="timer" aria-label="Hora actual">
+                    <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
                     <span id="live-clock">--:--:--</span>
                 </div>
-                
-                <!-- Role Switcher Tabs -->
-                <div class="bg-emerald-950 p-1 rounded-xl flex space-x-1 border border-emerald-800">
-                    <button onclick="switchView('student')" id="tab-student" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5">
-                        <i class="fa-solid fa-users"></i>
+
+                <nav class="seg" aria-label="Cambiar de vista">
+                    <button type="button" onclick="switchView('student')" id="tab-student" class="seg__btn" aria-pressed="true" aria-label="Vista Alumnos">
+                        <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>
                         <span>Vista Alumnos</span>
                     </button>
-                    <button onclick="switchView('admin')" id="tab-admin" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-emerald-200 hover:text-white flex items-center space-x-1.5">
-                        <i class="fa-solid fa-gears"></i>
+                    <button type="button" onclick="switchView('admin')" id="tab-admin" class="seg__btn" aria-pressed="false" aria-label="Admin Horarios">
+                        <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>
                         <span>Admin Horarios</span>
                     </button>
-                </div>
+                </nav>
             </div>
         </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+    <main class="container page">
 
-        <!-- Notification Toast Area -->
-        <div id="notification-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-3 max-w-sm w-full pointer-events-none"></div>
+        <!-- Avisos flotantes -->
+        <div id="notification-container" class="toasts" role="status" aria-live="polite"></div>
 
-        <!-- ==================== VISTA ESTUDIANTE / GRUPOS ==================== -->
-        <div id="view-student" class="flex flex-col gap-6">
-            
-            <!-- Hero Banner -->
-            <div class="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none"></div>
-                
-                <div class="relative z-10 space-y-2">
-                    <span class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-700/60 text-emerald-200 border border-emerald-600/50">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>Notificaciones Activas en Tiempo Real</span>
-                    </span>
-                    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Panel de Control Estudiantil</h2>
-                    <p class="text-emerald-100 text-sm max-w-xl">Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
+        <!-- ==================== VISTA ESTUDIANTE ==================== -->
+        <div id="view-student" class="stack view">
+
+            <div class="intro">
+                <div>
+                    <h2 class="intro__title">Panel de Control Estudiantil</h2>
+                    <p class="intro__text">Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
                 </div>
-
-                <!-- Selector de Grupo -->
-                <div class="relative z-10 bg-emerald-950/80 p-4 rounded-xl border border-emerald-700/60 backdrop-blur-md shadow-lg min-w-[260px]">
-                    <label for="group-selector" class="block text-xs font-medium text-emerald-300 mb-1.5 uppercase tracking-wider">Seleccionar Grupo:</label>
-                    <div class="relative">
-                        <select id="group-selector" onchange="changeGroup(this.value)" class="w-full bg-emerald-900 text-white text-sm font-semibold rounded-lg px-3 py-2.5 appearance-none border border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-10 cursor-pointer">
-                            <option value="">Cargando grupos...</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-emerald-300">
-                            <i class="fa-solid fa-chevron-down text-xs"></i>
-                        </div>
-                    </div>
+                <div class="group-pick">
+                    <label for="group-selector" class="field__label">Seleccionar Grupo</label>
+                    <select id="group-selector" onchange="changeGroup(this.value)" class="select">
+                        <option value="">Cargando grupos...</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Estado Actual -->
-            <div class="grid grid-cols-1 gap-6">
-
-                <!-- Current Active Class Card -->
-                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full -z-0"></div>
-                    
-                    <div class="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
-                        <div>
-                            <span class="text-xs font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">Estado Actual</span>
-                            <h3 id="current-subject-title" class="text-2xl font-bold text-slate-900 mt-2">Cálculo Diferencial</h3>
-                            <p id="current-teacher-name" class="text-sm text-slate-600 flex items-center gap-1.5 mt-0.5">
-                                <i class="fa-solid fa-chalkboard-user text-emerald-600"></i> Ing. Roberto Gómez Sánchez
-                            </p>
-                        </div>
-                        <div class="flex flex-col items-end">
-                            <span class="text-xs text-slate-500 font-medium">Horario de clase:</span>
-                            <span id="current-subject-time" class="text-sm font-mono font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-lg mt-1">08:00 - 08:50 hrs</span>
-                        </div>
-                    </div>
-
-                    <!-- Countdown and Progress -->
-                    <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <div class="md:col-span-2 space-y-2">
-                            <div class="flex justify-between text-xs font-semibold text-slate-600">
-                                <span id="progress-label">Progreso de la clase actual</span>
-                                <span id="progress-percent">65%</span>
-                            </div>
-                            <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
-                                <div id="class-progress-bar" class="bg-emerald-600 h-full rounded-full transition-all duration-500" style="width: 65%;"></div>
-                            </div>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border border-slate-200 text-center shadow-sm">
-                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Tiempo Restante</span>
-                            <span id="countdown-timer" class="text-xl font-mono font-bold text-emerald-700">18:42</span>
-                        </div>
-                    </div>
-
-                    <!-- Next Class Mini Preview -->
-                    <div class="relative z-10 mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                        <div class="flex items-center space-x-2">
-                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                            <span class="font-medium">Siguiente clase:</span>
-                            <strong id="next-subject-name" class="text-slate-800">Física II (08:50 - 09:40)</strong>
-                        </div>
+            <!-- Clase en curso -->
+            <section class="now" id="now-panel" data-state="none" aria-label="Estado actual">
+                <div class="now__main">
+                    <h3 id="current-subject-title" class="now__title">Cargando…</h3>
+                    <p id="current-teacher-name" class="now__teacher"></p>
+                    <div class="now__meta">
+                        <span id="now-state" class="now__state">Sin clase</span>
+                        <span id="current-subject-time" class="now__time">—</span>
                     </div>
                 </div>
 
-            </div>
+                <div class="now__side">
+                    <span class="now__count-label">Tiempo restante</span>
+                    <span id="countdown-timer" class="now__count" role="timer">--:--</span>
+                </div>
+
+                <div class="now__progress">
+                    <div class="now__progress-head">
+                        <span id="progress-label">Progreso de la clase actual</span>
+                        <b id="progress-percent">—</b>
+                    </div>
+                    <div class="track" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
+                        <div id="class-progress-bar" class="track__bar"></div>
+                    </div>
+                </div>
+
+                <ol id="day-strip" class="strip" aria-hidden="true"></ol>
+
+                <div class="now__next">
+                    <span>Siguiente clase:</span>
+                    <strong id="next-subject-name">—</strong>
+                </div>
+            </section>
 
             <!-- Notificaciones en este celular -->
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                        <i class="fa-solid fa-bell"></i>
-                    </div>
+            <section class="notify" aria-label="Notificaciones">
+                <div class="notify__who">
+                    <div class="notify__icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg></div>
                     <div>
-                        <h4 class="font-bold text-slate-800 text-sm">Recibe avisos de cambio de clase</h4>
-                        <p class="text-xs text-slate-500">Estado en este celular: <span id="notification-status" class="font-semibold text-slate-700">Sin activar</span></p>
+                        <h4 class="notify__title">Recibe avisos de cambio de clase</h4>
+                        <p class="notify__status">Estado en este celular: <strong id="notification-status">Sin activar</strong></p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <button type="button" onclick="requestNotificationPermission()" class="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer select-none">
-                        Activar Notificaciones
-                    </button>
-                    <button type="button" onclick="testNotification()" class="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer select-none">
-                        Probar
-                    </button>
+                <div class="notify__actions">
+                    <button type="button" onclick="requestNotificationPermission()" class="btn btn--primary">Activar Notificaciones</button>
+                    <button type="button" onclick="testNotification()" class="btn btn--secondary">Probar</button>
                 </div>
-            </div>
+            </section>
 
-            <!-- Tabla de horario -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                <div class="p-5 border-b border-slate-100 flex justify-between items-center gap-4">
-                    <h3 class="font-bold text-slate-800 text-base">Horario de Clases</h3>
-                    <span class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium border border-emerald-200">
-                        Actualizado hoy
-                    </span>
+            <!-- Horario -->
+            <section class="panel" aria-labelledby="schedule-heading">
+                <div class="panel__head">
+                    <h3 id="schedule-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Horario de Clases</h3>
+                    <span id="schedule-updated" class="badge">Cargando…</span>
                 </div>
 
-                <!-- Vista de escritorio/tablet: tabla completa -->
-                <div class="hidden md:block overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                <div id="schedule-empty" class="empty-state hidden">
+                    <strong>Este grupo todavía no tiene materias</strong>
+                    Cuando dirección capture el horario, aparecerá aquí.
+                </div>
+
+                <!-- Escritorio / tablet: tabla completa -->
+                <div class="week">
+                    <table>
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                <th class="py-3 px-4">Hora</th>
-                                <th class="py-3 px-4">Lunes</th>
-                                <th class="py-3 px-4">Martes</th>
-                                <th class="py-3 px-4">Miércoles</th>
-                                <th class="py-3 px-4">Jueves</th>
-                                <th class="py-3 px-4">Viernes</th>
+                            <tr id="week-head">
+                                <th scope="col">Hora</th>
+                                <th scope="col" data-day="Lunes">Lunes</th>
+                                <th scope="col" data-day="Martes">Martes</th>
+                                <th scope="col" data-day="Miércoles">Miércoles</th>
+                                <th scope="col" data-day="Jueves">Jueves</th>
+                                <th scope="col" data-day="Viernes">Viernes</th>
                             </tr>
                         </thead>
-                        <tbody id="schedule-table-body" class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
-                            <!-- Injected by JavaScript -->
-                        </tbody>
+                        <tbody id="schedule-table-body"></tbody>
                     </table>
                 </div>
 
-                <!-- Vista movil: pestañas de dia + lista vertical -->
-                <div class="md:hidden">
-                    <div id="mobile-day-tabs" class="flex gap-1.5 px-4 pt-4 pb-3 overflow-x-auto">
-                        <!-- Injected by JavaScript -->
-                    </div>
-                    <div id="mobile-schedule-list" class="divide-y divide-slate-100">
-                        <!-- Injected by JavaScript -->
-                    </div>
+                <!-- Celular: pestañas de día + lista -->
+                <div class="day">
+                    <div id="mobile-day-tabs" class="day-tabs" role="tablist" aria-label="Día de la semana"></div>
+                    <ol id="mobile-schedule-list" class="day-list"></ol>
                 </div>
-            </div>
+            </section>
 
         </div>
 
         <!-- ==================== VISTA ADMINISTRADOR ==================== -->
-        <div id="view-admin" class="flex flex-col gap-6 hidden">
+        <div id="view-admin" class="stack view hidden">
 
-            <!-- Pantalla de Login -->
-            <div id="admin-login" class="max-w-sm mx-auto w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
-                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto mb-4">
-                    <i class="fa-solid fa-lock text-lg"></i>
-                </div>
-                <h3 class="text-center font-bold text-slate-800 mb-1">Acceso de Administrador</h3>
-                <p class="text-center text-xs text-slate-500 mb-5">Solo la dirección puede modificar el horario.</p>
-                <form onsubmit="submitLogin(event)" class="space-y-3">
-                    <input type="password" id="admin-password" required placeholder="Contraseña" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition">Entrar</button>
-                    <p id="login-error" class="text-center text-xs text-rose-600 hidden">Contraseña incorrecta.</p>
-                </form>
-            </div>
-
-            <!-- Contenido protegido de Admin -->
-            <div id="admin-content" class="hidden flex-col gap-6">
-
-            <div class="bg-slate-900 text-white rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <!-- Acceso -->
+            <section id="admin-login" class="login">
+                <div class="login__icon"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg></div>
                 <div>
-                    <span class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        <i class="fa-solid fa-shield-halved"></i>
-                        <span>Panel de Administración Base de Datos</span>
-                    </span>
-                    <h2 class="text-2xl font-bold tracking-tight mt-2">Gestión de Horarios y Grupos</h2>
-                    <p class="text-slate-400 text-sm">Agrega, edita o elimina materias. Los cambios se guardan en el servidor y se reflejan para todos.</p>
+                    <h3 class="login__title">Acceso de Administrador</h3>
+                    <p class="hint" style="margin:6px auto 0">Solo la dirección puede modificar el horario.</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="openAddModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition shadow-md flex items-center space-x-2">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>Nueva Materia / Bloque</span>
-                    </button>
-                    <button onclick="logoutAdmin()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition">
-                        Cerrar sesión
-                    </button>
-                </div>
-            </div>
-
-            <!-- Gestion de Grupos -->
-            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
-                    <i class="fa-solid fa-users text-emerald-600"></i> Gestión de Grupos
-                </h4>
-                <p class="text-xs text-slate-500 mb-4 max-w-xl">Agrega grupos nuevos para próximos años, o borra los que ya no uses. Borrar un grupo también borra todas sus materias del horario.</p>
-
-                <form onsubmit="addGroup(event)" class="flex gap-2 mb-4">
-                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
-                        <i class="fa-solid fa-plus"></i> Agregar Grupo
-                    </button>
+                <form onsubmit="submitLogin(event)">
+                    <div class="field">
+                        <label class="field__label" for="admin-password">Contraseña</label>
+                        <input type="password" id="admin-password" required autocomplete="current-password" placeholder="Contraseña" class="input">
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--block">Entrar</button>
+                    <p id="login-error" class="msg msg--err hidden" role="alert" style="text-align:center">Contraseña incorrecta.</p>
                 </form>
+            </section>
 
-                <div id="groups-list" class="flex flex-wrap gap-2">
-                    <!-- Injected by JavaScript -->
+            <!-- Contenido protegido -->
+            <div id="admin-content" class="stack hidden">
+
+                <div class="admin-head">
+                    <div>
+                        <h2 class="admin-head__title">Gestión de Horarios y Grupos</h2>
+                        <p class="admin-head__text">Agrega, edita o elimina materias. Los cambios se guardan en el servidor y se reflejan para todos.</p>
+                    </div>
+                    <div class="admin-head__actions">
+                        <button type="button" onclick="openAddModal()" class="btn btn--primary">
+                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                            Nueva Materia / Bloque
+                        </button>
+                        <button type="button" onclick="logoutAdmin()" class="btn btn--secondary">
+                            <svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>
+                            Cerrar sesión
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Importar Horario por codigo -->
-            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
-                    <i class="fa-solid fa-file-import text-emerald-600"></i> Importar Horario (pega el código)
-                </h4>
-                <p class="text-xs text-slate-500 mb-3 max-w-2xl">Mándame por chat una foto de un horario y te devuelvo un código para pegar aquí abajo. Le das "Importar y Guardar" y se agrega TODO junto a la base de datos, sin capturarlo materia por materia. Si mencionas un grupo que no existe todavía, se crea solo.</p>
-                <textarea id="import-json" rows="7" placeholder='[
+                <div class="admin-grid">
+
+                    <!-- Columna principal: registros -->
+                    <div class="admin-col">
+
+                        <details class="panel fold">
+                            <summary>
+                                <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
+                                <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                            </summary>
+                            <div class="panel__body">
+                                <p class="hint">Mándame por chat una foto de un horario y te devuelvo un código para pegar aquí abajo. Le das "Importar y Guardar" y se agrega TODO junto a la base de datos, sin capturarlo materia por materia. Si mencionas un grupo que no existe todavía, se crea solo.</p>
+                                <label class="sr-only" for="import-json">Código del horario (JSON)</label>
+                                <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
   { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
-]' class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
-                <div class="flex items-center justify-between gap-4 mt-3">
-                    <p id="import-status" class="text-xs text-slate-500"></p>
-                    <button type="button" onclick="importSchedule()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
-                        <i class="fa-solid fa-upload"></i> Importar y Guardar
-                    </button>
-                </div>
-            </div>
+]'></textarea>
+                                <div class="row-between">
+                                    <p id="import-status" class="msg" role="status"></p>
+                                    <button type="button" onclick="importSchedule()" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                                        Importar y Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </details>
 
-            <!-- Timbre Escolar (ESP32) -->
-            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-1">
-                    <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        <i class="fa-solid fa-bullhorn text-emerald-600"></i> Timbre Escolar
-                    </h4>
-                    <span id="bell-status" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 w-fit">
-                        <i class="fa-solid fa-circle text-[8px]"></i> <span id="bell-status-text">Revisando...</span>
-                    </span>
-                </div>
-                <p class="text-xs text-slate-500 mb-4 max-w-2xl">Las horas que pongas aquí las jala el ESP32 solito (cada ~10 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas.</p>
+                        <section class="panel" aria-label="Registros del horario">
+                            <div class="toolbar">
+                                <div class="input-icon">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+                                    <label class="sr-only" for="admin-search">Buscar materia o docente</label>
+                                    <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="input">
+                                </div>
+                                <label class="sr-only" for="admin-group-filter">Filtrar por grupo</label>
+                                <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="select">
+                                    <option value="ALL">Todos los Grupos</option>
+                                </select>
+                                <p class="toolbar__count">Mostrando <b id="admin-count">0</b> registros en base de datos</p>
+                            </div>
+                            <div class="data-wrap">
+                                <table class="data">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Grupo</th>
+                                            <th scope="col">Día</th>
+                                            <th scope="col">Hora</th>
+                                            <th scope="col">Materia</th>
+                                            <th scope="col">Docente</th>
+                                            <th scope="col" style="text-align:right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-table-body"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
 
-                <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
-                        <i class="fa-solid fa-bell"></i> Tocar timbre ahora
-                    </button>
-                    <span id="bell-ring-msg" class="text-xs text-slate-500"></span>
-                </div>
+                    <!-- Columna lateral: timbre, grupos, alertas -->
+                    <div class="admin-col">
 
-                <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Horas programadas</h5>
-                <div id="bell-times-list" class="flex flex-wrap gap-2 mb-3"></div>
+                        <!-- Timbre escolar (ESP32) -->
+                        <section class="panel" aria-labelledby="bell-heading">
+                            <div class="panel__head">
+                                <h3 id="bell-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> Timbre Escolar</h3>
+                                <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Las horas que pongas aquí las jala el ESP32 solito (cada ~10 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas.</p>
 
-                <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <input type="time" id="bell-new-time" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <button type="button" onclick="addBellTime()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
-                        <i class="fa-solid fa-plus"></i> Agregar hora
-                    </button>
-                </div>
+                                <div>
+                                    <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                                        Tocar timbre ahora
+                                    </button>
+                                    <p id="bell-ring-msg" class="msg" role="status" style="margin-top:8px"></p>
+                                </div>
 
-                <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
-                    <label class="text-xs font-semibold text-slate-600 flex items-center gap-2">
-                        Duración (segundos)
-                        <input type="number" id="bell-duration" min="1" max="30" value="5" class="w-16 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    </label>
-                    <div class="flex items-center gap-3 text-xs font-semibold text-slate-600">
-                        <span>Días:</span>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="1"> Lun</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="2"> Mar</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="3"> Mié</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="4"> Jue</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="5"> Vie</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="6"> Sáb</label>
-                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="0"> Dom</label>
+                                <hr class="divider">
+
+                                <div style="display:flex;flex-direction:column;gap:10px">
+                                    <h4 class="panel__sub">Horas programadas</h4>
+                                    <div id="bell-times-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
+                                        <input type="time" id="bell-new-time" class="input">
+                                        <button type="button" onclick="addBellTime()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar hora
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="field" style="max-width:190px">
+                                    <label class="field__label" for="bell-duration">Duración (segundos)</label>
+                                    <input type="number" id="bell-duration" min="1" max="30" value="5" class="input">
+                                </div>
+
+                                <fieldset style="border:0;padding:0;margin:0;min-width:0">
+                                    <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
+                                    <div class="days">
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
+                                    </div>
+                                </fieldset>
+
+                                <div class="row-between">
+                                    <p id="bell-save-msg" class="msg" role="status"></p>
+                                    <button type="button" onclick="saveBell()" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
+                                        Guardar timbre
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Gestión de grupos -->
+                        <section class="panel" aria-labelledby="groups-heading">
+                            <div class="panel__head">
+                                <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Agrega grupos nuevos para próximos años, o borra los que ya no uses. Borrar un grupo también borra todas sus materias del horario.</p>
+                                <form onsubmit="addGroup(event)" class="inline-form">
+                                    <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
+                                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
+                                    <button type="submit" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                        Agregar Grupo
+                                    </button>
+                                </form>
+                                <div id="groups-list" class="chips"></div>
+                            </div>
+                        </section>
+
+                        <!-- Notificaciones automáticas -->
+                        <section class="panel" aria-labelledby="alerts-heading">
+                            <div class="panel__head">
+                                <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
+                            </div>
+                            <div class="panel__body" style="padding-bottom:0">
+                                <p class="hint">Cuando cambie de bloque según la hora real, se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa desde su propio celular en la vista de Alumnos.</p>
+                                <h4 class="panel__sub">Registro de Alertas</h4>
+                            </div>
+                            <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
+                                <table class="log">
+                                    <thead>
+                                        <tr><th scope="col">Hora</th><th scope="col">Terminó</th><th scope="col">Sigue</th></tr>
+                                    </thead>
+                                    <tbody id="alert-log-body">
+                                        <tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between gap-4">
-                    <p id="bell-save-msg" class="text-xs text-slate-500"></p>
-                    <button type="button" onclick="saveBell()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
-                        <i class="fa-solid fa-floppy-disk"></i> Guardar timbre
-                    </button>
-                </div>
             </div>
-
-            <!-- Notificaciones Automaticas -->
-            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">
-                    <i class="fa-solid fa-bell text-amber-600"></i> Notificaciones Automáticas
-                </h4>
-                <p class="text-xs text-slate-500 mb-4 max-w-xl">Cuando cambie de bloque según la hora real, se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa desde su propio celular en la vista de Alumnos.</p>
-
-                <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Registro de Alertas</h5>
-                <div class="overflow-x-auto border border-slate-100 rounded-xl">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                <th class="py-2.5 px-4">Hora</th>
-                                <th class="py-2.5 px-4">Terminó</th>
-                                <th class="py-2.5 px-4">Sigue</th>
-                            </tr>
-                        </thead>
-                        <tbody id="alert-log-body" class="divide-y divide-slate-100 text-xs text-slate-700">
-                            <tr><td colspan="3" class="py-6 text-center text-slate-400 italic">Todavía no se ha registrado ninguna alerta.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Management Controls / Filters -->
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center space-x-3 w-full sm:w-auto">
-                    <div class="relative w-full sm:w-64">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                            <i class="fa-solid fa-search text-xs"></i>
-                        </span>
-                        <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                    <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        <option value="ALL">Todos los Grupos</option>
-                    </select>
-                </div>
-                <div class="text-xs text-slate-500">
-                    Mostrando <span id="admin-count" class="font-bold text-slate-700">0</span> registros en base de datos
-                </div>
-            </div>
-
-            <!-- Database Records Table -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                                <th class="py-3.5 px-4">Grupo</th>
-                                <th class="py-3.5 px-4">Día</th>
-                                <th class="py-3.5 px-4">Hora</th>
-                                <th class="py-3.5 px-4">Materia</th>
-                                <th class="py-3.5 px-4">Docente</th>
-                                <th class="py-3.5 px-4 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-table-body" class="divide-y divide-slate-100 text-xs text-slate-700">
-                            <!-- Injected by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            </div>
-
         </div>
 
     </main>
 
-    <!-- Modal para Agregar / Editar Materia -->
-    <div id="schedule-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <div class="bg-slate-900 text-white p-5 flex justify-between items-center">
-                <h3 id="modal-title" class="font-bold text-sm">Registrar Nueva Materia en Horario</h3>
-                <button onclick="closeAddModal()" class="text-slate-400 hover:text-white transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
+    <!-- Registrar / editar materia -->
+    <dialog id="schedule-modal" class="modal" aria-labelledby="modal-title">
+        <div class="modal__head">
+            <h3 id="modal-title" class="modal__title">Registrar Nueva Materia en Horario</h3>
+            <button type="button" onclick="closeAddModal()" class="modal__close" aria-label="Cerrar">
+                <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <form id="schedule-form" onsubmit="saveScheduleItem(event)" class="modal__body">
+            <input type="hidden" id="edit-id">
+            <div class="field">
+                <label class="field__label" for="form-group">Grupo</label>
+                <select id="form-group" required class="select"></select>
             </div>
-            <form id="schedule-form" onsubmit="saveScheduleItem(event)" class="p-6 space-y-4">
-                <input type="hidden" id="edit-id">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Grupo:</label>
-                    <select id="form-group" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        <!-- Injected by JavaScript -->
+            <div class="modal__row">
+                <div class="field">
+                    <label class="field__label" for="form-day">Día de la Semana</label>
+                    <select id="form-day" required class="select">
+                        <option value="Lunes">Lunes</option>
+                        <option value="Martes">Martes</option>
+                        <option value="Miércoles">Miércoles</option>
+                        <option value="Jueves">Jueves</option>
+                        <option value="Viernes">Viernes</option>
                     </select>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Día de la Semana:</label>
-                        <select id="form-day" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="Lunes">Lunes</option>
-                            <option value="Martes">Martes</option>
-                            <option value="Miércoles">Miércoles</option>
-                            <option value="Jueves">Jueves</option>
-                            <option value="Viernes">Viernes</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Bloque Horario:</label>
-                        <select id="form-time" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="07:00 - 08:00">07:00 - 08:00 hrs</option>
-                            <option value="08:00 - 08:45">08:00 - 08:45 hrs</option>
-                            <option value="08:45 - 09:15">08:45 - 09:15 hrs (Receso)</option>
-                            <option value="09:15 - 10:00">09:15 - 10:00 hrs</option>
-                            <option value="10:00 - 11:00">10:00 - 11:00 hrs</option>
-                            <option value="11:00 - 12:00">11:00 - 12:00 hrs</option>
-                            <option value="12:00 - 13:00">12:00 - 13:00 hrs</option>
-                            <option value="13:00 - 14:00">13:00 - 14:00 hrs</option>
-                            <option value="14:00 - 15:00">14:00 - 15:00 hrs</option>
-                        </select>
-                    </div>
+                <div class="field">
+                    <label class="field__label" for="form-time">Bloque Horario</label>
+                    <select id="form-time" required class="select">
+                        <option value="07:00 - 08:00">07:00 - 08:00 hrs</option>
+                        <option value="08:00 - 08:45">08:00 - 08:45 hrs</option>
+                        <option value="08:45 - 09:15">08:45 - 09:15 hrs (Receso)</option>
+                        <option value="09:15 - 10:00">09:15 - 10:00 hrs</option>
+                        <option value="10:00 - 11:00">10:00 - 11:00 hrs</option>
+                        <option value="11:00 - 12:00">11:00 - 12:00 hrs</option>
+                        <option value="12:00 - 13:00">12:00 - 13:00 hrs</option>
+                        <option value="13:00 - 14:00">13:00 - 14:00 hrs</option>
+                        <option value="14:00 - 15:00">14:00 - 15:00 hrs</option>
+                    </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Materia:</label>
-                    <input type="text" id="form-subject" required placeholder="Ej. Estructura de Datos" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Docente Asignado:</label>
-                    <input type="text" id="form-teacher" required placeholder="Ej. Ing. María Pérez" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div class="pt-3 flex space-x-3">
-                    <button type="button" onclick="closeAddModal()" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">Cancelar</button>
-                    <button type="submit" class="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shadow-md">Guardar Registro</button>
-                </div>
-            </form>
-        </div>
-    </div>
+            </div>
+            <div class="field">
+                <label class="field__label" for="form-subject">Nombre de la Materia</label>
+                <input type="text" id="form-subject" required placeholder="Ej. Estructura de Datos" class="input">
+            </div>
+            <div class="field">
+                <label class="field__label" for="form-teacher">Docente Asignado</label>
+                <input type="text" id="form-teacher" required placeholder="Ej. Ing. María Pérez" class="input">
+            </div>
+            <div class="modal__foot">
+                <button type="button" onclick="closeAddModal()" class="btn btn--secondary">Cancelar</button>
+                <button type="submit" class="btn btn--primary">Guardar Registro</button>
+            </div>
+        </form>
+    </dialog>
 
-    <!-- Logica de la aplicacion -->
     <script src="app.js"></script>
 </body>
 </html>
