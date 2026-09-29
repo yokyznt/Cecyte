@@ -18,8 +18,8 @@
     ESP32 GPIO2 -> IN (señal) del módulo relé
     Lado AC del relé: Corriente -> C, Timbre -> NO
 
-  ANTES DE SUBIRLO cambia solo las 4 cosas de "CONFIGURACIÓN":
-    WIFI_SSID, WIFI_PASSWORD, SERVER_URL y DEVICE_KEY.
+  ANTES DE SUBIRLO cambia SOLO WIFI_SSID y WIFI_PASSWORD.
+  (La direccion de tu sitio y la llave ya estan puestas.)
 
   Relé: si el timbre suena al revés (prendido todo el tiempo salvo
   cuando debería sonar), cambia RELAY_ACTIVO_EN_BAJO a false.
@@ -32,12 +32,12 @@
 #include <time.h>
 
 // ---------- CONFIGURACIÓN ----------
+// >>> LO UNICO QUE TIENES QUE CAMBIAR: tu WiFi (entre las comillas) <<<
 const char* WIFI_SSID     = "NOMBRE_DE_TU_WIFI";
-const char* WIFI_PASSWORD = "CONTRASEÑA_DE_TU_WIFI";
+const char* WIFI_PASSWORD = "CONTRASENA_DE_TU_WIFI";
 
-// Tu dominio de Vercel, SIN diagonal al final y con /api/bell
+// Lo de abajo YA esta listo, no lo toques:
 const char* SERVER_URL = "https://cecyteo.vercel.app/api/bell";
-// Debe ser IGUAL a la variable BELL_DEVICE_KEY que pongas en Vercel
 const char* DEVICE_KEY = "65f3fde588876a90ed6d2f09511dfecfa891cdce6d6cb7d5";
 
 const int  PIN_RELE = 2;                  // GPIO02 -> IN del relé
