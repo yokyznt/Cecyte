@@ -30,6 +30,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <Preferences.h>
 
 // ---------- CONFIGURACIÓN ----------
 // >>> LO UNICO QUE TIENES QUE CAMBIAR: tu WiFi (entre las comillas) <<<
@@ -58,6 +59,8 @@ int  numHorarios = 9;
 bool diasActivos[7] = {false, true, true, true, true, true, false};          // 0=Dom ... 6=Sáb
 unsigned long duracionMs = 5000;
 
+Preferences prefs; // memoria permanente del ESP32 (sobrevive a apagones)
+
 String ultimoRingId = "";        // último "tocar ahora" ya atendido
 bool   ringIdInicializado = false; // al arrancar NO tocamos por un ringId viejo
 
@@ -77,6 +80,38 @@ void apagarRele() {
   digitalWrite(PIN_RELE, RELAY_ACTIVO_EN_BAJO ? HIGH : LOW);
   releActivo = false;
   Serial.println("Timbre apagado");
+}
+
+// Guarda las horas en la memoria del ESP32 para que un apagon no las borre
+void guardarConfig() {
+  prefs.begin("timbre", false);
+  prefs.putUChar("n", numHorarios);
+  if (numHorarios > 0) prefs.putBytes("horas", horarios, numHorarios * sizeof(int));
+  uint8_t mascara = 0;
+  for (int i = 0; i < 7; i++) if (diasActivos[i]) mascara |= (1 << i);
+  prefs.putUChar("dias", mascara);
+  prefs.putUShort("dur", (uint16_t)(duracionMs / 1000));
+  prefs.end();
+}
+
+// Al arrancar, recupera lo ultimo que se guardo (si hay algo guardado)
+void cargarConfig() {
+  prefs.begin("timbre", false);
+  if (prefs.isKey("n")) {
+    int n = prefs.getUChar("n", 0);
+    if (n <= MAX_HORARIOS) {
+      numHorarios = n;
+      if (n > 0) prefs.getBytes("horas", horarios, n * sizeof(int));
+    }
+    uint8_t mascara = prefs.getUChar("dias", 0);
+    for (int i = 0; i < 7; i++) diasActivos[i] = (mascara >> i) & 1;
+    uint16_t seg = prefs.getUShort("dur", 5);
+    if (seg >= 1 && seg <= 30) duracionMs = seg * 1000UL;
+    Serial.printf("Horario recuperado de la memoria: %d horas\n", numHorarios);
+  } else {
+    Serial.println("Sin horario guardado todavia: uso el de fabrica");
+  }
+  prefs.end();
 }
 
 void conectarWiFi() {
@@ -139,6 +174,14 @@ void consultarServidor() {
       String dias     = cuerpo.substring(p2 + 1, p3);
       String horas    = cuerpo.substring(p3 + 1);
 
+      // Copia de lo anterior, para saber si algo cambio y solo entonces guardar
+      int  viejoN = numHorarios;
+      int  viejasHoras[MAX_HORARIOS];
+      bool viejosDias[7];
+      memcpy(viejasHoras, horarios, sizeof(horarios));
+      memcpy(viejosDias, diasActivos, sizeof(diasActivos));
+      unsigned long viejaDur = duracionMs;
+
       if (segundos >= 1 && segundos <= 30) duracionMs = segundos * 1000UL;
 
       for (int i = 0; i < 7; i++) diasActivos[i] = false;
@@ -148,6 +191,14 @@ void consultarServidor() {
       }
 
       parsearHoras(horas);
+
+      bool cambio = (viejoN != numHorarios) || (viejaDur != duracionMs) ||
+                    memcmp(viejosDias, diasActivos, sizeof(diasActivos)) != 0 ||
+                    memcmp(viejasHoras, horarios, numHorarios * sizeof(int)) != 0;
+      if (cambio) {
+        guardarConfig();
+        Serial.println("Horario nuevo guardado en la memoria del ESP32");
+      }
 
       // "Tocar ahora": solo si el id cambió desde la última vez que lo vimos
       if (!ringIdInicializado) {
@@ -190,6 +241,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_RELE, OUTPUT);
   apagarRele();
+
+  cargarConfig(); // usa las horas guardadas, aunque no haya internet
 
   conectarWiFi();
 
