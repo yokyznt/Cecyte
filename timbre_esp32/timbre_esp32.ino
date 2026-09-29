@@ -34,7 +34,7 @@
 // ---------- CONFIGURACIÓN ----------
 // >>> LO UNICO QUE TIENES QUE CAMBIAR: tu WiFi (entre las comillas) <<<
 const char* WIFI_SSID     = "SSID:	Mega_2.4G_E308";
-const char* WIFI_PASSWORD = "CONTRASENA_DE_TU_WIFI";
+const char* WIFI_PASSWORD = "RtGQ29P7";
 
 // Lo de abajo YA esta listo, no lo toques:
 const char* SERVER_URL = "https://cecyteo.vercel.app/api/bell";
