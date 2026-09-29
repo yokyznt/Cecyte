@@ -160,7 +160,50 @@ function renderDayStrip(day, slot) {
         const isNow = !!(slot && slot.key === s.key);
         const isPast = !!day && end <= nowMinutes;
         const cls = ['strip__seg', s.receso ? 'is-recess' : '', isNow ? 'is-now' : (isPast ? 'is-past' : '')].join(' ').trim();
-        return `<li class="${cls}" style="flex:${end - start}" title="${esc(s.label)}"></li>`;
+        return `<li class="${cls}" style="flex:${end - start}" title="${esc(s.label)}"><span class="strip__label">${s.key.slice(0, 5)}</span></li>`;
+    }).join('');
+}
+
+// Agenda de "Hoy": todos los bloques del dia real, con pasado / ahora / siguiente
+function renderTodayAgenda() {
+    const list = document.getElementById('today-agenda');
+    const dayBadge = document.getElementById('agenda-day');
+    const dateLabel = document.getElementById('today-label');
+    if (!list) return;
+
+    const now = new Date();
+    const fecha = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (dateLabel) dateLabel.innerText = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+
+    const day = getCurrentDaySpanish();
+    if (dayBadge) dayBadge.innerText = day || 'Fin de semana';
+    if (!day) {
+        list.innerHTML = '<li class="agenda__empty"><strong>Hoy no hay clases</strong>Disfruta tu fin de semana. El lunes aquí verás tu día.</li>';
+        return;
+    }
+
+    const nowSlot = getCurrentSlot();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    let nextMarked = false;
+
+    list.innerHTML = timeSlots.map(slot => {
+        const [start, end] = slot.key.split(' - ');
+        const isNow = !!(nowSlot && nowSlot.key === slot.key);
+        const isPast = timeToMinutes(end) <= nowMinutes;
+        const match = slot.receso ? null : findClass(currentStudentGroup, day, slot.key);
+
+        let cls = 'agenda__item';
+        let tag = '';
+        if (isNow) { cls += ' is-now'; tag = 'Ahora'; }
+        else if (isPast) cls += ' is-past';
+        else if (match && !nextMarked) { cls += ' is-next'; tag = 'Sigue'; nextMarked = true; }
+        if (slot.receso) cls += ' is-recess';
+        else if (!match) cls += ' is-free';
+
+        const subject = slot.receso ? 'Receso'
+            : match ? `${esc(match.subject)}${match.teacher ? `<small>${esc(match.teacher)}</small>` : ''}`
+            : 'Hora libre';
+        return `<li class="${cls}"><span class="agenda__time">${start}</span><span class="agenda__subject">${subject}</span><span class="agenda__tag">${tag}</span></li>`;
     }).join('');
 }
 
@@ -471,7 +514,8 @@ function renderStudentSchedule() {
         emptyEl.classList.toggle('hidden', !scheduleLoaded || hasAny);
     }
 
-    // Mantener sincronizada la vista movil (lista por dia)
+    // Mantener sincronizada la agenda de hoy y la vista movil (lista por dia)
+    renderTodayAgenda();
     renderMobileDayTabs();
     renderMobileSchedule();
 }

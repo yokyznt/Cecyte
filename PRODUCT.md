@@ -31,7 +31,7 @@ Schedule blocks are fixed: 07:00-08:00, 08:00-08:45, 08:45-09:15 (receso), 09:15
 - All copy is Spanish (es-MX). Keep every existing feature, id and behavior.
 
 ## Brand Commitments
-CECyTE institutional green stays the primary brand color (confirmed by the user). Name shown: "CECyTE Plantel 18". No official logo asset in the repo; do not fabricate one.
+CECyTE institutional green stays the primary brand color (confirmed by the user). Palette is green and white with some black, light, friendly but formal (user request, 2026-09-29); no other accent hues. Name shown: "CECyTE Plantel 18". No official logo asset in the repo; do not fabricate one.
 
 ## Evidence on Hand
 No logo, photos or testimonials in the repo. Do not invent any.
@@ -40,7 +40,7 @@ No logo, photos or testimonials in the repo. Do not invent any.
 1. The present moment leads: what is happening now outranks the full grid.
 2. Phone first for students, density for the admin.
 3. Every state is legible at a glance and in sunlight (contrast, size, no color-only meaning).
-4. The interface is quiet; the school's green and one warm signal (the bell) carry the identity.
+4. The interface is quiet; the school's green carries identity and state, black carries formality.
 
 ## Accessibility & Inclusion
 Students are teenagers on mid-range phones and variable connections. Target WCAG AA contrast, 44px touch targets, keyboard and screen-reader operable, respects reduced motion.
