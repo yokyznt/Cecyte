@@ -25,6 +25,28 @@ const timeSlots = [
 ];
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 let mobileActiveDay = 'Lunes'; // Dia mostrado en la vista de lista para celular (se ajusta al real en window.onload)
+let scheduleLoaded = false; // evita mostrar "grupo sin materias" antes de que llegue el horario del servidor
+let lastRenderedNowKey = null; // repinta el resaltado de "ahora" solo cuando cambia el bloque
+const dayShort = { 'Lunes': 'Lun', 'Martes': 'Mar', 'Miércoles': 'Mié', 'Jueves': 'Jue', 'Viernes': 'Vie' };
+
+// ==================== Utilidades de interfaz ====================
+// Icono del sprite SVG que vive en index.html
+function icon(name) {
+    return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
+
+// Escapa texto antes de meterlo con innerHTML (materias, docentes y grupos los captura un humano)
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Bloque de una materia (celda de la tabla y fila de la lista movil)
+function slotHtml(match, isNow) {
+    return `<div class="slot${isNow ? ' is-now' : ''}">
+        <span class="slot__subject">${esc(match.subject)}</span>
+        ${match.teacher ? `<span class="slot__teacher">${icon('user')}<span>${esc(match.teacher)}</span></span>` : ''}
+    </div>`;
+}
 
 // Calcula que dia debe abrir por default la vista movil: el dia de hoy si es Lunes-Viernes,
 // Lunes si es Sabado/Domingo, y tambien Lunes si ya es Viernes despues de la ultima clase.
@@ -51,24 +73,39 @@ setInterval(() => {
 
 // Pinta la tarjeta "Estado Actual" segun la hora real y el horario cargado del servidor
 function updateCurrentClassCard() {
+    const panel = document.getElementById('now-panel');
     const titleEl = document.getElementById('current-subject-title');
     const teacherEl = document.getElementById('current-teacher-name');
     const timeEl = document.getElementById('current-subject-time');
+    const stateEl = document.getElementById('now-state');
     const percentEl = document.getElementById('progress-percent');
     const barEl = document.getElementById('class-progress-bar');
+    const trackEl = document.getElementById('progress-track');
     const countdownEl = document.getElementById('countdown-timer');
     const nextEl = document.getElementById('next-subject-name');
     if (!titleEl) return; // la tarjeta no esta en pantalla todavia
 
     const day = getCurrentDaySpanish();
     const slot = day ? getCurrentSlot() : null;
+    const teacherLine = (iconName, text) => `${icon(iconName)}<span>${esc(text)}</span>`;
+    const setState = (state, label) => { panel.dataset.state = state; stateEl.innerText = label; };
+
+    // Cuando cambia el bloque, repinta el horario (resalta la hora actual) y la tira del dia
+    const nowKey = `${day}|${slot ? slot.key : 'none'}`;
+    if (nowKey !== lastRenderedNowKey) {
+        lastRenderedNowKey = nowKey;
+        renderStudentSchedule();
+        renderDayStrip(day, slot);
+    }
 
     if (!slot) {
         titleEl.innerText = day ? 'Sin clase en este momento' : 'Hoy no hay clases';
-        teacherEl.innerHTML = '<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —';
+        teacherEl.innerHTML = '';
         timeEl.innerText = '—';
+        setState('none', 'Sin clase');
         percentEl.innerText = '—';
         barEl.style.width = '0%';
+        trackEl.setAttribute('aria-valuenow', '0');
         countdownEl.innerText = '--:--';
         nextEl.innerText = findNextClassLabel(day) || 'Sin más clases';
         return;
@@ -91,22 +128,40 @@ function updateCurrentClassCard() {
 
     if (slot.receso) {
         titleEl.innerText = 'Receso';
-        teacherEl.innerHTML = '<i class="fa-solid fa-mug-hot text-emerald-600"></i> Disfruta tu receso';
+        teacherEl.innerHTML = teacherLine('coffee', 'Disfruta tu receso');
+        setState('recess', 'Receso');
     } else if (currentClass) {
         titleEl.innerText = currentClass.subject;
-        teacherEl.innerHTML = currentClass.teacher
-            ? `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> ${currentClass.teacher}`
-            : `<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —`;
+        teacherEl.innerHTML = currentClass.teacher ? teacherLine('user', currentClass.teacher) : '';
+        setState('class', 'En curso');
     } else {
         titleEl.innerText = 'Hora libre';
-        teacherEl.innerHTML = '<i class="fa-solid fa-chalkboard-user text-emerald-600"></i> —';
+        teacherEl.innerHTML = '';
+        setState('free', 'Hora libre');
     }
 
     timeEl.innerText = `${slot.key} hrs`;
     percentEl.innerText = `${percent}%`;
     barEl.style.width = `${percent}%`;
+    trackEl.setAttribute('aria-valuenow', String(percent));
     countdownEl.innerText = `${remMin}:${remSec}`;
     nextEl.innerText = findNextClassLabel(day, slot.key) || 'Sin más clases hoy';
+}
+
+// Tira del dia: un segmento por bloque, proporcional a su duracion (pasado / ahora / por venir)
+function renderDayStrip(day, slot) {
+    const strip = document.getElementById('day-strip');
+    if (!strip) return;
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    strip.innerHTML = timeSlots.map(s => {
+        const [start, end] = s.key.split(' - ').map(timeToMinutes);
+        const isNow = !!(slot && slot.key === s.key);
+        const isPast = !!day && end <= nowMinutes;
+        const cls = ['strip__seg', s.receso ? 'is-recess' : '', isNow ? 'is-now' : (isPast ? 'is-past' : '')].join(' ').trim();
+        return `<li class="${cls}" style="flex:${end - start}" title="${esc(s.label)}"></li>`;
+    }).join('');
 }
 
 // Busca la siguiente materia asignada despues del bloque actual (o desde el inicio si no hay bloque activo)
@@ -129,6 +184,9 @@ async function loadSchedule() {
         const res = await fetch('/api/schedule');
         if (!res.ok) return;
         scheduleDatabase = await res.json();
+        scheduleLoaded = true;
+        const updatedEl = document.getElementById('schedule-updated');
+        if (updatedEl) updatedEl.innerText = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
         renderStudentSchedule();
         if (isAdminLoggedIn) renderAdminTable();
     } catch (err) {
@@ -180,7 +238,7 @@ function populateGroupSelectors() {
     const studentSelect = document.getElementById('group-selector');
     if (studentSelect) {
         studentSelect.innerHTML = groupsList.length
-            ? groupsList.map(g => `<option value="${g}" ${g === currentStudentGroup ? 'selected' : ''}>${g}</option>`).join('')
+            ? groupsList.map(g => `<option value="${esc(g)}" ${g === currentStudentGroup ? 'selected' : ''}>${esc(g)}</option>`).join('')
             : '<option value="">Sin grupos todavía</option>';
     }
 
@@ -188,14 +246,14 @@ function populateGroupSelectors() {
     if (adminFilter) {
         const current = adminFilter.value || 'ALL';
         adminFilter.innerHTML = '<option value="ALL">Todos los Grupos</option>' +
-            groupsList.map(g => `<option value="${g}">${g}</option>`).join('');
+            groupsList.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
         adminFilter.value = groupsList.includes(current) || current === 'ALL' ? current : 'ALL';
     }
 
     const formGroup = document.getElementById('form-group');
     if (formGroup) {
         formGroup.innerHTML = groupsList.length
-            ? groupsList.map(g => `<option value="${g}">${g}</option>`).join('')
+            ? groupsList.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('')
             : '<option value="">Agrega un grupo primero</option>';
     }
 }
@@ -282,16 +340,13 @@ function renderGroupsList() {
     if (!container) return;
 
     if (groupsList.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400 italic">Todavía no hay grupos. Agrega uno arriba.</p>';
+        container.innerHTML = '<p class="chips__empty">Todavía no hay grupos. Agrega uno arriba.</p>';
         return;
     }
 
     container.innerHTML = groupsList.map(g => `
-        <span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg pl-3 pr-2 py-1.5 text-xs font-semibold">
-            ${g}
-            <button type="button" onclick="deleteGroup('${g.replace(/'/g, "\\'")}')" class="text-emerald-400 hover:text-rose-600 transition">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+        <span class="chip">${esc(g)}
+            <button type="button" class="chip__x" data-name="${esc(g)}" onclick="deleteGroup(this.dataset.name)" title="Eliminar" aria-label="Eliminar grupo ${esc(g)}">${icon('x')}</button>
         </span>
     `).join('');
 }
@@ -305,18 +360,12 @@ function switchView(view) {
     const tabStudent = document.getElementById('tab-student');
     const tabAdmin = document.getElementById('tab-admin');
 
-    if (view === 'student') {
-        studentView.classList.remove('hidden');
-        adminView.classList.add('hidden');
-        tabStudent.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5';
-        tabAdmin.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-emerald-200 hover:text-white flex items-center space-x-1.5';
-    } else {
-        studentView.classList.add('hidden');
-        adminView.classList.remove('hidden');
-        tabAdmin.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5';
-        tabStudent.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-emerald-200 hover:text-white flex items-center space-x-1.5';
-        checkAdminSession();
-    }
+    const isStudent = view === 'student';
+    studentView.classList.toggle('hidden', !isStudent);
+    adminView.classList.toggle('hidden', isStudent);
+    tabStudent.setAttribute('aria-pressed', String(isStudent));
+    tabAdmin.setAttribute('aria-pressed', String(!isStudent));
+    if (!isStudent) checkAdminSession();
 }
 
 // Revisa con el servidor si ya hay una sesion de admin valida en este dispositivo
@@ -339,13 +388,11 @@ async function checkAdminSession() {
 function showAdminLogin() {
     document.getElementById('admin-login').classList.remove('hidden');
     document.getElementById('admin-content').classList.add('hidden');
-    document.getElementById('admin-content').classList.remove('flex');
 }
 
 function showAdminContent() {
     document.getElementById('admin-login').classList.add('hidden');
     document.getElementById('admin-content').classList.remove('hidden');
-    document.getElementById('admin-content').classList.add('flex');
     populateGroupSelectors();
     renderGroupsList();
     renderAdminTable();
@@ -385,41 +432,44 @@ async function logoutAdmin() {
     showAdminLogin();
 }
 
-// Render de la tabla semanal de horario
+/// Render de la tabla semanal de horario (resalta el dia y la hora actuales)
 function renderStudentSchedule() {
     const tbody = document.getElementById('schedule-table-body');
-    tbody.innerHTML = '';
-    timeSlots.forEach(slot => {
-        let tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50/80 transition';
+    const today = getCurrentDaySpanish();
+    const nowSlot = today ? getCurrentSlot() : null;
 
-        let tdTime = document.createElement('td');
-        tdTime.className = 'py-3 px-4 font-mono font-bold text-slate-500 bg-slate-50/50 border-b border-slate-100';
-        tdTime.innerText = slot.label;
-        tr.appendChild(tdTime);
-
-        daysOfWeek.forEach(day => {
-            let td = document.createElement('td');
-            td.className = 'py-3 px-4 border-b border-slate-100';
-
-            // El receso siempre queda en blanco
-            if (!slot.receso) {
-                const match = scheduleDatabase.find(i => i.group === currentStudentGroup && i.day === day && i.time === slot.key);
-                if (match) {
-                    td.innerHTML = `
-                        <div class="p-2 rounded-xl bg-emerald-50/80 border border-emerald-100 shadow-2xs">
-                            <span class="font-bold text-emerald-900 block">${match.subject}</span>
-                            ${match.teacher ? `<span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>` : ''}
-                        </div>
-                    `;
-                }
-                // si no hay match, la celda queda vacia (en blanco)
-            }
-            tr.appendChild(td);
-        });
-
-        tbody.appendChild(tr);
+    // Encabezado: marca la columna de hoy
+    document.querySelectorAll('#week-head th[data-day]').forEach(th => {
+        const isToday = th.dataset.day === today;
+        th.classList.toggle('is-today', isToday);
+        th.innerHTML = isToday ? `${th.dataset.day}<span class="today-tag">· Hoy</span>` : th.dataset.day;
     });
+
+    tbody.innerHTML = timeSlots.map(slot => {
+        const [start, end] = slot.key.split(' - ');
+        const isNowRow = !!(nowSlot && nowSlot.key === slot.key);
+        const timeCell = `<td class="time-cell"><span class="t-start">${start}</span><span class="t-end">${end}</span></td>`;
+
+        // El receso siempre queda en blanco: una sola banda a lo ancho
+        if (slot.receso) {
+            return `<tr class="${isNowRow ? 'is-now-row' : ''}">${timeCell}<td class="recess-cell" colspan="${daysOfWeek.length}">Receso</td></tr>`;
+        }
+
+        const cells = daysOfWeek.map(day => {
+            const match = findClass(currentStudentGroup, day, slot.key);
+            const isToday = day === today;
+            // si no hay match, la celda queda vacia (en blanco)
+            return `<td class="${isToday ? 'is-today' : ''}">${match ? slotHtml(match, isNowRow && isToday) : ''}</td>`;
+        }).join('');
+        return `<tr class="${isNowRow ? 'is-now-row' : ''}">${timeCell}${cells}</tr>`;
+    }).join('');
+
+    // Grupo sin materias: avisa en vez de dejar una cuadricula vacia sin explicacion
+    const emptyEl = document.getElementById('schedule-empty');
+    if (emptyEl) {
+        const hasAny = scheduleDatabase.some(i => i.group === currentStudentGroup);
+        emptyEl.classList.toggle('hidden', !scheduleLoaded || hasAny);
+    }
 
     // Mantener sincronizada la vista movil (lista por dia)
     renderMobileDayTabs();
@@ -429,6 +479,7 @@ function renderStudentSchedule() {
 // Cambia el dia activo en la vista movil (lista vertical)
 function switchMobileDay(day) {
     mobileActiveDay = day;
+    renderMobileDayTabs();
     renderMobileSchedule();
 }
 
@@ -436,67 +487,47 @@ function switchMobileDay(day) {
 function renderMobileDayTabs() {
     const container = document.getElementById('mobile-day-tabs');
     if (!container) return;
-    container.innerHTML = '';
+    const today = getCurrentDaySpanish();
 
-    daysOfWeek.forEach(day => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.innerText = day;
-        btn.onclick = () => switchMobileDay(day);
-        btn.className = (day === mobileActiveDay)
-            ? 'shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition'
-            : 'shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
-        container.appendChild(btn);
-    });
+    container.innerHTML = daysOfWeek.map(day => `
+        <button type="button" role="tab" class="day-tab${day === today ? ' is-today' : ''}"
+            aria-selected="${day === mobileActiveDay}" aria-label="${day}${day === today ? ' (hoy)' : ''}"
+            onclick="switchMobileDay('${day}')">${dayShort[day]}</button>
+    `).join('');
 }
 
 // Pinta la lista vertical de horas para el dia activo (vista movil)
 function renderMobileSchedule() {
     const list = document.getElementById('mobile-schedule-list');
     if (!list) return;
-    list.innerHTML = '';
+    const today = getCurrentDaySpanish();
+    const nowSlot = today ? getCurrentSlot() : null;
 
-    timeSlots.forEach(slot => {
-        const row = document.createElement('div');
-        row.className = 'px-4 py-3 flex items-start gap-3';
+    list.innerHTML = timeSlots.map(slot => {
+        const [start, end] = slot.key.split(' - ');
+        const isNowRow = !!(nowSlot && mobileActiveDay === today && nowSlot.key === slot.key);
+        const time = `<div class="time-cell"><span class="t-start">${start}</span><span class="t-end">${end}</span></div>`;
 
-        const timeCol = document.createElement('div');
-        timeCol.className = 'w-[92px] shrink-0 pt-0.5 font-mono text-[10.5px] font-bold text-slate-500 leading-tight';
-        timeCol.innerText = slot.label;
-        row.appendChild(timeCol);
-
-        const contentCol = document.createElement('div');
-        contentCol.className = 'flex-1 min-w-0';
-
-        // El receso siempre queda en blanco
-        if (!slot.receso) {
-            const match = scheduleDatabase.find(i => i.group === currentStudentGroup && i.day === mobileActiveDay && i.time === slot.key);
-            if (match) {
-                contentCol.innerHTML = `
-                    <div class="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-100">
-                        <span class="font-bold text-emerald-900 text-xs block">${match.subject}</span>
-                        ${match.teacher ? `<span class="text-[10px] text-slate-500 block mt-0.5"><i class="fa-solid fa-user-tie text-emerald-600"></i> ${match.teacher}</span>` : ''}
-                    </div>
-                `;
-            }
-            // si no hay match, queda en blanco
+        let body;
+        if (slot.receso) {
+            body = '<div class="empty">Receso</div>'; // el receso siempre queda en blanco
+        } else {
+            const match = findClass(currentStudentGroup, mobileActiveDay, slot.key);
+            body = match ? slotHtml(match, isNowRow) : '<div class="empty">Hora libre</div>';
         }
-
-        row.appendChild(contentCol);
-        list.appendChild(row);
-    });
+        return `<li class="day-row${slot.receso ? ' is-recess' : ''}${isNowRow ? ' is-now' : ''}">${time}${body}</li>`;
+    }).join('');
 }
 
 // Render Admin Table
 function renderAdminTable(filterQuery = '') {
     const tbody = document.getElementById('admin-table-body');
-    tbody.innerHTML = '';
-
     const groupFilter = document.getElementById('admin-group-filter')?.value || 'ALL';
+    const query = filterQuery.toLowerCase();
 
-    let filtered = scheduleDatabase.filter(item => {
-        const matchesQuery = item.subject.toLowerCase().includes(filterQuery.toLowerCase()) ||
-               item.teacher.toLowerCase().includes(filterQuery.toLowerCase());
+    const filtered = scheduleDatabase.filter(item => {
+        const matchesQuery = item.subject.toLowerCase().includes(query) ||
+               item.teacher.toLowerCase().includes(query);
         const matchesGroup = groupFilter === 'ALL' || item.group === groupFilter;
         return matchesQuery && matchesGroup;
     });
@@ -504,26 +535,23 @@ function renderAdminTable(filterQuery = '') {
     document.getElementById('admin-count').innerText = filtered.length;
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 italic">No se encontraron registros en la base de datos.</td></tr>`;
+        tbody.innerHTML = '<tr class="row-empty"><td colspan="6" class="cell-empty">No se encontraron registros en la base de datos.</td></tr>';
         return;
     }
 
-    filtered.forEach(item => {
-        let tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition';
-        tr.innerHTML = `
-            <td class="py-3 px-4 font-bold text-emerald-700">${item.group}</td>
-            <td class="py-3 px-4">${item.day}</td>
-            <td class="py-3 px-4 font-mono">${item.time}</td>
-            <td class="py-3 px-4 font-bold text-slate-800">${item.subject}</td>
-            <td class="py-3 px-4 text-slate-600">${item.teacher || '—'}</td>
-            <td class="py-3 px-4 text-right space-x-2">
-                <button onclick="editScheduleItem(${item.id})" class="p-1.5 text-slate-400 hover:text-emerald-600 transition bg-slate-100 hover:bg-emerald-50 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
-                <button onclick="deleteScheduleItem(${item.id})" class="p-1.5 text-slate-400 hover:text-rose-600 transition bg-slate-100 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash"></i></button>
+    tbody.innerHTML = filtered.map(item => `
+        <tr>
+            <td class="cell-group">${esc(item.group)}</td>
+            <td class="cell-day">${esc(item.day)}</td>
+            <td class="cell-time num">${esc(item.time)}</td>
+            <td class="cell-subject">${esc(item.subject)}</td>
+            <td class="cell-teacher">${esc(item.teacher) || '—'}</td>
+            <td class="cell-actions">
+                <button type="button" onclick="editScheduleItem(${item.id})" class="icon-btn" title="Editar" aria-label="Editar ${esc(item.subject)}">${icon('pencil')}</button>
+                <button type="button" onclick="deleteScheduleItem(${item.id})" class="icon-btn icon-btn--danger" title="Eliminar" aria-label="Eliminar ${esc(item.subject)}">${icon('trash')}</button>
             </td>
-        `;
-        tbody.appendChild(tr);
-    });
+        </tr>
+    `).join('');
 }
 
 function filterAdminTable(query) {
@@ -535,13 +563,11 @@ function openAddModal() {
     document.getElementById('modal-title').innerText = 'Registrar Nueva Materia en Horario';
     document.getElementById('schedule-form').reset();
     document.getElementById('edit-id').value = '';
-    document.getElementById('schedule-modal').classList.remove('hidden');
-    document.getElementById('schedule-modal').classList.add('flex');
+    document.getElementById('schedule-modal').showModal();
 }
 
 function closeAddModal() {
-    document.getElementById('schedule-modal').classList.remove('flex');
-    document.getElementById('schedule-modal').classList.add('hidden');
+    document.getElementById('schedule-modal').close();
 }
 
 function editScheduleItem(id) {
@@ -556,8 +582,7 @@ function editScheduleItem(id) {
     document.getElementById('form-subject').value = item.subject;
     document.getElementById('form-teacher').value = item.teacher;
 
-    document.getElementById('schedule-modal').classList.remove('hidden');
-    document.getElementById('schedule-modal').classList.add('flex');
+    document.getElementById('schedule-modal').showModal();
 }
 
 async function saveScheduleItem(e) {
@@ -837,43 +862,41 @@ function renderAlertLog() {
     if (!tbody) return;
 
     if (alertLog.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="py-6 text-center text-slate-400 italic">Todavía no se ha registrado ninguna alerta.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = alertLog.map(entry => `
         <tr>
-            <td class="py-2.5 px-4 font-mono">${entry.time}</td>
-            <td class="py-2.5 px-4">${entry.termino}</td>
-            <td class="py-2.5 px-4 font-semibold text-emerald-700">${entry.sigue}</td>
+            <td class="num">${esc(entry.time)}</td>
+            <td>${esc(entry.termino)}</td>
+            <td class="go">${esc(entry.sigue)}</td>
         </tr>
     `).join('');
 }
 
-function showNotificationToast(title, message, type, iconColor = 'bg-emerald-600') {
+function showNotificationToast(title, message, type = 'info') {
     const container = document.getElementById('notification-container');
     const toast = document.createElement('div');
-    toast.className = `pointer-events-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-4 flex items-start space-x-3 transition-all duration-300 translate-y-2 opacity-0 animate-in fade-in slide-in-from-bottom-5`;
-    
+    const iconByType = { success: 'check', info: 'bell', warning: 'alert' };
+    toast.className = `toast toast--${iconByType[type] ? type : 'info'}`;
+
     toast.innerHTML = `
-        <div class="w-10 h-10 rounded-xl ${iconColor} text-white flex items-center justify-center shrink-0 shadow-md">
-            <i class="fa-solid fa-bell"></i>
-        </div>
-        <div class="flex-1">
-            <div class="flex justify-between items-center">
-                <h5 class="font-bold text-xs text-slate-900">${title}</h5>
-                <span class="text-[10px] text-slate-400 font-mono">Ahora</span>
+        <div class="toast__icon">${icon(iconByType[type] || 'bell')}</div>
+        <div class="toast__body">
+            <div class="toast__head">
+                <h5 class="toast__title">${esc(title)}</h5>
+                <span class="toast__time">Ahora</span>
             </div>
-            <p class="text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-line">${message}</p>
+            <p class="toast__msg">${esc(message)}</p>
         </div>
     `;
 
     container.appendChild(toast);
 
-    // Auto dismiss after 5 seconds
+    // Se cierra solo a los 5 segundos
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(10px)';
+        toast.classList.add('is-leaving');
         setTimeout(() => toast.remove(), 300);
     }, 5000);
 }
@@ -884,20 +907,20 @@ function showNotificationToast(title, message, type, iconColor = 'bg-emerald-600
 async function importSchedule() {
     const textarea = document.getElementById('import-json');
     const statusEl = document.getElementById('import-status');
-    statusEl.className = 'text-xs text-slate-500';
+    statusEl.className = 'msg';
     statusEl.innerText = '';
 
     let parsed;
     try {
         parsed = JSON.parse(textarea.value);
     } catch (err) {
-        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.className = 'msg msg--err';
         statusEl.innerText = 'Eso no es un código válido — revisa que sea JSON correcto (llaves, comillas, comas).';
         return;
     }
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.className = 'msg msg--err';
         statusEl.innerText = 'El código debe ser una lista de materias entre corchetes [ ].';
         return;
     }
@@ -914,12 +937,12 @@ async function importSchedule() {
     });
 
     if (errors.length > 0) {
-        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.className = 'msg msg--err';
         statusEl.innerHTML = errors.slice(0, 6).join('<br>');
         return;
     }
 
-    statusEl.className = 'text-xs text-slate-500';
+    statusEl.className = 'msg';
     statusEl.innerText = 'Importando...';
 
     // Crea sobre la marcha los grupos mencionados que todavia no existan
@@ -967,13 +990,13 @@ async function importSchedule() {
     const saved = await saveScheduleToServer();
     if (!saved) {
         scheduleDatabase = previousState;
-        statusEl.className = 'text-xs text-rose-600 font-semibold';
+        statusEl.className = 'msg msg--err';
         statusEl.innerText = 'No se pudo guardar en el servidor. Intenta de nuevo.';
         return;
     }
 
     textarea.value = '';
-    statusEl.className = 'text-xs text-emerald-700 font-semibold';
+    statusEl.className = 'msg msg--ok';
     statusEl.innerText = `Listo: ${addedCount} materias nuevas agregadas` + (replacedCount ? `, ${replacedCount} reemplazadas (ya ocupaban ese horario).` : '.');
     renderAdminTable();
     renderStudentSchedule();
@@ -1012,11 +1035,10 @@ function renderBell() {
     if (!list) return;
     list.innerHTML = bellConfig.times.length
         ? bellConfig.times.map(t => `
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
-                ${t}
-                <button type="button" onclick="removeBellTime('${t}')" class="text-emerald-600 hover:text-rose-600" title="Quitar"><i class="fa-solid fa-xmark"></i></button>
+            <span class="chip">${esc(t)}
+                <button type="button" class="chip__x" data-time="${esc(t)}" onclick="removeBellTime(this.dataset.time)" title="Quitar" aria-label="Quitar ${esc(t)}">${icon('x')}</button>
             </span>`).join('')
-        : '<span class="text-xs text-slate-400 italic">No hay horas programadas.</span>';
+        : '<span class="chips__empty">No hay horas programadas.</span>';
 
     document.getElementById('bell-duration').value = bellConfig.duration;
     document.querySelectorAll('.bell-day').forEach(cb => {
@@ -1031,10 +1053,10 @@ function renderBellStatus() {
 
     const ageSec = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
     if (ageSec !== null && ageSec < 60) {
-        box.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 w-fit';
+        box.className = 'badge badge--ok';
         text.innerText = 'ESP32 en línea';
     } else {
-        box.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 w-fit';
+        box.className = 'badge badge--off';
         text.innerText = ageSec === null ? 'ESP32 sin conexión (nunca visto)' : 'ESP32 sin conexión';
     }
 }
@@ -1060,7 +1082,7 @@ async function saveBell() {
     const days = [...document.querySelectorAll('.bell-day')].filter(cb => cb.checked).map(cb => Number(cb.value));
     const duration = Number(document.getElementById('bell-duration').value);
 
-    msg.className = 'text-xs text-slate-500';
+    msg.className = 'msg';
     msg.innerText = 'Guardando...';
 
     try {
@@ -1081,10 +1103,10 @@ async function saveBell() {
 
         bellConfig = { ...bellConfig, ...data };
         renderBell();
-        msg.className = 'text-xs text-emerald-600';
+        msg.className = 'msg msg--ok';
         msg.innerText = 'Guardado. El ESP32 lo toma en ~10 segundos.';
     } catch (err) {
-        msg.className = 'text-xs text-rose-600';
+        msg.className = 'msg msg--err';
         msg.innerText = err.message;
     }
 }
@@ -1093,8 +1115,7 @@ async function ringBellNow() {
     const btn = document.getElementById('bell-ring-btn');
     const msg = document.getElementById('bell-ring-msg');
     btn.disabled = true;
-    btn.classList.add('opacity-60');
-    msg.className = 'text-xs text-slate-500';
+    msg.className = 'msg';
     msg.innerText = 'Enviando orden...';
 
     try {
@@ -1112,15 +1133,14 @@ async function ringBellNow() {
         }
         if (!res.ok) throw new Error('No se pudo enviar la orden.');
 
-        msg.className = 'text-xs text-emerald-600';
+        msg.className = 'msg msg--ok';
         msg.innerText = 'Orden enviada. Suena en máximo ~10 segundos.';
     } catch (err) {
-        msg.className = 'text-xs text-rose-600';
+        msg.className = 'msg msg--err';
         msg.innerText = err.message;
     } finally {
         setTimeout(() => {
             btn.disabled = false;
-            btn.classList.remove('opacity-60');
         }, 4000);
     }
 }
@@ -1128,6 +1148,10 @@ async function ringBellNow() {
 // Initial render on load
 window.onload = async function() {
     mobileActiveDay = getDefaultMobileDay(); // abre en el dia real de hoy
+
+    // Tocar fuera del formulario (el fondo del <dialog>) cierra el modal
+    const scheduleModal = document.getElementById('schedule-modal');
+    scheduleModal.addEventListener('click', e => { if (e.target === scheduleModal) scheduleModal.close(); });
     await loadGroups();   // trae la lista de grupos (necesaria para filtrar el horario)
     await loadSchedule(); // trae el horario real del servidor
     await registerServiceWorker();
