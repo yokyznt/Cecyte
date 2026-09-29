@@ -34,8 +34,8 @@
 
 // ---------- CONFIGURACIÓN ----------
 // >>> LO UNICO QUE TIENES QUE CAMBIAR: tu WiFi (entre las comillas) <<<
-const char* WIFI_SSID     = "Mega_2.4G_E308";
-const char* WIFI_PASSWORD = "RtGQ29P7";
+const char* WIFI_SSID     = "NOMBRE_DE_TU_WIFI";
+const char* WIFI_PASSWORD = "CONTRASENA_DE_TU_WIFI";
 
 // Lo de abajo YA esta listo, no lo toques:
 const char* SERVER_URL = "https://cecyteo.vercel.app/api/bell";
@@ -54,8 +54,8 @@ const int  DST_OFFSET_SEG = 0;
 const int MAX_HORARIOS = 40;
 
 // Valores de respaldo (los mismos de antes) por si el servidor no responde al arrancar
-int  horarios[MAX_HORARIOS] = {420, 525, 555, 600, 660, 720, 780, 840, 900}; // minutos desde 00:00
-int  numHorarios = 9;
+int  horarios[MAX_HORARIOS] = {420, 480, 525, 555, 600, 660, 720, 780, 840, 900}; // minutos desde 00:00
+int  numHorarios = 10;
 bool diasActivos[7] = {false, true, true, true, true, true, false};          // 0=Dom ... 6=Sáb
 unsigned long duracionMs = 5000;
 
