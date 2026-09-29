@@ -29,13 +29,14 @@
     /* Blancos y neutros */
     --paper:   oklch(0.988 0.006 150);
     --surface: oklch(1 0 0);
-    --mint:    oklch(0.955 0.035 152);
+    --page:    oklch(0.94 0.026 152);   /* fondo de la página: verde grisáceo para que las tarjetas blancas resalten */
+    --mint:    oklch(0.905 0.05 152);
     --line:    oklch(0.915 0.014 150);
     --line-strong: oklch(0.84 0.02 150);
     --ink:     var(--black);
     --ink-2:   oklch(0.42 0.02 160);
     --ink-3:   oklch(0.52 0.018 160);
-    --grid:    oklch(0.55 0.12 152 / 0.075);
+    --grid:    oklch(0.5 0.12 152 / 0.09);
 
     --font-ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
@@ -64,7 +65,7 @@
 /* ==================== Base ==================== */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; background: var(--paper); }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; background: var(--page); }
 
 /* Fondo: lavado menta arriba + cuadrícula de cuaderno que se desvanece hacia abajo */
 body {
@@ -80,12 +81,12 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     caret-color: var(--green-700);
-    background-color: var(--paper);
+    background-color: var(--page);
     background-image:
-        linear-gradient(to bottom, oklch(0.988 0.006 150 / 0) 0, var(--paper) 720px),
+        linear-gradient(to bottom, oklch(0.94 0.026 152 / 0) 0, var(--page) 720px),
         linear-gradient(var(--grid) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-        radial-gradient(120% 70% at 85% -10%, var(--mint) 0, oklch(0.955 0.035 152 / 0) 60%);
+        radial-gradient(120% 70% at 85% -10%, var(--mint) 0, oklch(0.905 0.05 152 / 0) 60%);
     background-size: 100% 100%, 28px 28px, 28px 28px, 100% 900px;
     background-repeat: no-repeat, repeat, repeat, no-repeat;
     background-position: 0 0, -1px -1px, -1px -1px, 0 0;
