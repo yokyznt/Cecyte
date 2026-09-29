@@ -33,7 +33,7 @@
 
 // ---------- CONFIGURACIÓN ----------
 // >>> LO UNICO QUE TIENES QUE CAMBIAR: tu WiFi (entre las comillas) <<<
-const char* WIFI_SSID     = "NOMBRE_DE_TU_WIFI";
+const char* WIFI_SSID     = "SSID:	Mega_2.4G_E308";
 const char* WIFI_PASSWORD = "CONTRASENA_DE_TU_WIFI";
 
 // Lo de abajo YA esta listo, no lo toques:
