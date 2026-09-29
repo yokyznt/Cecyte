@@ -293,6 +293,60 @@
                 </div>
             </div>
 
+            <!-- Timbre Escolar (ESP32) -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-1">
+                    <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-bullhorn text-emerald-600"></i> Timbre Escolar
+                    </h4>
+                    <span id="bell-status" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 w-fit">
+                        <i class="fa-solid fa-circle text-[8px]"></i> <span id="bell-status-text">Revisando...</span>
+                    </span>
+                </div>
+                <p class="text-xs text-slate-500 mb-4 max-w-2xl">Las horas que pongas aquí las jala el ESP32 solito (cada ~10 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas.</p>
+
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
+                        <i class="fa-solid fa-bell"></i> Tocar timbre ahora
+                    </button>
+                    <span id="bell-ring-msg" class="text-xs text-slate-500"></span>
+                </div>
+
+                <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Horas programadas</h5>
+                <div id="bell-times-list" class="flex flex-wrap gap-2 mb-3"></div>
+
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <input type="time" id="bell-new-time" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <button type="button" onclick="addBellTime()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
+                        <i class="fa-solid fa-plus"></i> Agregar hora
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
+                    <label class="text-xs font-semibold text-slate-600 flex items-center gap-2">
+                        Duración (segundos)
+                        <input type="number" id="bell-duration" min="1" max="30" value="5" class="w-16 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </label>
+                    <div class="flex items-center gap-3 text-xs font-semibold text-slate-600">
+                        <span>Días:</span>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="1"> Lun</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="2"> Mar</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="3"> Mié</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="4"> Jue</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="5"> Vie</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="6"> Sáb</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="bell-day" value="0"> Dom</label>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-4">
+                    <p id="bell-save-msg" class="text-xs text-slate-500"></p>
+                    <button type="button" onclick="saveBell()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shrink-0">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar timbre
+                    </button>
+                </div>
+            </div>
+
             <!-- Notificaciones Automaticas -->
             <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1">

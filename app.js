@@ -349,6 +349,7 @@ function showAdminContent() {
     populateGroupSelectors();
     renderGroupsList();
     renderAdminTable();
+    loadBell();
 }
 
 async function submitLogin(e) {
@@ -979,6 +980,151 @@ async function importSchedule() {
     showNotificationToast('Horario Importado', `${addedCount} agregadas, ${replacedCount} reemplazadas.`, 'success');
 }
 
+// ==================== Timbre escolar (ESP32) ====================
+// El ESP32 le pregunta a /api/bell cada ~10s por las horas y por si hay un "tocar ahora".
+// Aqui solo editamos esa configuracion y mostramos si el ESP32 esta en linea.
+let bellConfig = { times: [], duration: 5, days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
+
+async function loadBell(fromPoll = false) {
+    if (!isAdminLoggedIn) return;
+    try {
+        const res = await fetch('/api/bell', { credentials: 'same-origin', cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // En el refresco automatico solo actualizamos el estado "en linea",
+        // para no pisar lo que el admin esta editando y todavia no guarda.
+        if (fromPoll) {
+            bellConfig.lastSeen = data.lastSeen;
+            bellConfig.serverNow = data.serverNow;
+        } else {
+            bellConfig = data;
+            renderBell();
+        }
+        renderBellStatus();
+    } catch (err) {
+        console.error('No se pudo cargar el timbre:', err);
+    }
+}
+
+function renderBell() {
+    const list = document.getElementById('bell-times-list');
+    if (!list) return;
+    list.innerHTML = bellConfig.times.length
+        ? bellConfig.times.map(t => `
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
+                ${t}
+                <button type="button" onclick="removeBellTime('${t}')" class="text-emerald-600 hover:text-rose-600" title="Quitar"><i class="fa-solid fa-xmark"></i></button>
+            </span>`).join('')
+        : '<span class="text-xs text-slate-400 italic">No hay horas programadas.</span>';
+
+    document.getElementById('bell-duration').value = bellConfig.duration;
+    document.querySelectorAll('.bell-day').forEach(cb => {
+        cb.checked = bellConfig.days.includes(Number(cb.value));
+    });
+}
+
+function renderBellStatus() {
+    const box = document.getElementById('bell-status');
+    const text = document.getElementById('bell-status-text');
+    if (!box) return;
+
+    const ageSec = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
+    if (ageSec !== null && ageSec < 60) {
+        box.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 w-fit';
+        text.innerText = 'ESP32 en línea';
+    } else {
+        box.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 w-fit';
+        text.innerText = ageSec === null ? 'ESP32 sin conexión (nunca visto)' : 'ESP32 sin conexión';
+    }
+}
+
+function addBellTime() {
+    const input = document.getElementById('bell-new-time');
+    if (!input.value) return;
+    if (!bellConfig.times.includes(input.value)) {
+        bellConfig.times.push(input.value);
+        bellConfig.times.sort();
+    }
+    input.value = '';
+    renderBell();
+}
+
+function removeBellTime(t) {
+    bellConfig.times = bellConfig.times.filter(x => x !== t);
+    renderBell();
+}
+
+async function saveBell() {
+    const msg = document.getElementById('bell-save-msg');
+    const days = [...document.querySelectorAll('.bell-day')].filter(cb => cb.checked).map(cb => Number(cb.value));
+    const duration = Number(document.getElementById('bell-duration').value);
+
+    msg.className = 'text-xs text-slate-500';
+    msg.innerText = 'Guardando...';
+
+    try {
+        const res = await fetch('/api/bell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'save', times: bellConfig.times, duration, days })
+        });
+
+        if (res.status === 401) {
+            isAdminLoggedIn = false;
+            showAdminLogin();
+            return;
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar');
+
+        bellConfig = { ...bellConfig, ...data };
+        renderBell();
+        msg.className = 'text-xs text-emerald-600';
+        msg.innerText = 'Guardado. El ESP32 lo toma en ~10 segundos.';
+    } catch (err) {
+        msg.className = 'text-xs text-rose-600';
+        msg.innerText = err.message;
+    }
+}
+
+async function ringBellNow() {
+    const btn = document.getElementById('bell-ring-btn');
+    const msg = document.getElementById('bell-ring-msg');
+    btn.disabled = true;
+    btn.classList.add('opacity-60');
+    msg.className = 'text-xs text-slate-500';
+    msg.innerText = 'Enviando orden...';
+
+    try {
+        const res = await fetch('/api/bell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'ring' })
+        });
+
+        if (res.status === 401) {
+            isAdminLoggedIn = false;
+            showAdminLogin();
+            return;
+        }
+        if (!res.ok) throw new Error('No se pudo enviar la orden.');
+
+        msg.className = 'text-xs text-emerald-600';
+        msg.innerText = 'Orden enviada. Suena en máximo ~10 segundos.';
+    } catch (err) {
+        msg.className = 'text-xs text-rose-600';
+        msg.innerText = err.message;
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.classList.remove('opacity-60');
+        }, 4000);
+    }
+}
+
 // Initial render on load
 window.onload = async function() {
     mobileActiveDay = getDefaultMobileDay(); // abre en el dia real de hoy
@@ -997,4 +1143,5 @@ window.onload = async function() {
     setInterval(checkScheduleAndNotify, 20000); // revisa cambio de clase cada 20 segundos
     setInterval(loadSchedule, 15000); // refresca el horario cada 15 segundos por si otro admin hizo cambios
     setInterval(loadGroups, 15000); // refresca la lista de grupos por si se agrego/borro alguno
+    setInterval(() => loadBell(true), 15000); // refresca el estado "ESP32 en linea" del timbre
 }

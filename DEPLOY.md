@@ -104,3 +104,29 @@ Igual que antes: en la vista de Alumnos, botón "Activar Notificaciones".
 Ahora, además de pedir permiso, el celular se suscribe de verdad — por eso
 va a funcionar aunque cierren la página o apaguen la pantalla.
 
+
+## 8. Timbre escolar (ESP32 + relé)
+
+En el panel de Admin hay una tarjeta "Timbre Escolar" donde editas las horas,
+la duración, los días, y hay un botón para tocar el timbre al momento. El ESP32
+le pregunta a la página cada ~10 segundos, así que no hay que reprogramarlo.
+
+### Variable nueva en Vercel
+
+| Nombre | Valor |
+|---|---|
+| `BELL_DEVICE_KEY` | `55a7a7dcdbed739050a5f1e54a9720c41303fd1a732cea74` |
+
+Guarda y haz Redeploy. Esa misma llave va en `DEVICE_KEY` dentro de
+`timbre_esp32.ino` (es lo que le permite al ESP32 leer las horas sin sesión de admin).
+
+### En el ESP32
+
+Abre `timbre_esp32.ino` en Arduino IDE y cambia solo `WIFI_SSID`,
+`WIFI_PASSWORD` y `SERVER_URL` (tu dominio real de Vercel + `/api/bell`).
+Placa: "ESP32 Dev Module". No necesita librerías extra.
+
+### Cómo saber que funciona
+
+Entra a Admin: la tarjeta del timbre muestra "ESP32 en línea" en verde cuando
+el ESP32 ha consultado en el último minuto.
