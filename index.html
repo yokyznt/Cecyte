@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0f3d2b">
+    <meta name="theme-color" content="#ffffff">
     <meta name="description" content="Horario de clases del CECyTE Plantel 18: qué materia va ahora, cuál sigue y avisos de cambio de clase.">
     <title>CECyTE Plantel 18 - Control de Horarios y Notificaciones</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b93b'/%3E%3Cpath d='M16 7 4 13l12 6 12-6z' fill='%230f3d2b'/%3E%3Cpath d='M9 17v4c0 2 3 4 7 4s7-2 7-4v-4l-7 3.5z' fill='%230f3d2b'/%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121a16'/%3E%3Cpath d='M16 7 4 13l12 6 12-6z' fill='%235fd08e'/%3E%3Cpath d='M9 17v4c0 2 3 4 7 4s7-2 7-4v-4l-7 3.5z' fill='%235fd08e'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -79,7 +79,7 @@
             <div class="intro">
                 <div>
                     <h2 class="intro__title">Panel de Control Estudiantil</h2>
-                    <p class="intro__text">Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
+                    <p class="intro__text"><strong id="today-label">Hoy</strong> · Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
                 </div>
                 <div class="group-pick">
                     <label for="group-selector" class="field__label">Seleccionar Grupo</label>
@@ -89,46 +89,59 @@
                 </div>
             </div>
 
-            <!-- Clase en curso -->
-            <section class="now" id="now-panel" data-state="none" aria-label="Estado actual">
-                <div class="now__main">
-                    <h3 id="current-subject-title" class="now__title">Cargando…</h3>
-                    <p id="current-teacher-name" class="now__teacher"></p>
-                    <div class="now__meta">
+            <div class="today-grid">
+                <!-- Clase en curso -->
+                <section class="now" id="now-panel" data-state="none" aria-label="Estado actual">
+                    <div class="now__top">
                         <span id="now-state" class="now__state">Sin clase</span>
                         <span id="current-subject-time" class="now__time">—</span>
                     </div>
-                </div>
 
-                <div class="now__side">
-                    <span class="now__count-label">Tiempo restante</span>
-                    <span id="countdown-timer" class="now__count" role="timer">--:--</span>
-                </div>
-
-                <div class="now__progress">
-                    <div class="now__progress-head">
-                        <span id="progress-label">Progreso de la clase actual</span>
-                        <b id="progress-percent">—</b>
+                    <div class="now__main">
+                        <h3 id="current-subject-title" class="now__title">Cargando…</h3>
+                        <p id="current-teacher-name" class="now__teacher"></p>
                     </div>
-                    <div class="track" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
-                        <div id="class-progress-bar" class="track__bar"></div>
+
+                    <div class="now__clock">
+                        <div class="now__side">
+                            <span id="countdown-timer" class="now__count" role="timer">--:--</span>
+                            <span class="now__count-label">Tiempo restante</span>
+                        </div>
+                        <div class="now__progress">
+                            <div class="now__progress-head">
+                                <span id="progress-label">Progreso de la clase actual</span>
+                                <b id="progress-percent">—</b>
+                            </div>
+                            <div class="track" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track">
+                                <div id="class-progress-bar" class="track__bar"></div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <ol id="day-strip" class="strip" aria-hidden="true"></ol>
+                    <ol id="day-strip" class="strip" aria-hidden="true"></ol>
 
-                <div class="now__next">
-                    <span>Siguiente clase:</span>
-                    <strong id="next-subject-name">—</strong>
-                </div>
-            </section>
+                    <div class="now__next">
+                        <span class="now__next-label">Siguiente clase</span>
+                        <strong id="next-subject-name">—</strong>
+                    </div>
+                </section>
+
+                <!-- Agenda de hoy -->
+                <section class="panel agenda" aria-labelledby="agenda-heading">
+                    <div class="panel__head">
+                        <h3 id="agenda-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Hoy</h3>
+                        <span id="agenda-day" class="badge">—</span>
+                    </div>
+                    <ol id="today-agenda" class="agenda__list"></ol>
+                </section>
+            </div>
 
             <!-- Notificaciones en este celular -->
             <section class="notify" aria-label="Notificaciones">
                 <div class="notify__who">
                     <div class="notify__icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg></div>
                     <div>
-                        <h4 class="notify__title">Recibe avisos de cambio de clase</h4>
+                        <h3 class="notify__title">Recibe avisos de cambio de clase</h3>
                         <p class="notify__status">Estado en este celular: <strong id="notification-status">Sin activar</strong></p>
                     </div>
                 </div>
@@ -138,7 +151,7 @@
                 </div>
             </section>
 
-            <!-- Horario -->
+            <!-- Horario semanal -->
             <section class="panel" aria-labelledby="schedule-heading">
                 <div class="panel__head">
                     <h3 id="schedule-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Horario de Clases</h3>
@@ -176,7 +189,7 @@
 
         </div>
 
-        <!-- ==================== VISTA ADMINISTRADOR ==================== -->
+<!-- ==================== VISTA ADMINISTRADOR ==================== -->
         <div id="view-admin" class="stack view hidden">
 
             <!-- Acceso -->
@@ -383,6 +396,19 @@
         </div>
 
     </main>
+
+    <footer class="site-footer">
+        <div class="container site-footer__inner">
+            <div class="brand">
+                <div class="brand__mark brand__mark--footer"><svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg></div>
+                <div>
+                    <p class="site-footer__name">CECyTE Plantel 18</p>
+                    <p class="site-footer__sub">Control de Horarios y Notificaciones</p>
+                </div>
+            </div>
+            <p class="site-footer__note">El horario se actualiza solo cada 15 segundos.</p>
+        </div>
+    </footer>
 
     <!-- Registrar / editar materia -->
     <dialog id="schedule-modal" class="modal" aria-labelledby="modal-title">
