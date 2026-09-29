@@ -36,9 +36,9 @@ const char* WIFI_SSID     = "NOMBRE_DE_TU_WIFI";
 const char* WIFI_PASSWORD = "CONTRASEÑA_DE_TU_WIFI";
 
 // Tu dominio de Vercel, SIN diagonal al final y con /api/bell
-const char* SERVER_URL = "https://tu-dominio.vercel.app/api/bell";
+const char* SERVER_URL = "https://cecyteo.vercel.app/api/bell";
 // Debe ser IGUAL a la variable BELL_DEVICE_KEY que pongas en Vercel
-const char* DEVICE_KEY = "55a7a7dcdbed739050a5f1e54a9720c41303fd1a732cea74";
+const char* DEVICE_KEY = "65f3fde588876a90ed6d2f09511dfecfa891cdce6d6cb7d5";
 
 const int  PIN_RELE = 2;                  // GPIO02 -> IN del relé
 const bool RELAY_ACTIVO_EN_BAJO = true;   // true = el módulo se activa con LOW (lo más común)
