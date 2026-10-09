@@ -234,63 +234,8 @@
 
                 <div class="admin-grid">
 
-                    <!-- Columna principal: registros -->
-                    <div class="admin-col">
-
-                        <details class="panel fold">
-                            <summary>
-                                <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
-                                <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                            </summary>
-                            <div class="panel__body">
-                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
-                                <label class="sr-only" for="import-json">Código del horario (JSON)</label>
-                                <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
-  { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
-]'></textarea>
-                                <div class="row-between">
-                                    <p id="import-status" class="msg" role="status"></p>
-                                    <button type="button" onclick="importSchedule()" class="btn btn--primary">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-                                        Importar y Guardar
-                                    </button>
-                                </div>
-                            </div>
-                        </details>
-
-                        <section class="panel" aria-label="Registros del horario">
-                            <div class="toolbar">
-                                <div class="input-icon">
-                                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-                                    <label class="sr-only" for="admin-search">Buscar materia o docente</label>
-                                    <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="input">
-                                </div>
-                                <label class="sr-only" for="admin-group-filter">Filtrar por grupo</label>
-                                <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="select">
-                                    <option value="ALL">Todos los Grupos</option>
-                                </select>
-                                <p class="toolbar__count">Mostrando <b id="admin-count">0</b> registros en base de datos</p>
-                            </div>
-                            <div class="data-wrap">
-                                <table class="data">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Grupo</th>
-                                            <th scope="col">Día</th>
-                                            <th scope="col">Hora</th>
-                                            <th scope="col">Materia</th>
-                                            <th scope="col">Docente</th>
-                                            <th scope="col" style="text-align:right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="admin-table-body"></tbody>
-                                </table>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- Columna lateral: timbre, grupos, alertas -->
-                    <div class="admin-col">
+                    <!-- Timbre, grupos y alertas: arriba, a todo el ancho -->
+                    <div class="admin-top">
 
                         <!-- Timbre escolar (ESP32) -->
                         <section class="panel" aria-labelledby="bell-heading">
@@ -379,8 +324,40 @@
                             </div>
                         </section>
 
+                        <!-- Estado del ESP32, historial y firmware -->
+                        <section class="panel" aria-labelledby="esp-heading">
+                            <div class="panel__head">
+                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
+                            </div>
+                            <div class="panel__body">
+                                <ul id="esp-info" class="plain-list"></ul>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Últimos toques</h4>
+                                    <ul id="bell-log" class="log"></ul>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
+                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
+                                    <div class="grid-2">
+                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
+                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
+                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
+                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
+                                    </div>
+                                    <div class="row-between">
+                                        <p id="fw-msg" class="msg" role="status"></p>
+                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                         <!-- Ritmo del timbre -->
-                        <section class="panel" aria-labelledby="rhythm-heading">
+                        <section class="panel panel--wide" aria-labelledby="rhythm-heading">
                             <div class="panel__head">
                                 <h3 id="rhythm-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Ritmo del timbre</h3>
                                 <span id="rhythm-total" class="badge badge--idle">—</span>
@@ -501,38 +478,6 @@
                             </div>
                         </section>
 
-                        <!-- Estado del ESP32, historial y firmware -->
-                        <section class="panel" aria-labelledby="esp-heading">
-                            <div class="panel__head">
-                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
-                            </div>
-                            <div class="panel__body">
-                                <ul id="esp-info" class="plain-list"></ul>
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Últimos toques</h4>
-                                    <ul id="bell-log" class="log"></ul>
-                                </div>
-
-                                <hr class="divider">
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
-                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
-                                    <div class="grid-2">
-                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
-                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
-                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
-                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
-                                    </div>
-                                    <div class="row-between">
-                                        <p id="fw-msg" class="msg" role="status"></p>
-                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
                         <!-- Gestión de grupos -->
                         <section class="panel" aria-labelledby="groups-heading">
                             <div class="panel__head">
@@ -573,6 +518,61 @@
                             </div>
                         </section>
 
+
+                        <details class="panel fold panel--wide">
+                            <summary>
+                                <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
+                                <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                            </summary>
+                            <div class="panel__body">
+                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
+                                <label class="sr-only" for="import-json">Código del horario (JSON)</label>
+                                <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
+  { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
+]'></textarea>
+                                <div class="row-between">
+                                    <p id="import-status" class="msg" role="status"></p>
+                                    <button type="button" onclick="importSchedule()" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                                        Importar y Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- Registros del horario -->
+                    <div class="admin-col">
+
+                        <section class="panel" aria-label="Registros del horario">
+                            <div class="toolbar">
+                                <div class="input-icon">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+                                    <label class="sr-only" for="admin-search">Buscar materia o docente</label>
+                                    <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="input">
+                                </div>
+                                <label class="sr-only" for="admin-group-filter">Filtrar por grupo</label>
+                                <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="select">
+                                    <option value="ALL">Todos los Grupos</option>
+                                </select>
+                                <p class="toolbar__count">Mostrando <b id="admin-count">0</b> registros en base de datos</p>
+                            </div>
+                            <div class="data-wrap">
+                                <table class="data">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Grupo</th>
+                                            <th scope="col">Día</th>
+                                            <th scope="col">Hora</th>
+                                            <th scope="col">Materia</th>
+                                            <th scope="col">Docente</th>
+                                            <th scope="col" style="text-align:right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-table-body"></tbody>
+                                </table>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
