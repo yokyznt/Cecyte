@@ -729,6 +729,7 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 }
 .tap-pad.is-down, .tap-pad:active { background: var(--green-700); color: #fff; border-style: solid; transform: scale(0.99); }
 
+.overview { width: 100%; height: 96px; border-radius: var(--r-md); background: var(--green-50); border: 1px solid var(--line); touch-action: none; cursor: crosshair; }
 .wave { width: 100%; height: 72px; border-radius: var(--r-md); background: var(--green-50); border: 1px solid var(--line); }
 .textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); }
 

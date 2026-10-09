@@ -56,4 +56,24 @@ assert.deepStrictEqual(T.midiARitmo(notas, { modo: 'sostenido' }).ritmo, [500, 5
 assert.deepStrictEqual(T.midiARitmo(notas, { modo: 'golpes', golpe: 100, sep: 100 }).ritmo, [100, 900, 100]);
 assert.throws(() => T.parseMidi(Uint8Array.from([1, 2, 3, 4, 5])), /MIDI/);
 
+// 6b) Un golpe justo en el segundo 0 del pedazo también cuenta (10 golpes cada 0.5 s empezando en 0)
+const z = new Float32Array(sr * 5);
+for (let c = 0; c < 10; c++) for (let i = 0; i < 300; i++) z[c * 4000 + i] = Math.sin(i * 0.7) * Math.exp(-i / 80);
+assert.strictEqual(T.detectarGolpes(z, sr, 50, 120).length, 10);
+
+// 7) Selección del pedazo de la canción (canción de 100 s, selección actual 10 a 18)
+const sel = { a: 10, b: 18 };
+assert.deepStrictEqual(T.arrastrarSeleccion('nuevo', 40, sel, 100, 30), { a: 30, b: 40 });       // arrastrar hacia la derecha
+assert.deepStrictEqual(T.arrastrarSeleccion('nuevo', 20, sel, 100, 30), { a: 20, b: 30 });       // hacia la izquierda
+assert.deepStrictEqual(T.arrastrarSeleccion('nuevo', 90, sel, 100, 10), { a: 10, b: 35 });       // tope de 25 s
+assert.deepStrictEqual(T.arrastrarSeleccion('a', 12, sel, 100), { a: 12, b: 18 });
+assert.deepStrictEqual(T.arrastrarSeleccion('a', 99, sel, 100), { a: 17, b: 18 });               // mínimo 1 s
+assert.deepStrictEqual(T.arrastrarSeleccion('b', 90, sel, 100), { a: 10, b: 35 });               // tope de 25 s
+assert.deepStrictEqual(T.arrastrarSeleccion('mover', 50, sel, 100, 4), { a: 46, b: 54 });        // agarrada a 4 s del inicio
+assert.deepStrictEqual(T.arrastrarSeleccion('mover', 500, sel, 100, 4), { a: 92, b: 100 });      // no se sale de la canción
+assert.deepStrictEqual(T.arrastrarSeleccion('mover', -5, sel, 100, 4), { a: 0, b: 8 });
+assert.deepStrictEqual(T.arrastrarSeleccion('nuevo', 100, sel, 100, 100), { a: 99, b: 100 });    // un clic al final
+const resumen = T.resumenDeAudio({ length: 8000, numberOfChannels: 1, getChannelData: () => Float32Array.from({ length: 8000 }, (_, i) => (i < 4000 ? 0.9 : 0.1)) }, 10);
+assert(resumen[0] > 0.8 && resumen[9] < 0.2 && resumen.length === 10);
+
 console.log('timbre.test.js OK');

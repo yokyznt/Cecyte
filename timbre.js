@@ -82,7 +82,7 @@ function energiaFrames(x, sr, altaFrecuencia) {
 function detectarGolpes(x, sr, sens, sepMs) {
     const { e, hopMs } = energiaFrames(x, sr, true);
     const nivel = Array.from(e, v => Math.log(1 + 200 * v));
-    const flujo = nivel.map((v, i) => (i ? Math.max(0, v - nivel[i - 1]) : 0));
+    const flujo = nivel.map((v, i) => Math.max(0, v - (i ? nivel[i - 1] : 0)));   // el primer frame cuenta: un golpe justo al inicio del pedazo no se pierde
     const n = flujo.length;
     if (!n) return [];
 
@@ -93,7 +93,7 @@ function detectarGolpes(x, sr, sens, sepMs) {
     const umbral = Math.max(media + (3 - 2.6 * (sens / 100)) * desv, 0.08 * maxFlujo);
 
     const picos = [];
-    for (let i = 1; i < n; i++) {
+    for (let i = 0; i < n; i++) {
         if (flujo[i] <= umbral || nivel[i] < 0.25 * maxNivel) continue;
         let esPico = true;
         for (let k = Math.max(0, i - 2); k <= Math.min(n - 1, i + 2); k++) if (flujo[k] > flujo[i]) esPico = false;
@@ -218,6 +218,42 @@ function ritmoACodigo(r) {
     return `const unsigned long RITMO[] = {\n${filas.join('\n')}\n};`;
 }
 
+// Selección [a, b] (en segundos) al arrastrar sobre la canción.
+// modo: 'a' (borde izquierdo), 'b' (borde derecho), 'mover' (ref = dónde agarraste dentro) o 'nuevo' (ref = dónde empezó el arrastre).
+// Siempre queda entre 1 y 25 s y dentro de la canción (dur).
+const SEL_MIN = 1, SEL_MAX = 25;
+function arrastrarSeleccion(modo, t, sel, dur, ref) {
+    let { a, b } = sel;
+    t = Math.min(dur, Math.max(0, t));
+    if (modo === 'a') { a = Math.min(t, b - SEL_MIN); if (b - a > SEL_MAX) a = b - SEL_MAX; }
+    else if (modo === 'b') { b = Math.max(t, a + SEL_MIN); if (b - a > SEL_MAX) b = a + SEL_MAX; }
+    else if (modo === 'mover') { const largo = b - a; a = Math.min(Math.max(0, t - ref), Math.max(0, dur - largo)); b = a + largo; }
+    else {
+        a = Math.min(ref, t); b = Math.max(ref, t);
+        if (b - a > SEL_MAX) { if (t < ref) a = b - SEL_MAX; else b = a + SEL_MAX; }
+        if (b - a < SEL_MIN) b = a + SEL_MIN;
+    }
+    a = Math.max(0, a); b = Math.min(dur, b);
+    if (b - a < SEL_MIN) a = Math.max(0, b - SEL_MIN);
+    return { a: Math.round(a * 10) / 10, b: Math.round(b * 10) / 10 };
+}
+
+// Volumen de toda la canción en `bins` barritas (0 a 1) para dibujar la vista general
+function resumenDeAudio(buffer, bins = 700) {
+    const n = buffer.length, paso = n / bins, out = new Float32Array(bins);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+        const d = buffer.getChannelData(c);
+        for (let i = 0; i < bins; i++) {
+            const a = Math.floor(i * paso), b = Math.min(n, Math.floor((i + 1) * paso));
+            const salto = Math.max(1, Math.floor((b - a) / 200));
+            let m = 0;
+            for (let j = a; j < b; j += salto) { const v = Math.abs(d[j]); if (v > m) m = v; }
+            if (m > out[i]) out[i] = m;
+        }
+    }
+    return out;
+}
+
 const RITMO_DE_FABRICA = [220, 160, 200, 190, 200, 210, 140, 100, 140, 230, 100, 80, 130, 250, 160, 210, 200];
 const RITMOS_BASE = [
     ['Tu ritmo de siempre', RITMO_DE_FABRICA],
@@ -232,7 +268,7 @@ const RITMOS_BASE = [
 ];
 
 if (typeof module !== 'undefined') {
-    module.exports = { normalizarRitmo, intervalosARitmo, golpesAIntervalos, detectarGolpes, detectarSostenido, audioARitmo, parseMidi, midiARitmo, toquesARitmo, ritmoDeTexto, ritmoACodigo };
+    module.exports = { arrastrarSeleccion, resumenDeAudio, normalizarRitmo, intervalosARitmo, golpesAIntervalos, detectarGolpes, detectarSostenido, audioARitmo, parseMidi, midiARitmo, toquesARitmo, ritmoDeTexto, ritmoACodigo };
 }
 
 // ---------- Interfaz ----------
@@ -492,11 +528,98 @@ async function cargarMusica(file) {
         return;
     }
     info.innerText = `${musica.nombre} · ${musica.tipo === 'midi' ? 'MIDI' : 'audio'} · ${musica.duracion.toFixed(1)} s`;
+    musica.resumen = musica.tipo === 'audio' ? resumenDeAudio(musica.buffer) : null;
     $r('music-start').value = 0;
     $r('music-start').max = Math.max(0, Math.floor(musica.duracion - 1));
+    $r('music-len').value = Math.max(1, Math.min(8, Math.floor(musica.duracion)));
     $r('music-orig').hidden = musica.tipo !== 'audio';
     $r('music-controls').hidden = false;
     convertirMusica();
+}
+
+// ----- Elegir el pedazo arrastrando sobre la canción completa -----
+
+function seleccionActual() {
+    const a = Math.max(0, Number($r('music-start').value) || 0);
+    const largo = Math.min(SEL_MAX, Math.max(SEL_MIN, Number($r('music-len').value) || 8));
+    return { a, b: a + largo };
+}
+
+function ponerSeleccion(sel) {
+    $r('music-start').value = sel.a;
+    $r('music-len').value = Math.round((sel.b - sel.a) * 10) / 10;
+    dibujarResumen();
+}
+
+function dibujarResumen() {
+    const cv = $r('music-overview');
+    if (!cv || !musica) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const c = cv.getContext('2d');
+    c.scale(dpr, dpr);
+    c.clearRect(0, 0, w, h);
+    const estilo = getComputedStyle(document.documentElement);
+    const verde = estilo.getPropertyValue('--green-700').trim(), gris = estilo.getPropertyValue('--line-strong').trim();
+    const xDe = s => (s / musica.duracion) * w;
+
+    c.fillStyle = gris;
+    if (musica.resumen) {
+        const pico = musica.resumen.reduce((a, b) => Math.max(a, b), 0) || 1;
+        for (let px = 0; px < w; px++) {
+            const alto = Math.max(1, (musica.resumen[Math.floor((px / w) * musica.resumen.length)] / pico) * (h - 8));
+            c.fillRect(px, (h - alto) / 2, 1, alto);
+        }
+    } else {
+        musica.notas.forEach(n => c.fillRect(xDe(n.s / 1000), h * 0.3, Math.max(1, xDe((n.e - n.s) / 1000)), h * 0.4));
+    }
+
+    // zona elegida: sombreada, con dos bordes para agarrar
+    const { a, b } = seleccionActual();
+    const x1 = xDe(a), x2 = Math.min(w, xDe(Math.min(b, musica.duracion)));
+    c.fillStyle = verde;
+    c.globalAlpha = 0.16;
+    c.fillRect(x1, 0, x2 - x1, h);
+    c.globalAlpha = 1;
+    c.fillRect(x1 - 1, 0, 3, h);
+    c.fillRect(x2 - 2, 0, 3, h);
+    $r('music-sel-label').innerText = `Pedazo elegido: de ${a.toFixed(1)} s a ${Math.min(b, musica.duracion).toFixed(1)} s (${(Math.min(b, musica.duracion) - a).toFixed(1)} s)`;
+}
+
+let arrastreMusica = null;
+function resumenTiempo(e) {
+    const r = $r('music-overview').getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * musica.duracion;
+}
+
+function resumenAbajo(e) {
+    if (!musica) return;
+    const t = resumenTiempo(e), { a, b } = seleccionActual();
+    const tol = (12 / $r('music-overview').clientWidth) * musica.duracion;   // ~12 px para agarrar un borde
+    if (Math.abs(t - a) <= tol) arrastreMusica = { modo: 'a' };
+    else if (Math.abs(t - b) <= tol) arrastreMusica = { modo: 'b' };
+    else if (t > a && t < b) arrastreMusica = { modo: 'mover', ref: t - a };
+    else arrastreMusica = { modo: 'nuevo', ref: t };
+    e.currentTarget.setPointerCapture(e.pointerId);
+}
+
+function resumenMueve(e) {
+    if (!musica) return;
+    if (!arrastreMusica) {   // solo el cursor: flechas sobre los bordes, mano en el centro
+        const t = resumenTiempo(e), { a, b } = seleccionActual();
+        const tol = (12 / $r('music-overview').clientWidth) * musica.duracion;
+        $r('music-overview').style.cursor = Math.abs(t - a) <= tol || Math.abs(t - b) <= tol ? 'ew-resize' : (t > a && t < b ? 'grab' : 'crosshair');
+        return;
+    }
+    const s = seleccionActual();
+    ponerSeleccion(arrastrarSeleccion(arrastreMusica.modo, resumenTiempo(e), { a: s.a, b: Math.min(s.b, musica.duracion) }, musica.duracion, arrastreMusica.ref));
+}
+
+function resumenSuelta() {
+    if (!arrastreMusica) return;
+    arrastreMusica = null;
+    convertirMusica();   // al soltar: se convierte el pedazo elegido en el ritmo del timbre
 }
 
 function opcionesMusica() {
@@ -527,6 +650,7 @@ function convertirMusica() {
     const op = opcionesMusica();
     const inicio = Math.max(0, Number($r('music-start').value) || 0);
     const largo = Math.min(25, Math.max(1, Number($r('music-len').value) || 8));
+    dibujarResumen();
     $r('music-sens-v').innerText = op.sens;
     $r('music-hit-v').innerText = op.golpe + ' ms';
     $r('music-sep-v').innerText = op.sep + ' ms';
