@@ -1,17 +1,19 @@
 // /api/bell  -> control del timbre escolar (ESP32 + relé)
 //
-// GET  ?key=BELL_DEVICE_KEY   -> lo usa el ESP32. Responde TEXTO PLANO (4 líneas):
+// GET  ?key=BELL_DEVICE_KEY   -> lo usa el ESP32. Responde TEXTO PLANO (5 líneas):
 //                                 1) id del último "tocar ahora"
-//                                 2) segundos que suena el timbre
+//                                 2) segundos totales que dura el ritmo (informativo)
 //                                 3) días activos (0=Dom,1=Lun ... 6=Sáb), ej. "12345"
 //                                 4) horas separadas por coma, ej. "07:00,08:45,09:15"
-//                                Además guarda "visto por última vez" para el panel.
+//                                 5) ritmo en ms alternando SUENA,PAUSA,SUENA... ej. "220,160,200"
+//                                Con &s=1 además guarda "visto por última vez" para el panel
+//                                (el ESP32 lo manda cada ~30 s para gastar menos la base de datos).
 // GET  (con sesión de admin)  -> responde JSON con la configuración + si el ESP32 está en línea.
-// POST { action: 'save', times, duration, days }  -> solo admin, guarda horas del timbre.
+// POST { action: 'save', times, days, rhythm }    -> solo admin, guarda horas, días y ritmo del timbre.
 // POST { action: 'ring' }                         -> solo admin, "toca el timbre ahora".
 //
 // El ESP32 no puede recibir órdenes desde Internet (está detrás del router),
-// así que él le pregunta a esta API cada ~10 segundos si hay algo nuevo.
+// así que él le pregunta a esta API cada ~5 segundos si hay algo nuevo.
 
 import { kv } from '@vercel/kv';
 import { verifyToken, parseCookies } from '../lib/auth.js';
@@ -19,12 +21,27 @@ import { verifyToken, parseCookies } from '../lib/auth.js';
 const BELL_KEY = 'cecyte_bell';
 const SEEN_KEY = 'cecyte_bell_seen';
 
+// Ritmo: milisegundos alternando SUENA, PAUSA, SUENA, ... (siempre impar: empieza y termina sonando)
+const DEFAULT_RHYTHM = [220, 160, 200, 190, 200, 210, 140, 100, 140, 230, 100, 80, 130, 250, 160, 210, 200];
+const MAX_STEPS = 120;      // el ESP32 guarda hasta 128
+const MIN_STEP_MS = 20;     // menos que esto el relé ni alcanza a cerrar
+const MAX_STEP_MS = 5000;   // tope por paso: un relé trabado prendido no dura más de 5 s
+const MAX_TOTAL_MS = 30000;
+
 const DEFAULT_BELL = {
     times: ['07:00', '08:45', '09:15', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'],
-    duration: 5,
+    duration: 3,
     days: [1, 2, 3, 4, 5],
+    rhythm: DEFAULT_RHYTHM,
     ringId: '0'
 };
+
+function validRhythm(r) {
+    return Array.isArray(r)
+        && r.length >= 1 && r.length <= MAX_STEPS && r.length % 2 === 1
+        && r.every(n => Number.isInteger(n) && n >= MIN_STEP_MS && n <= MAX_STEP_MS)
+        && r.reduce((a, b) => a + b, 0) <= MAX_TOTAL_MS;
+}
 
 async function getBell() {
     const saved = await kv.get(BELL_KEY);
@@ -81,21 +98,23 @@ export default async function handler(req, res) {
             }
 
             if (body.action === 'save') {
-                const { times, duration, days } = body;
+                const { times, days, rhythm } = body;
 
                 if (!Array.isArray(times) || times.length > 40 || !times.every(t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t))) {
                     return res.status(400).json({ error: 'Horas inválidas (formato HH:MM).' });
                 }
-                const dur = Number(duration);
-                if (!Number.isInteger(dur) || dur < 1 || dur > 30) {
-                    return res.status(400).json({ error: 'La duración debe ser de 1 a 30 segundos.' });
+                if (rhythm !== undefined && !validRhythm(rhythm)) {
+                    return res.status(400).json({ error: 'Ritmo inválido: cantidad impar de pasos (empieza y termina sonando), cada paso de 20 a 5000 ms y máximo 30 s en total.' });
                 }
                 if (!Array.isArray(days) || !days.every(d => Number.isInteger(d) && d >= 0 && d <= 6)) {
                     return res.status(400).json({ error: 'Días inválidos.' });
                 }
 
                 bell.times = [...new Set(times)].sort();
-                bell.duration = dur;
+                if (rhythm !== undefined) {
+                    bell.rhythm = rhythm;
+                    bell.duration = Math.max(1, Math.ceil(rhythm.reduce((a, b) => a + b, 0) / 1000));
+                }
                 bell.days = [...new Set(days)].sort();
                 await kv.set(BELL_KEY, bell);
                 return res.status(200).json({ ok: true, ...bell });

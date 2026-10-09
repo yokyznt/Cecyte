@@ -1048,9 +1048,9 @@ async function importSchedule() {
 }
 
 // ==================== Timbre escolar (ESP32) ====================
-// El ESP32 le pregunta a /api/bell cada ~10s por las horas y por si hay un "tocar ahora".
+// El ESP32 le pregunta a /api/bell cada ~5s por las horas, el ritmo y si hay un "tocar ahora".
 // Aqui solo editamos esa configuracion y mostramos si el ESP32 esta en linea.
-let bellConfig = { times: [], duration: 5, days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
+let bellConfig = { times: [], rhythm: [], days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
 
 async function loadBell(fromPoll = false) {
     if (!isAdminLoggedIn) return;
@@ -1084,10 +1084,10 @@ function renderBell() {
             </span>`).join('')
         : '<span class="chips__empty">No hay horas programadas.</span>';
 
-    document.getElementById('bell-duration').value = bellConfig.duration;
     document.querySelectorAll('.bell-day').forEach(cb => {
         cb.checked = bellConfig.days.includes(Number(cb.value));
     });
+    if (typeof renderRhythm === 'function') renderRhythm(); // timbre.js: editor del ritmo
 }
 
 function renderBellStatus() {
@@ -1096,7 +1096,7 @@ function renderBellStatus() {
     if (!box) return;
 
     const ageSec = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
-    if (ageSec !== null && ageSec < 60) {
+    if (ageSec !== null && ageSec < 90) { // el ESP32 avisa cada ~30 s
         box.className = 'badge badge--ok';
         text.innerText = 'ESP32 en línea';
     } else {
@@ -1121,10 +1121,10 @@ function removeBellTime(t) {
     renderBell();
 }
 
-async function saveBell() {
-    const msg = document.getElementById('bell-save-msg');
+// Guarda horas, días y ritmo juntos. Devuelve true si el servidor lo aceptó.
+async function saveBell(msgId = 'bell-save-msg') {
+    const msg = document.getElementById(msgId);
     const days = [...document.querySelectorAll('.bell-day')].filter(cb => cb.checked).map(cb => Number(cb.value));
-    const duration = Number(document.getElementById('bell-duration').value);
 
     msg.className = 'msg';
     msg.innerText = 'Guardando...';
@@ -1134,13 +1134,13 @@ async function saveBell() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ action: 'save', times: bellConfig.times, duration, days })
+            body: JSON.stringify({ action: 'save', times: bellConfig.times, days, rhythm: bellConfig.rhythm })
         });
 
         if (res.status === 401) {
             isAdminLoggedIn = false;
             showAdminLogin();
-            return;
+            return false;
         }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al guardar');
@@ -1148,10 +1148,12 @@ async function saveBell() {
         bellConfig = { ...bellConfig, ...data };
         renderBell();
         msg.className = 'msg msg--ok';
-        msg.innerText = 'Guardado. El ESP32 lo toma en ~10 segundos.';
+        msg.innerText = 'Guardado. El ESP32 lo toma en ~5 segundos y se actualiza solo.';
+        return true;
     } catch (err) {
         msg.className = 'msg msg--err';
         msg.innerText = err.message;
+        return false;
     }
 }
 
@@ -1178,7 +1180,7 @@ async function ringBellNow() {
         if (!res.ok) throw new Error('No se pudo enviar la orden.');
 
         msg.className = 'msg msg--ok';
-        msg.innerText = 'Orden enviada. Suena en máximo ~10 segundos.';
+        msg.innerText = 'Orden enviada. Suena en máximo ~5 segundos.';
     } catch (err) {
         msg.className = 'msg msg--err';
         msg.innerText = err.message;

@@ -30,6 +30,9 @@
         <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
         <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
         <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+        <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+        <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
         <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
         <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
@@ -296,7 +299,7 @@
                                 <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">Las horas que pongas aquí las jala el ESP32 solito (cada ~10 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas.</p>
+                                <p class="hint">Las horas, los días y el ritmo los jala el ESP32 solito (cada ~5 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas. El ritmo se edita en el panel de abajo.</p>
 
                                 <div>
                                     <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
@@ -321,11 +324,6 @@
                                     </div>
                                 </div>
 
-                                <div class="field" style="max-width:190px">
-                                    <label class="field__label" for="bell-duration">Duración (segundos)</label>
-                                    <input type="number" id="bell-duration" min="1" max="30" value="5" class="input">
-                                </div>
-
                                 <fieldset style="border:0;padding:0;margin:0;min-width:0">
                                     <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
                                     <div class="days">
@@ -345,6 +343,117 @@
                                         <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
                                         Guardar timbre
                                     </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Ritmo del timbre -->
+                        <section class="panel" aria-labelledby="rhythm-heading">
+                            <div class="panel__head">
+                                <h3 id="rhythm-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Ritmo del timbre</h3>
+                                <span id="rhythm-total" class="badge badge--idle">—</span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Así suena el timbre cada vez que se activa. Edítalo a mano, golpéalo con el dedo o conviértelo desde una canción. Escúchalo aquí antes de guardarlo; al guardar, el ESP32 lo descarga solo.</p>
+
+                                <div class="tl" role="img" aria-label="Línea de tiempo del ritmo: los bloques verdes son los momentos en que suena">
+                                    <div id="rhythm-tl-bars" class="tl__bars"></div>
+                                    <span id="rhythm-head" class="tl__head" hidden></span>
+                                </div>
+                                <p id="rhythm-warn" class="msg msg--err" hidden>El ritmo se pasa de 30 s o de 59 toques; el servidor no lo va a aceptar.</p>
+
+                                <div class="btn-row">
+                                    <button type="button" onclick="playRhythm()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar</button>
+                                    <button type="button" onclick="stopPreview()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Detener</button>
+                                </div>
+
+                                <div>
+                                    <h4 class="panel__sub" style="margin-bottom:8px">Ritmos de ejemplo</h4>
+                                    <div id="rhythm-presets" class="pills"></div>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="seg" role="group" aria-label="Cómo crear el ritmo" style="align-self:flex-start;flex-wrap:wrap">
+                                    <button type="button" class="seg__btn" data-rtabbtn="pasos" aria-pressed="true" onclick="showRhythmTab('pasos')">Editar toques</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="golpear" aria-pressed="false" onclick="showRhythmTab('golpear')">Golpear</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="musica" aria-pressed="false" onclick="showRhythmTab('musica')">De música</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="codigo" aria-pressed="false" onclick="showRhythmTab('codigo')">Código</button>
+                                </div>
+
+                                <!-- Editar toques -->
+                                <div data-rtab="pasos" class="stack">
+                                    <p class="hint">Cada toque es un “suena” seguido de una “pausa”, en milisegundos (1000 ms = 1 s). El último toque solo suena y termina.</p>
+                                    <div id="rhythm-steps" class="steps"></div>
+                                    <div><button type="button" onclick="agregarToque()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Agregar toque</button></div>
+                                </div>
+
+                                <!-- Golpear -->
+                                <div data-rtab="golpear" class="stack" hidden>
+                                    <p class="hint">Mantén apretado el botón (o la barra espaciadora) el tiempo que quieres que suene y suéltalo para la pausa. Cuando pasen 2 segundos sin tocar, se convierte solo en ritmo.</p>
+                                    <button type="button" id="tap-pad" class="tap-pad" onpointerdown="event.preventDefault();this.setPointerCapture(event.pointerId);tapAbajo()" onpointerup="tapArriba()" onpointercancel="tapArriba()" oncontextmenu="return false">Apretar para sonar</button>
+                                    <div class="row-between">
+                                        <p id="tap-count" class="msg" role="status">Pulsa y mantén para marcar cada toque.</p>
+                                        <div class="btn-row">
+                                            <button type="button" onclick="terminarGolpeo()" class="btn btn--secondary btn--sm">Terminar ya</button>
+                                            <button type="button" onclick="reiniciarGolpeo()" class="btn btn--secondary btn--sm">Empezar de nuevo</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Música -->
+                                <div data-rtab="musica" class="stack" hidden>
+                                    <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Se queda con un pedazo de hasta 25 s y lo convierte a toques del timbre. El archivo no se sube a ningún lado: todo pasa en tu navegador.</p>
+                                    <div class="field">
+                                        <label class="field__label" for="music-file">Archivo de música</label>
+                                        <input type="file" id="music-file" accept="audio/*,.mid,.midi" class="input" onchange="cargarMusica(this.files[0])">
+                                        <p id="music-info" class="msg" role="status"></p>
+                                    </div>
+                                    <div id="music-controls" class="stack" hidden>
+                                        <canvas id="music-wave" class="wave" role="img" aria-label="Volumen del pedazo elegido; las rayas verdes son los toques detectados"></canvas>
+                                        <div class="grid-2">
+                                            <div class="field"><label class="field__label" for="music-start">Empezar en (segundos)</label>
+                                                <input type="number" id="music-start" min="0" step="1" value="0" class="input" oninput="convertirMusicaSuave()"></div>
+                                            <div class="field"><label class="field__label" for="music-len">Duración del pedazo (s)</label>
+                                                <input type="number" id="music-len" min="1" max="25" step="1" value="8" class="input" oninput="convertirMusicaSuave()"></div>
+                                        </div>
+                                        <div class="field"><label class="field__label" for="music-mode">Cómo convertir</label>
+                                            <select id="music-mode" class="select" onchange="convertirMusica()">
+                                                <option value="golpes">Un toque por cada golpe / nota (recomendado)</option>
+                                                <option value="sostenido">Seguir el volumen (suena mientras suena la música)</option>
+                                            </select></div>
+                                        <div class="field"><label class="field__label" for="music-sens">Sensibilidad: <span id="music-sens-v">50</span></label>
+                                            <input type="range" id="music-sens" min="0" max="100" value="50" oninput="convertirMusicaSuave()"></div>
+                                        <div id="music-hit-box" class="field"><label class="field__label" for="music-hit">Cuánto dura cada toque: <span id="music-hit-v">120 ms</span></label>
+                                            <input type="range" id="music-hit" min="40" max="400" step="10" value="120" oninput="convertirMusicaSuave()"></div>
+                                        <div id="music-sep-box" class="field"><label class="field__label" for="music-sep">Separación mínima entre toques: <span id="music-sep-v">120 ms</span></label>
+                                            <input type="range" id="music-sep" min="80" max="600" step="10" value="120" oninput="convertirMusicaSuave()"></div>
+                                        <div class="btn-row">
+                                            <button type="button" id="music-orig" onclick="escucharOriginal()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar la canción</button>
+                                            <button type="button" onclick="playRhythm()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar como timbre</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Código -->
+                                <div data-rtab="codigo" class="stack" hidden>
+                                    <p class="hint">Pega aquí un arreglo de Arduino (con o sin comentarios) para cargarlo, o copia el ritmo actual como código.</p>
+                                    <label class="sr-only" for="rhythm-paste">Ritmo como código o lista de números</label>
+                                    <textarea id="rhythm-paste" class="textarea" rows="7" spellcheck="false" placeholder="const unsigned long RITMO[] = { 220, 160, 200 };"></textarea>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="usarTextoRitmo()" class="btn btn--secondary btn--sm">Usar este ritmo</button>
+                                        <button type="button" onclick="verCodigoRitmo()" class="btn btn--secondary btn--sm">Ver / copiar el actual</button>
+                                    </div>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="row-between">
+                                    <p id="rhythm-save-msg" class="msg" role="status"></p>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="guardarRitmo(false)" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar ritmo</button>
+                                        <button type="button" onclick="guardarRitmo(true)" class="btn btn--bell"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Guardar y tocar</button>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -465,6 +574,7 @@
         </form>
     </dialog>
 
+    <script src="timbre.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
