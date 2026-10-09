@@ -82,7 +82,7 @@
             <div class="intro">
                 <div>
                     <h2 class="intro__title">Panel de Control Estudiantil</h2>
-                    <p class="intro__text"><strong id="today-label">Hoy</strong> · Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
+                    <p class="intro__text"><strong id="today-label">Hoy</strong> · Elige tu grupo para ver tu horario y la clase en curso.</p>
                 </div>
                 <div class="group-pick">
                     <label for="group-selector" class="field__label">Seleccionar Grupo</label>
@@ -218,7 +218,7 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Gestión de Horarios y Grupos</h2>
-                        <p class="admin-head__text">Agrega, edita o elimina materias. Los cambios se guardan en el servidor y se reflejan para todos.</p>
+                        <p class="admin-head__text">Agrega, edita o elimina materias. Todos ven los cambios.</p>
                     </div>
                     <div class="admin-head__actions">
                         <button type="button" onclick="openAddModal()" class="btn btn--primary">
@@ -243,7 +243,7 @@
                                 <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
                             </summary>
                             <div class="panel__body">
-                                <p class="hint">Mándame por chat una foto de un horario y te devuelvo un código para pegar aquí abajo. Le das "Importar y Guardar" y se agrega TODO junto a la base de datos, sin capturarlo materia por materia. Si mencionas un grupo que no existe todavía, se crea solo.</p>
+                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
                                 <label class="sr-only" for="import-json">Código del horario (JSON)</label>
                                 <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
   { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
@@ -299,7 +299,7 @@
                                 <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">Las horas, los días y el ritmo los jala el ESP32 solito (cada ~5 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas. El ritmo se edita en el panel de abajo.</p>
+                                <p class="hint">El ESP32 descarga las horas, los días y el ritmo cada 5 segundos. "Tocar timbre ahora" suena sin esperar la hora programada.</p>
 
                                 <div>
                                     <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
@@ -354,7 +354,7 @@
                                 <span id="rhythm-total" class="badge badge--idle">—</span>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">Así suena el timbre cada vez que se activa. Edítalo a mano, golpéalo con el dedo o conviértelo desde una canción. Escúchalo aquí antes de guardarlo; al guardar, el ESP32 lo descarga solo.</p>
+                                <p class="hint">Escúchalo aquí antes de guardar. El ESP32 lo descarga en unos 5 segundos.</p>
 
                                 <div class="tl" role="img" aria-label="Línea de tiempo del ritmo: los bloques verdes son los momentos en que suena">
                                     <div id="rhythm-tl-bars" class="tl__bars"></div>
@@ -383,14 +383,14 @@
 
                                 <!-- Editar toques -->
                                 <div data-rtab="pasos" class="stack">
-                                    <p class="hint">Cada toque es un “suena” seguido de una “pausa”, en milisegundos (1000 ms = 1 s). El último toque solo suena y termina.</p>
+                                    <p class="hint">Cada toque suena y luego hace una pausa, en milisegundos (1000 ms = 1 s). El último solo suena.</p>
                                     <div id="rhythm-steps" class="steps"></div>
                                     <div><button type="button" onclick="agregarToque()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Agregar toque</button></div>
                                 </div>
 
                                 <!-- Golpear -->
                                 <div data-rtab="golpear" class="stack" hidden>
-                                    <p class="hint">Mantén apretado el botón (o la barra espaciadora) el tiempo que quieres que suene y suéltalo para la pausa. Cuando pasen 2 segundos sin tocar, se convierte solo en ritmo.</p>
+                                    <p class="hint">Mantén apretado el botón (o la barra espaciadora) para que suene y suéltalo para la pausa. Tras 2 segundos sin tocar, se arma el ritmo.</p>
                                     <button type="button" id="tap-pad" class="tap-pad" onpointerdown="event.preventDefault();this.setPointerCapture(event.pointerId);tapAbajo()" onpointerup="tapArriba()" onpointercancel="tapArriba()" oncontextmenu="return false">Apretar para sonar</button>
                                     <div class="row-between">
                                         <p id="tap-count" class="msg" role="status">Pulsa y mantén para marcar cada toque.</p>
@@ -403,7 +403,7 @@
 
                                 <!-- Música -->
                                 <div data-rtab="musica" class="stack" hidden>
-                                    <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Se queda con un pedazo de hasta 25 s y lo convierte a toques del timbre. El archivo no se sube a ningún lado: todo pasa en tu navegador.</p>
+                                    <p class="hint">Sube un MP3, WAV, OGG o MIDI. Se convierte un pedazo de hasta 25 s y el archivo no sale de tu navegador.</p>
                                     <div class="field">
                                         <label class="field__label" for="music-file">Archivo de música</label>
                                         <input type="file" id="music-file" accept="audio/*,.mid,.midi" class="input" onchange="cargarMusica(this.files[0])">
@@ -437,7 +437,7 @@
 
                                 <!-- Código -->
                                 <div data-rtab="codigo" class="stack" hidden>
-                                    <p class="hint">Pega aquí un arreglo de Arduino (con o sin comentarios) para cargarlo, o copia el ritmo actual como código.</p>
+                                    <p class="hint">Pega un arreglo de Arduino, con o sin comentarios, o copia el ritmo actual como código.</p>
                                     <label class="sr-only" for="rhythm-paste">Ritmo como código o lista de números</label>
                                     <textarea id="rhythm-paste" class="textarea" rows="7" spellcheck="false" placeholder="const unsigned long RITMO[] = { 220, 160, 200 };"></textarea>
                                     <div class="btn-row">
@@ -464,7 +464,7 @@
                                 <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">Agrega grupos nuevos para próximos años, o borra los que ya no uses. Borrar un grupo también borra todas sus materias del horario.</p>
+                                <p class="hint">Borrar un grupo también borra sus materias del horario.</p>
                                 <form onsubmit="addGroup(event)" class="inline-form">
                                     <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
                                     <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
@@ -483,7 +483,7 @@
                                 <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
                             </div>
                             <div class="panel__body" style="padding-bottom:0">
-                                <p class="hint">Cuando cambie de bloque según la hora real, se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa desde su propio celular en la vista de Alumnos.</p>
+                                <p class="hint">Al cambiar de bloque se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa en su celular, en la vista de Alumnos.</p>
                                 <h4 class="panel__sub">Registro de Alertas</h4>
                             </div>
                             <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
