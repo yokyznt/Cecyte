@@ -337,6 +337,38 @@
                                     </div>
                                 </fieldset>
 
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Días sin timbre</h4>
+                                    <p class="hint">Vacaciones, suspensiones y días festivos: ese día no suena nada.</p>
+                                    <div id="bell-off-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
+                                        <input type="date" id="bell-off-date" class="input">
+                                        <button type="button" onclick="addOffDate()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar día
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Horario especial</h4>
+                                    <p class="hint">Un día con otras horas, por ejemplo un día corto. Ese día manda sobre las horas normales y sobre los días de la semana.</p>
+                                    <div id="bell-special-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-special-date">Fecha del horario especial</label>
+                                        <input type="date" id="bell-special-date" class="input" style="max-width:170px">
+                                        <label class="sr-only" for="bell-special-times">Horas de ese día</label>
+                                        <input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00">
+                                        <button type="button" onclick="addSpecial()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div class="row-between">
                                     <p id="bell-save-msg" class="msg" role="status"></p>
                                     <button type="button" onclick="saveBell()" class="btn btn--primary">
@@ -370,6 +402,17 @@
                                 <div>
                                     <h4 class="panel__sub" style="margin-bottom:8px">Ritmos de ejemplo</h4>
                                     <div id="rhythm-presets" class="pills"></div>
+                                </div>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Ritmo propio para una hora</h4>
+                                    <p class="hint">Por ejemplo, un ritmo distinto para el recreo. Deja el ritmo de arriba como quieres que suene, elige la hora y asígnalo. Las demás horas siguen con el ritmo normal.</p>
+                                    <div id="rhythm-ovr-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="rhythm-ovr-time">Hora con ritmo propio</label>
+                                        <select id="rhythm-ovr-time" class="select" style="max-width:130px"></select>
+                                        <button type="button" onclick="setOverride()" class="btn btn--secondary">Usar para esa hora</button>
+                                    </div>
                                 </div>
 
                                 <hr class="divider">
@@ -453,6 +496,38 @@
                                     <div class="btn-row">
                                         <button type="button" onclick="guardarRitmo(false)" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar ritmo</button>
                                         <button type="button" onclick="guardarRitmo(true)" class="btn btn--bell"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Guardar y tocar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Estado del ESP32, historial y firmware -->
+                        <section class="panel" aria-labelledby="esp-heading">
+                            <div class="panel__head">
+                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
+                            </div>
+                            <div class="panel__body">
+                                <ul id="esp-info" class="plain-list"></ul>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Últimos toques</h4>
+                                    <ul id="bell-log" class="log"></ul>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
+                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
+                                    <div class="grid-2">
+                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
+                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
+                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
+                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
+                                    </div>
+                                    <div class="row-between">
+                                        <p id="fw-msg" class="msg" role="status"></p>
+                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
                                     </div>
                                 </div>
                             </div>
@@ -575,6 +650,7 @@
     </dialog>
 
     <script src="timbre.js"></script>
+    <script src="timbre-estado.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

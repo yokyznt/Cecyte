@@ -1050,7 +1050,7 @@ async function importSchedule() {
 // ==================== Timbre escolar (ESP32) ====================
 // El ESP32 le pregunta a /api/bell cada ~5s por las horas, el ritmo y si hay un "tocar ahora".
 // Aqui solo editamos esa configuracion y mostramos si el ESP32 esta en linea.
-let bellConfig = { times: [], rhythm: [], days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
+let bellConfig = { times: [], rhythm: [], rhythms: {}, offDates: [], specials: {}, log: [], fw: null, days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
 
 async function loadBell(fromPoll = false) {
     if (!isAdminLoggedIn) return;
@@ -1062,8 +1062,8 @@ async function loadBell(fromPoll = false) {
         // En el refresco automatico solo actualizamos el estado "en linea",
         // para no pisar lo que el admin esta editando y todavia no guarda.
         if (fromPoll) {
-            bellConfig.lastSeen = data.lastSeen;
-            bellConfig.serverNow = data.serverNow;
+            Object.assign(bellConfig, { lastSeen: data.lastSeen, serverNow: data.serverNow, espFw: data.espFw, espRssi: data.espRssi, espClockDiffMs: data.espClockDiffMs, log: data.log, fw: data.fw });
+            if (typeof renderEstado === 'function') renderEstado();
         } else {
             bellConfig = data;
             renderBell();
@@ -1088,6 +1088,7 @@ function renderBell() {
         cb.checked = bellConfig.days.includes(Number(cb.value));
     });
     if (typeof renderRhythm === 'function') renderRhythm(); // timbre.js: editor del ritmo
+    if (typeof renderBellExtras === 'function') renderBellExtras(); // timbre-estado.js: excepciones, estado y firmware
 }
 
 function renderBellStatus() {
@@ -1134,7 +1135,7 @@ async function saveBell(msgId = 'bell-save-msg') {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ action: 'save', times: bellConfig.times, days, rhythm: bellConfig.rhythm })
+            body: JSON.stringify({ action: 'save', times: bellConfig.times, days, rhythm: bellConfig.rhythm, rhythms: bellConfig.rhythms, offDates: bellConfig.offDates, specials: bellConfig.specials })
         });
 
         if (res.status === 401) {
