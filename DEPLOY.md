@@ -130,3 +130,20 @@ Placa: "ESP32 Dev Module". No necesita librerías extra.
 
 Entra a Admin: la tarjeta del timbre muestra "ESP32 en línea" en verde cuando
 el ESP32 ha consultado en el último minuto.
+
+## 9. Robot mBot Ranger (USB, sin servidor)
+
+En Admin hay una pestaña **Robot**. Todo ocurre entre el navegador y el robot por
+USB (Web Serial, Chrome o Edge en una computadora); no usa Vercel ni variables nuevas.
+
+Una sola vez hay que subirle al robot `robot/mbot_ranger_web/mbot_ranger_web.ino`
+con el IDE de Arduino (placa "Arduino Mega or Mega 2560", librería Makeblock). Es el
+sketch del tanquecito con los modos del botón más el modo 4, el de la página.
+Después, al abrir la pestaña con el robot enchufado, se conecta solo.
+
+- **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`).
+- **Luces:** los 12 LEDs del anillo, brillo y efectos; se aplican al instante.
+- **Seguridad:** el botón **Paro** corta nota y motores al momento, y si la página
+  deja de mandar órdenes los motores se paran solos a los 3 segundos.
+- **Afinar:** si las notas salen bajas o altas, ajusta `AJUSTE_US` en el `.ino`.
+- **Pruebas:** `node test/robot.test.js`.

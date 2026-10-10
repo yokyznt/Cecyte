@@ -921,6 +921,42 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
+/* ==================== Robot mBot Ranger ==================== */
+@media (min-width: 1100px) { .admin-top .panel__body > .rb-full { grid-column: 1 / -1; } }
+
+.rb-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.rb-check input { width: 20px; height: 20px; accent-color: var(--green-700); }
+.rb-paro { border-color: var(--rose-700); color: var(--rose-700); }
+.rb-paro:hover:not(:disabled) { background: var(--rose-100); border-color: var(--rose-700); }
+.rb-prog { width: 100%; height: 8px; accent-color: var(--green-700); }
+
+/* Anillo de 12 LEDs: cada botón es un LED y se pinta del color que tiene */
+.rb-leds { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 28px 40px; align-items: start; }
+@media (max-width: 700px) { .rb-leds { grid-template-columns: 1fr; } }
+.rb-anillo {
+    position: relative; width: min(100%, 300px); aspect-ratio: 1; margin-inline: auto;
+    border-radius: 50%; background: var(--black-2); border: 1px solid var(--black);
+}
+.rb-led {
+    position: absolute; width: 44px; height: 44px; translate: -50% -50%;
+    border-radius: 50%; border: 2px solid oklch(1 0 0 / 0.55); background: var(--c, #000);
+    color: #fff; font-size: var(--fs-cap); font-weight: 700; text-shadow: 0 0 3px #000, 0 0 3px #000;
+    font-variant-numeric: tabular-nums; cursor: pointer;
+    transition: scale 120ms var(--ease-out);
+}
+.rb-led:hover { scale: 1.08; }
+.rb-led[aria-pressed="true"] { outline: 3px solid #fff; outline-offset: 2px; scale: 1.12; }
+.rb-leds > .stack { max-width: 440px; }
+.rb-color { width: 100%; max-width: 220px; height: 44px; padding: 3px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; }
+.rb-paleta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rb-sw { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); cursor: pointer; transition: scale 120ms var(--ease-out); }
+.rb-sw:hover { scale: 1.08; }
+
+.rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 4px 16px; }
+.rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.rb-instalar ol { margin: 4px 0 14px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.rb-instalar a { color: var(--green-800); font-weight: 700; }
+
 @media print {
     .site-header, .site-footer, .notify, .toasts, .intro .group-pick, .agenda { display: none !important; }
     body { background: #fff; }

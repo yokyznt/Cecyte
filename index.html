@@ -32,6 +32,7 @@
         <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
         <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
         <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+        <symbol id="i-robot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
         <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
         <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
@@ -241,6 +242,9 @@
                         </button>
                         <button type="button" role="tab" id="tab-esp32" data-section-tab="esp32" aria-controls="sec-esp32" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>ESP32</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot" data-section-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
                         </button>
                         <button type="button" role="tab" id="tab-grupos" data-section-tab="grupos" aria-controls="sec-grupos" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span>Grupos</span>
@@ -505,6 +509,116 @@
                             </div>
                         </section>
 
+                        <!-- Robot mBot Ranger (Me Auriga) por USB: canciones, baile y LEDs -->
+                        <section class="panel admin-sec" id="sec-robot" data-section="robot" role="tabpanel" aria-labelledby="robot-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="robot-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Robot mBot Ranger</h3>
+                                <span id="rb-badge" class="badge badge--idle"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint rb-full">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
+
+                                <div class="btn-row rb-full">
+                                    <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
+                                    <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
+                                    <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
+                                </div>
+                                <p class="hint rb-full"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
+                                <p id="rb-msg" class="msg" role="status"></p>
+                                <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
+
+                                <!-- Canción -->
+                                <div class="stack">
+                                    <h4 class="panel__sub">Canción</h4>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-cancion">Elige una canción</label>
+                                        <select id="rb-cancion" class="select"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-notas">Notas</label>
+                                        <textarea id="rb-notas" class="textarea" rows="6" spellcheck="false"></textarea>
+                                        <p id="rb-err-notas" class="msg msg--err" role="status"></p>
+                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). Lo que sigue a // es un comentario.</p>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
+                                        <input type="range" id="rb-bpm" min="50" max="220" step="1">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-escuchar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar aquí</button>
+                                        <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
+                                        <button type="button" id="rb-tocar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Cantar en el robot</button>
+                                    </div>
+                                </div>
+
+                                <!-- Baile -->
+                                <div class="stack">
+                                    <h4 class="panel__sub">Baile</h4>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-baile">Elige un baile</label>
+                                        <select id="rb-baile" class="select"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-pasos">Pasos</label>
+                                        <textarea id="rb-pasos" class="textarea" rows="3" spellcheck="false"></textarea>
+                                        <p id="rb-err-baile" class="msg msg--err" role="status"></p>
+                                        <p class="hint">AD adelante, AT atrás, GI gira a la izquierda, GD gira a la derecha, PA parar. Duran como las notas (/2 son dos tiempos). Si el baile es más corto que la canción, se repite.</p>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-vel">Velocidad de las ruedas: <span id="rb-vel-v"></span></label>
+                                        <input type="range" id="rb-vel" min="40" max="180" step="5">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-bailar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Bailar y cantar</button>
+                                        <label class="rb-check"><input type="checkbox" id="rb-repetir"><span>Repetir hasta pulsar Paro</span></label>
+                                    </div>
+                                    <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
+                                </div>
+
+                                <hr class="divider">
+
+                                <!-- Luces -->
+                                <div class="stack rb-full">
+                                    <h4 class="panel__sub">Luces del anillo (12 LEDs)</h4>
+                                    <div class="rb-leds">
+                                        <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
+                                        <div class="stack">
+                                            <div class="field">
+                                                <label class="field__label" for="rb-led-color">Color del LED elegido</label>
+                                                <input type="color" id="rb-led-color" class="rb-color">
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos de ese color</button>
+                                            </div>
+                                            <div>
+                                                <span class="field__label" id="rb-paleta-label">Colores rápidos (pintan todos)</span>
+                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"></div>
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-brillo">Brillo: <span id="rb-brillo-v"></span></label>
+                                                <input type="range" id="rb-brillo" min="0" max="100" step="1">
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-efecto">Efecto</label>
+                                                <select id="rb-efecto" class="select"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Instalación del programa -->
+                                <details id="rb-instalar" class="rb-full rb-instalar">
+                                    <summary>Instalar el programa en el robot (una sola vez)</summary>
+                                    <ol>
+                                        <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
+                                        <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
+                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página.</li>
+                                        <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
+                                    </ol>
+                                </details>
+                            </div>
+                        </section>
+
                         <!-- Gestión de grupos -->
                         <section class="panel admin-sec" id="sec-grupos" data-section="grupos" role="tabpanel" aria-labelledby="groups-heading" hidden>
                             <div class="panel__head">
@@ -677,6 +791,7 @@
 
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
+    <script src="robot.js"></script>
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
 </body>

@@ -4,7 +4,7 @@
 // última sección y se puede abrir directo con un enlace: https://.../#admin-timbre
 // Depende de: switchView() de app.js (solo para abrir el admin desde el enlace).
 
-const ADMIN_SECCIONES = ['horarios', 'timbre', 'ritmo', 'esp32', 'grupos', 'alertas'];
+const ADMIN_SECCIONES = ['horarios', 'timbre', 'ritmo', 'esp32', 'robot', 'grupos', 'alertas'];
 
 function seccionGuardada() {
     const deHash = location.hash.startsWith('#admin-') ? location.hash.slice(7) : '';
