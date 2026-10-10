@@ -104,7 +104,7 @@ function updateCurrentClassCard() {
         timeEl.innerText = '—';
         setState('none', 'Sin clase');
         percentEl.innerText = '—';
-        barEl.style.width = '0%';
+        barEl.style.clipPath = 'inset(0 100% 0 0 round 99px)';
         trackEl.setAttribute('aria-valuenow', '0');
         countdownEl.innerText = '--:--';
         nextEl.innerText = findNextClassLabel(day) || 'Sin más clases';
@@ -142,7 +142,7 @@ function updateCurrentClassCard() {
 
     timeEl.innerText = `${slot.key} hrs`;
     percentEl.innerText = `${percent}%`;
-    barEl.style.width = `${percent}%`;
+    barEl.style.clipPath = `inset(0 ${100 - percent}% 0 0 round 99px)`;
     trackEl.setAttribute('aria-valuenow', String(percent));
     countdownEl.innerText = `${remMin}:${remSec}`;
     nextEl.innerText = findNextClassLabel(day, slot.key) || 'Sin más clases hoy';
@@ -162,6 +162,15 @@ function renderDayStrip(day, slot) {
         const cls = ['strip__seg', s.receso ? 'is-recess' : '', isNow ? 'is-now' : (isPast ? 'is-past' : '')].join(' ').trim();
         return `<li class="${cls}" style="flex:${end - start}" title="${esc(s.label)}"><span class="strip__label">${s.key.slice(0, 5)}</span></li>`;
     }).join('');
+}
+
+// Entrada escalonada de una lista: solo la primera vez que se pinta (o al cambiar de grupo), no en cada repintado
+function animarUnaVez(el, hijo, clave = currentStudentGroup) {
+    if (!el || el.dataset.animada === String(clave)) return;
+    if (hijo && !el.querySelector(hijo)) return;
+    el.dataset.animada = String(clave);
+    el.classList.add('is-entering');
+    setTimeout(() => el.classList.remove('is-entering'), 1400);
 }
 
 // Agenda de "Hoy": todos los bloques del dia real, con pasado / ahora / siguiente
@@ -205,6 +214,7 @@ function renderTodayAgenda() {
             : 'Hora libre';
         return `<li class="${cls}"><span class="agenda__time">${start}</span><span class="agenda__subject">${subject}</span><span class="agenda__tag">${tag}</span></li>`;
     }).join('');
+    animarUnaVez(list);
 }
 
 // Busca la siguiente materia asignada despues del bloque actual (o desde el inicio si no hay bloque activo)
@@ -506,6 +516,7 @@ function renderStudentSchedule() {
         }).join('');
         return `<tr class="${isNowRow ? 'is-now-row' : ''}">${timeCell}${cells}</tr>`;
     }).join('');
+    animarUnaVez(tbody, ".slot");
 
     // Grupo sin materias: avisa en vez de dejar una cuadricula vacia sin explicacion
     const emptyEl = document.getElementById('schedule-empty');
@@ -561,6 +572,7 @@ function renderMobileSchedule() {
         }
         return `<li class="day-row${slot.receso ? ' is-recess' : ''}${isNowRow ? ' is-now' : ''}">${time}${body}</li>`;
     }).join('');
+    animarUnaVez(list, ".slot", currentStudentGroup + mobileActiveDay); // al cambiar de dia vuelve a entrar
 }
 
 // Render Admin Table
@@ -1048,9 +1060,9 @@ async function importSchedule() {
 }
 
 // ==================== Timbre escolar (ESP32) ====================
-// El ESP32 le pregunta a /api/bell cada ~10s por las horas y por si hay un "tocar ahora".
+// El ESP32 le pregunta a /api/bell cada ~5s por las horas, el ritmo y si hay un "tocar ahora".
 // Aqui solo editamos esa configuracion y mostramos si el ESP32 esta en linea.
-let bellConfig = { times: [], duration: 5, days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
+let bellConfig = { times: [], rhythm: [], rhythms: {}, offDates: [], specials: {}, log: [], fw: null, days: [1, 2, 3, 4, 5], lastSeen: null, serverNow: 0 };
 
 async function loadBell(fromPoll = false) {
     if (!isAdminLoggedIn) return;
@@ -1062,8 +1074,8 @@ async function loadBell(fromPoll = false) {
         // En el refresco automatico solo actualizamos el estado "en linea",
         // para no pisar lo que el admin esta editando y todavia no guarda.
         if (fromPoll) {
-            bellConfig.lastSeen = data.lastSeen;
-            bellConfig.serverNow = data.serverNow;
+            Object.assign(bellConfig, { lastSeen: data.lastSeen, serverNow: data.serverNow, espFw: data.espFw, espRssi: data.espRssi, espClockDiffMs: data.espClockDiffMs, log: data.log, fw: data.fw });
+            if (typeof renderEstado === 'function') renderEstado();
         } else {
             bellConfig = data;
             renderBell();
@@ -1084,10 +1096,11 @@ function renderBell() {
             </span>`).join('')
         : '<span class="chips__empty">No hay horas programadas.</span>';
 
-    document.getElementById('bell-duration').value = bellConfig.duration;
     document.querySelectorAll('.bell-day').forEach(cb => {
         cb.checked = bellConfig.days.includes(Number(cb.value));
     });
+    if (typeof renderRhythm === 'function') renderRhythm(); // timbre.js: editor del ritmo
+    if (typeof renderBellExtras === 'function') renderBellExtras(); // timbre-estado.js: excepciones, estado y firmware
 }
 
 function renderBellStatus() {
@@ -1096,7 +1109,7 @@ function renderBellStatus() {
     if (!box) return;
 
     const ageSec = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
-    if (ageSec !== null && ageSec < 60) {
+    if (ageSec !== null && ageSec < 90) { // el ESP32 avisa cada ~30 s
         box.className = 'badge badge--ok';
         text.innerText = 'ESP32 en línea';
     } else {
@@ -1121,10 +1134,10 @@ function removeBellTime(t) {
     renderBell();
 }
 
-async function saveBell() {
-    const msg = document.getElementById('bell-save-msg');
+// Guarda horas, días y ritmo juntos. Devuelve true si el servidor lo aceptó.
+async function saveBell(msgId = 'bell-save-msg') {
+    const msg = document.getElementById(msgId);
     const days = [...document.querySelectorAll('.bell-day')].filter(cb => cb.checked).map(cb => Number(cb.value));
-    const duration = Number(document.getElementById('bell-duration').value);
 
     msg.className = 'msg';
     msg.innerText = 'Guardando...';
@@ -1134,13 +1147,13 @@ async function saveBell() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ action: 'save', times: bellConfig.times, duration, days })
+            body: JSON.stringify({ action: 'save', times: bellConfig.times, days, rhythm: bellConfig.rhythm, rhythms: bellConfig.rhythms, offDates: bellConfig.offDates, specials: bellConfig.specials })
         });
 
         if (res.status === 401) {
             isAdminLoggedIn = false;
             showAdminLogin();
-            return;
+            return false;
         }
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Error al guardar');
@@ -1148,10 +1161,12 @@ async function saveBell() {
         bellConfig = { ...bellConfig, ...data };
         renderBell();
         msg.className = 'msg msg--ok';
-        msg.innerText = 'Guardado. El ESP32 lo toma en ~10 segundos.';
+        msg.innerText = 'Guardado. El ESP32 lo toma en ~5 segundos y se actualiza solo.';
+        return true;
     } catch (err) {
         msg.className = 'msg msg--err';
         msg.innerText = err.message;
+        return false;
     }
 }
 
@@ -1178,7 +1193,7 @@ async function ringBellNow() {
         if (!res.ok) throw new Error('No se pudo enviar la orden.');
 
         msg.className = 'msg msg--ok';
-        msg.innerText = 'Orden enviada. Suena en máximo ~10 segundos.';
+        msg.innerText = 'Orden enviada. Suena en máximo ~5 segundos.';
     } catch (err) {
         msg.className = 'msg msg--err';
         msg.innerText = err.message;

@@ -2,3 +2,7 @@ node_modules/
 .vercel
 .env
 .env.local
+timbre/secretos.h
+.playwright-mcp/
+.impeccable/
+.env*

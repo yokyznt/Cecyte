@@ -6,7 +6,8 @@
     <meta name="theme-color" content="#ffffff">
     <meta name="description" content="Horario de clases del CECyTE Plantel 18: qué materia va ahora, cuál sigue y avisos de cambio de clase.">
     <title>CECyTE Plantel 18 - Control de Horarios y Notificaciones</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121a16'/%3E%3Cpath d='M16 7 4 13l12 6 12-6z' fill='%235fd08e'/%3E%3Cpath d='M9 17v4c0 2 3 4 7 4s7-2 7-4v-4l-7 3.5z' fill='%235fd08e'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" href="logo-cecyte.png">
+    <link rel="apple-touch-icon" href="logo-cecyte.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -30,6 +31,10 @@
         <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
         <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
         <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+        <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+        <symbol id="i-robot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+        <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
         <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
         <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
@@ -44,7 +49,7 @@
     <header class="site-header">
         <div class="container site-header__inner">
             <h1 class="brand">
-                <span class="brand__mark"><svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg></span>
+                <img class="brand__logo" src="logo-cecyte.png" alt="" width="44" height="44">
                 <span class="brand__name">CECyTE Plantel 18</span>
             </h1>
 
@@ -75,21 +80,17 @@
 
         <!-- ==================== VISTA ESTUDIANTE ==================== -->
         <div id="view-student" class="stack view">
+            <h2 class="sr-only">Mi horario</h2>
 
-            <div class="intro">
-                <div>
-                    <h2 class="intro__title">Panel de Control Estudiantil</h2>
-                    <p class="intro__text"><strong id="today-label">Hoy</strong> · Consulta tu horario de clases, descubre qué materia está en curso y recibe alertas automáticas cuando inicie o termine una hora de clase.</p>
-                </div>
-                <div class="group-pick">
-                    <label for="group-selector" class="field__label">Seleccionar Grupo</label>
+            <div class="today-grid">
+                <!-- Grupo: la primera decisión del alumno, antes de ver su día -->
+                <div class="group-bar">
+                    <label for="group-selector" class="group-bar__label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Mi grupo</label>
                     <select id="group-selector" onchange="changeGroup(this.value)" class="select">
                         <option value="">Cargando grupos...</option>
                     </select>
                 </div>
-            </div>
 
-            <div class="today-grid">
                 <!-- Clase en curso -->
                 <section class="now" id="now-panel" data-state="none" aria-label="Estado actual">
                     <div class="now__top">
@@ -142,7 +143,7 @@
                     <div class="notify__icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg></div>
                     <div>
                         <h3 class="notify__title">Recibe avisos de cambio de clase</h3>
-                        <p class="notify__status">Estado en este celular: <strong id="notification-status">Sin activar</strong></p>
+                        <p class="notify__status">Estado en este dispositivo: <strong id="notification-status">Sin activar</strong></p>
                     </div>
                 </div>
                 <div class="notify__actions">
@@ -155,7 +156,6 @@
             <section class="panel" aria-labelledby="schedule-heading">
                 <div class="panel__head">
                     <h3 id="schedule-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Horario de Clases</h3>
-                    <span id="schedule-updated" class="badge">Cargando…</span>
                 </div>
 
                 <div id="schedule-empty" class="empty-state hidden">
@@ -215,7 +215,7 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Gestión de Horarios y Grupos</h2>
-                        <p class="admin-head__text">Agrega, edita o elimina materias. Los cambios se guardan en el servidor y se reflejan para todos.</p>
+                        <p class="admin-head__text">Agrega, edita o elimina materias. Todos ven los cambios.</p>
                     </div>
                     <div class="admin-head__actions">
                         <button type="button" onclick="openAddModal()" class="btn btn--primary">
@@ -229,18 +229,444 @@
                     </div>
                 </div>
 
+                <nav class="sections" aria-label="Secciones del panel de administración">
+                    <div class="sections__list" role="tablist" aria-orientation="horizontal">
+                        <button type="button" role="tab" id="tab-horarios" data-section-tab="horarios" aria-controls="sec-horarios" aria-selected="true">
+                            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>Horarios</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-timbre" data-section-tab="timbre" aria-controls="sec-timbre" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span>Timbre</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-ritmo" data-section-tab="ritmo" aria-controls="sec-ritmo" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Ritmo</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-esp32" data-section-tab="esp32" aria-controls="sec-esp32" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>ESP32</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot" data-section-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-grupos" data-section-tab="grupos" aria-controls="sec-grupos" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span>Grupos</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-alertas" data-section-tab="alertas" aria-controls="sec-alertas" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span>Alertas</span>
+                        </button>
+                    </div>
+                </nav>
+
                 <div class="admin-grid">
 
-                    <!-- Columna principal: registros -->
-                    <div class="admin-col">
+                    <!-- Timbre, grupos y alertas: arriba, a todo el ancho -->
+                    <div class="admin-top">
 
-                        <details class="panel fold">
+                        <!-- Timbre escolar (ESP32) -->
+                        <section class="panel admin-sec" id="sec-timbre" data-section="timbre" role="tabpanel" aria-labelledby="bell-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="bell-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> Timbre Escolar</h3>
+                                <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">El ESP32 descarga las horas, los días y el ritmo cada 5 segundos. "Tocar timbre ahora" suena sin esperar la hora programada.</p>
+
+                                <div>
+                                    <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                                        Tocar timbre ahora
+                                    </button>
+                                    <p id="bell-ring-msg" class="msg" role="status" style="margin-top:8px"></p>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div style="display:flex;flex-direction:column;gap:10px">
+                                    <h4 class="panel__sub">Horas programadas</h4>
+                                    <div id="bell-times-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
+                                        <input type="time" id="bell-new-time" class="input">
+                                        <button type="button" onclick="addBellTime()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar hora
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <fieldset style="border:0;padding:0;margin:0;min-width:0">
+                                    <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
+                                    <div class="days">
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
+                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
+                                    </div>
+                                </fieldset>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Días sin timbre</h4>
+                                    <p class="hint">Vacaciones, suspensiones y días festivos: ese día no suena nada.</p>
+                                    <div id="bell-off-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
+                                        <input type="date" id="bell-off-date" class="input">
+                                        <button type="button" onclick="addOffDate()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar día
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Horario especial</h4>
+                                    <p class="hint">Un día con otras horas, por ejemplo un día corto. Ese día manda sobre las horas normales y sobre los días de la semana.</p>
+                                    <div id="bell-special-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="bell-special-date">Fecha del horario especial</label>
+                                        <input type="date" id="bell-special-date" class="input" style="max-width:170px">
+                                        <label class="sr-only" for="bell-special-times">Horas de ese día</label>
+                                        <input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00">
+                                        <button type="button" onclick="addSpecial()" class="btn btn--secondary">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                            Agregar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="row-between">
+                                    <p id="bell-save-msg" class="msg" role="status"></p>
+                                    <button type="button" onclick="saveBell()" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
+                                        Guardar timbre
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Estado del ESP32, historial y firmware -->
+                        <section class="panel admin-sec" id="sec-esp32" data-section="esp32" role="tabpanel" aria-labelledby="esp-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
+                            </div>
+                            <div class="panel__body">
+                                <ul id="esp-info" class="plain-list"></ul>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Últimos toques</h4>
+                                    <ul id="bell-log" class="log"></ul>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
+                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
+                                    <div class="grid-2">
+                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
+                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
+                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
+                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
+                                    </div>
+                                    <div class="row-between">
+                                        <p id="fw-msg" class="msg" role="status"></p>
+                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Ritmo del timbre -->
+                        <section class="panel admin-sec" id="sec-ritmo" data-section="ritmo" role="tabpanel" aria-labelledby="rhythm-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="rhythm-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Ritmo del timbre</h3>
+                                <span id="rhythm-total" class="badge badge--idle">—</span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Escúchalo aquí antes de guardar. El ESP32 lo descarga en unos 5 segundos.</p>
+
+                                <div class="tl" role="img" aria-label="Línea de tiempo del ritmo: los bloques verdes son los momentos en que suena">
+                                    <div id="rhythm-tl-bars" class="tl__bars"></div>
+                                    <span id="rhythm-head" class="tl__head" hidden></span>
+                                </div>
+                                <p id="rhythm-warn" class="msg msg--err" hidden>El ritmo se pasa de 30 s o de 59 toques; el servidor no lo va a aceptar.</p>
+
+                                <div class="btn-row">
+                                    <button type="button" onclick="playRhythm()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar</button>
+                                    <button type="button" onclick="stopPreview()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Detener</button>
+                                </div>
+
+                                <div>
+                                    <h4 class="panel__sub" style="margin-bottom:8px">Ritmos de ejemplo</h4>
+                                    <div id="rhythm-presets" class="pills"></div>
+                                </div>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Ritmo propio para una hora</h4>
+                                    <p class="hint">Por ejemplo, un ritmo distinto para el recreo. Deja el ritmo de arriba como quieres que suene, elige la hora y asígnalo. Las demás horas siguen con el ritmo normal.</p>
+                                    <div id="rhythm-ovr-list" class="chips"></div>
+                                    <div class="inline-form">
+                                        <label class="sr-only" for="rhythm-ovr-time">Hora con ritmo propio</label>
+                                        <select id="rhythm-ovr-time" class="select" style="max-width:130px"></select>
+                                        <button type="button" onclick="setOverride()" class="btn btn--secondary">Usar para esa hora</button>
+                                    </div>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="seg" role="group" aria-label="Cómo crear el ritmo" style="align-self:flex-start;flex-wrap:wrap">
+                                    <button type="button" class="seg__btn" data-rtabbtn="pasos" aria-pressed="true" onclick="showRhythmTab('pasos')">Editar toques</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="golpear" aria-pressed="false" onclick="showRhythmTab('golpear')">Golpear</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="musica" aria-pressed="false" onclick="showRhythmTab('musica')">De música</button>
+                                    <button type="button" class="seg__btn" data-rtabbtn="codigo" aria-pressed="false" onclick="showRhythmTab('codigo')">Código</button>
+                                </div>
+
+                                <!-- Editar toques -->
+                                <div data-rtab="pasos" class="stack">
+                                    <p class="hint">Cada toque suena y luego hace una pausa, en milisegundos (1000 ms = 1 s). El último solo suena.</p>
+                                    <div id="rhythm-steps" class="steps"></div>
+                                    <div><button type="button" onclick="agregarToque()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Agregar toque</button></div>
+                                </div>
+
+                                <!-- Golpear -->
+                                <div data-rtab="golpear" class="stack" hidden>
+                                    <p class="hint">Mantén apretado el botón (o la barra espaciadora) para que suene y suéltalo para la pausa. Tras 2 segundos sin tocar, se arma el ritmo.</p>
+                                    <button type="button" id="tap-pad" class="tap-pad" onpointerdown="event.preventDefault();this.setPointerCapture(event.pointerId);tapAbajo()" onpointerup="tapArriba()" onpointercancel="tapArriba()" oncontextmenu="return false">Apretar para sonar</button>
+                                    <div class="row-between">
+                                        <p id="tap-count" class="msg" role="status">Pulsa y mantén para marcar cada toque.</p>
+                                        <div class="btn-row">
+                                            <button type="button" onclick="terminarGolpeo()" class="btn btn--secondary btn--sm">Terminar ya</button>
+                                            <button type="button" onclick="reiniciarGolpeo()" class="btn btn--secondary btn--sm">Empezar de nuevo</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Música -->
+                                <div data-rtab="musica" class="stack" hidden>
+                                    <p class="hint">Sube un MP3, WAV, OGG o MIDI. Se convierte un pedazo de hasta 25 s y el archivo no sale de tu navegador.</p>
+                                    <div class="field">
+                                        <label class="field__label" for="music-file">Archivo de música</label>
+                                        <input type="file" id="music-file" accept="audio/*,.mid,.midi" class="input" onchange="cargarMusica(this.files[0])">
+                                        <p id="music-info" class="msg" role="status"></p>
+                                    </div>
+                                    <div id="music-controls" class="stack" hidden>
+                                        <div class="field">
+                                            <span class="field__label" id="music-pick-label">Elige el pedazo: arrastra sobre la canción</span>
+                                            <canvas id="music-overview" class="overview" role="img" aria-labelledby="music-pick-label"
+                                                onpointerdown="resumenAbajo(event)" onpointermove="resumenMueve(event)" onpointerup="resumenSuelta()" onpointercancel="resumenSuelta()"></canvas>
+                                            <p id="music-sel-label" class="msg" role="status"></p>
+                                            <p class="hint">Arrastra para marcar una zona nueva, mueve la zona desde el centro o estira los bordes. Máximo 25 s. Ese pedazo es el que se convierte en el ritmo del timbre.</p>
+                                        </div>
+                                        <canvas id="music-wave" class="wave" role="img" aria-label="Volumen del pedazo elegido; las rayas verdes son los toques detectados"></canvas>
+                                        <div class="grid-2">
+                                            <div class="field"><label class="field__label" for="music-start">Empezar en (segundos)</label>
+                                                <input type="number" id="music-start" min="0" step="0.1" value="0" class="input" oninput="convertirMusicaSuave()"></div>
+                                            <div class="field"><label class="field__label" for="music-len">Duración del pedazo (s)</label>
+                                                <input type="number" id="music-len" min="1" max="25" step="0.5" value="8" class="input" oninput="convertirMusicaSuave()"></div>
+                                        </div>
+                                        <div class="field"><label class="field__label" for="music-mode">Cómo convertir</label>
+                                            <select id="music-mode" class="select" onchange="convertirMusica()">
+                                                <option value="golpes">Un toque por cada golpe / nota (recomendado)</option>
+                                                <option value="sostenido">Seguir el volumen (suena mientras suena la música)</option>
+                                            </select></div>
+                                        <div class="field"><label class="field__label" for="music-sens">Sensibilidad: <span id="music-sens-v">50</span></label>
+                                            <input type="range" id="music-sens" min="0" max="100" value="50" oninput="convertirMusicaSuave()"></div>
+                                        <div id="music-hit-box" class="field"><label class="field__label" for="music-hit">Cuánto dura cada toque: <span id="music-hit-v">120 ms</span></label>
+                                            <input type="range" id="music-hit" min="40" max="400" step="10" value="120" oninput="convertirMusicaSuave()"></div>
+                                        <div id="music-sep-box" class="field"><label class="field__label" for="music-sep">Separación mínima entre toques: <span id="music-sep-v">120 ms</span></label>
+                                            <input type="range" id="music-sep" min="80" max="600" step="10" value="120" oninput="convertirMusicaSuave()"></div>
+                                        <div class="btn-row">
+                                            <button type="button" id="music-orig" onclick="escucharOriginal()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar el pedazo elegido</button>
+                                            <button type="button" onclick="playRhythm()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar como timbre</button>
+                                            <button type="button" onclick="stopPreview()" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Pausar sonido</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Código -->
+                                <div data-rtab="codigo" class="stack" hidden>
+                                    <p class="hint">Pega un arreglo de Arduino, con o sin comentarios, o copia el ritmo actual como código.</p>
+                                    <label class="sr-only" for="rhythm-paste">Ritmo como código o lista de números</label>
+                                    <textarea id="rhythm-paste" class="textarea" rows="7" spellcheck="false" placeholder="const unsigned long RITMO[] = { 220, 160, 200 };"></textarea>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="usarTextoRitmo()" class="btn btn--secondary btn--sm">Usar este ritmo</button>
+                                        <button type="button" onclick="verCodigoRitmo()" class="btn btn--secondary btn--sm">Ver / copiar el actual</button>
+                                    </div>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="row-between">
+                                    <p id="rhythm-save-msg" class="msg" role="status"></p>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="guardarRitmo(false)" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar ritmo</button>
+                                        <button type="button" onclick="guardarRitmo(true)" class="btn btn--bell"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Guardar y tocar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Robot mBot Ranger (Me Auriga) por USB: canciones, baile y LEDs -->
+                        <section class="panel admin-sec" id="sec-robot" data-section="robot" role="tabpanel" aria-labelledby="robot-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="robot-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Robot mBot Ranger</h3>
+                                <span id="rb-badge" class="badge badge--idle"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint rb-full">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
+
+                                <div class="btn-row rb-full">
+                                    <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
+                                    <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
+                                    <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
+                                </div>
+                                <p class="hint rb-full"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
+                                <p id="rb-msg" class="msg" role="status"></p>
+                                <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
+
+                                <!-- Canción -->
+                                <div class="stack">
+                                    <h4 class="panel__sub">Canción</h4>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-cancion">Elige una canción</label>
+                                        <select id="rb-cancion" class="select"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-notas">Notas</label>
+                                        <textarea id="rb-notas" class="textarea" rows="6" spellcheck="false"></textarea>
+                                        <p id="rb-err-notas" class="msg msg--err" role="status"></p>
+                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). Lo que sigue a // es un comentario.</p>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
+                                        <input type="range" id="rb-bpm" min="50" max="220" step="1">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-escuchar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar aquí</button>
+                                        <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
+                                        <button type="button" id="rb-tocar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Cantar en el robot</button>
+                                    </div>
+                                </div>
+
+                                <!-- Baile -->
+                                <div class="stack">
+                                    <h4 class="panel__sub">Baile</h4>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-baile">Elige un baile</label>
+                                        <select id="rb-baile" class="select"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-pasos">Pasos</label>
+                                        <textarea id="rb-pasos" class="textarea" rows="3" spellcheck="false"></textarea>
+                                        <p id="rb-err-baile" class="msg msg--err" role="status"></p>
+                                        <p class="hint">AD adelante, AT atrás, GI gira a la izquierda, GD gira a la derecha, PA parar. Duran como las notas (/2 son dos tiempos). Si el baile es más corto que la canción, se repite.</p>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-vel">Velocidad de las ruedas: <span id="rb-vel-v"></span></label>
+                                        <input type="range" id="rb-vel" min="40" max="180" step="5">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-bailar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Bailar y cantar</button>
+                                        <label class="rb-check"><input type="checkbox" id="rb-repetir"><span>Repetir hasta pulsar Paro</span></label>
+                                    </div>
+                                    <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
+                                </div>
+
+                                <hr class="divider">
+
+                                <!-- Luces -->
+                                <div class="stack rb-full">
+                                    <h4 class="panel__sub">Luces del anillo (12 LEDs)</h4>
+                                    <div class="rb-leds">
+                                        <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
+                                        <div class="stack">
+                                            <div class="field">
+                                                <label class="field__label" for="rb-led-color">Color del LED elegido</label>
+                                                <input type="color" id="rb-led-color" class="rb-color">
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos de ese color</button>
+                                            </div>
+                                            <div>
+                                                <span class="field__label" id="rb-paleta-label">Colores rápidos (pintan todos)</span>
+                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"></div>
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-brillo">Brillo: <span id="rb-brillo-v"></span></label>
+                                                <input type="range" id="rb-brillo" min="0" max="100" step="1">
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-efecto">Efecto</label>
+                                                <select id="rb-efecto" class="select"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Instalación del programa -->
+                                <details id="rb-instalar" class="rb-full rb-instalar">
+                                    <summary>Instalar el programa en el robot (una sola vez)</summary>
+                                    <ol>
+                                        <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
+                                        <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
+                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página.</li>
+                                        <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
+                                    </ol>
+                                </details>
+                            </div>
+                        </section>
+
+                        <!-- Gestión de grupos -->
+                        <section class="panel admin-sec" id="sec-grupos" data-section="grupos" role="tabpanel" aria-labelledby="groups-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Borrar un grupo también borra sus materias del horario.</p>
+                                <form onsubmit="addGroup(event)" class="inline-form">
+                                    <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
+                                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
+                                    <button type="submit" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                        Agregar Grupo
+                                    </button>
+                                </form>
+                                <div id="groups-list" class="chips"></div>
+                            </div>
+                        </section>
+
+                        <!-- Notificaciones automáticas -->
+                        <section class="panel admin-sec" id="sec-alertas" data-section="alertas" role="tabpanel" aria-labelledby="alerts-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
+                            </div>
+                            <div class="panel__body" style="padding-bottom:0">
+                                <p class="hint">Al cambiar de bloque se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa en su dispositivo, en la vista de Alumnos.</p>
+                                <h4 class="panel__sub">Registro de Alertas</h4>
+                            </div>
+                            <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
+                                <table class="log">
+                                    <thead>
+                                        <tr><th scope="col">Hora</th><th scope="col">Terminó</th><th scope="col">Sigue</th></tr>
+                                    </thead>
+                                    <tbody id="alert-log-body">
+                                        <tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+
+                        <details class="panel fold admin-sec" data-section="horarios">
                             <summary>
                                 <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
                                 <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
                             </summary>
                             <div class="panel__body">
-                                <p class="hint">Mándame por chat una foto de un horario y te devuelvo un código para pegar aquí abajo. Le das "Importar y Guardar" y se agrega TODO junto a la base de datos, sin capturarlo materia por materia. Si mencionas un grupo que no existe todavía, se crea solo.</p>
+                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
                                 <label class="sr-only" for="import-json">Código del horario (JSON)</label>
                                 <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
   { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
@@ -254,6 +680,10 @@
                                 </div>
                             </div>
                         </details>
+                    </div>
+
+                    <!-- Registros del horario -->
+                    <div class="admin-col admin-sec" id="sec-horarios" data-section="horarios" role="tabpanel" aria-label="Horarios">
 
                         <section class="panel" aria-label="Registros del horario">
                             <div class="toolbar">
@@ -285,111 +715,6 @@
                             </div>
                         </section>
                     </div>
-
-                    <!-- Columna lateral: timbre, grupos, alertas -->
-                    <div class="admin-col">
-
-                        <!-- Timbre escolar (ESP32) -->
-                        <section class="panel" aria-labelledby="bell-heading">
-                            <div class="panel__head">
-                                <h3 id="bell-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> Timbre Escolar</h3>
-                                <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
-                            </div>
-                            <div class="panel__body">
-                                <p class="hint">Las horas que pongas aquí las jala el ESP32 solito (cada ~10 segundos), no hay que tocar el código. El botón de abajo suena el timbre al momento, aparte de las horas programadas.</p>
-
-                                <div>
-                                    <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
-                                        Tocar timbre ahora
-                                    </button>
-                                    <p id="bell-ring-msg" class="msg" role="status" style="margin-top:8px"></p>
-                                </div>
-
-                                <hr class="divider">
-
-                                <div style="display:flex;flex-direction:column;gap:10px">
-                                    <h4 class="panel__sub">Horas programadas</h4>
-                                    <div id="bell-times-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
-                                        <input type="time" id="bell-new-time" class="input">
-                                        <button type="button" onclick="addBellTime()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar hora
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="field" style="max-width:190px">
-                                    <label class="field__label" for="bell-duration">Duración (segundos)</label>
-                                    <input type="number" id="bell-duration" min="1" max="30" value="5" class="input">
-                                </div>
-
-                                <fieldset style="border:0;padding:0;margin:0;min-width:0">
-                                    <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
-                                    <div class="days">
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
-                                    </div>
-                                </fieldset>
-
-                                <div class="row-between">
-                                    <p id="bell-save-msg" class="msg" role="status"></p>
-                                    <button type="button" onclick="saveBell()" class="btn btn--primary">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
-                                        Guardar timbre
-                                    </button>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Gestión de grupos -->
-                        <section class="panel" aria-labelledby="groups-heading">
-                            <div class="panel__head">
-                                <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
-                            </div>
-                            <div class="panel__body">
-                                <p class="hint">Agrega grupos nuevos para próximos años, o borra los que ya no uses. Borrar un grupo también borra todas sus materias del horario.</p>
-                                <form onsubmit="addGroup(event)" class="inline-form">
-                                    <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
-                                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
-                                    <button type="submit" class="btn btn--primary">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                        Agregar Grupo
-                                    </button>
-                                </form>
-                                <div id="groups-list" class="chips"></div>
-                            </div>
-                        </section>
-
-                        <!-- Notificaciones automáticas -->
-                        <section class="panel" aria-labelledby="alerts-heading">
-                            <div class="panel__head">
-                                <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
-                            </div>
-                            <div class="panel__body" style="padding-bottom:0">
-                                <p class="hint">Cuando cambie de bloque según la hora real, se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa desde su propio celular en la vista de Alumnos.</p>
-                                <h4 class="panel__sub">Registro de Alertas</h4>
-                            </div>
-                            <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
-                                <table class="log">
-                                    <thead>
-                                        <tr><th scope="col">Hora</th><th scope="col">Terminó</th><th scope="col">Sigue</th></tr>
-                                    </thead>
-                                    <tbody id="alert-log-body">
-                                        <tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                    </div>
                 </div>
 
             </div>
@@ -400,13 +725,12 @@
     <footer class="site-footer">
         <div class="container site-footer__inner">
             <div class="brand">
-                <div class="brand__mark brand__mark--footer"><svg class="icon" aria-hidden="true"><use href="#i-cap"/></svg></div>
+                <img class="brand__logo" src="logo-cecyte.png" alt="" width="44" height="44">
                 <div>
                     <p class="site-footer__name">CECyTE Plantel 18</p>
                     <p class="site-footer__sub">Control de Horarios y Notificaciones</p>
                 </div>
             </div>
-            <p class="site-footer__note">El horario se actualiza solo cada 15 segundos.</p>
         </div>
     </footer>
 
@@ -465,6 +789,10 @@
         </form>
     </dialog>
 
+    <script src="timbre.js"></script>
+    <script src="timbre-estado.js"></script>
+    <script src="robot.js"></script>
+    <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
