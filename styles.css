@@ -796,6 +796,42 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
     .admin-top .btn--block { width: auto; justify-self: start; min-width: 280px; }
 }
 
+/* ==================== Secciones del admin ====================
+   Barra de pestañas fija bajo el encabezado: icono + texto, la activa con subrayado verde.
+   Una sola sección visible a la vez, a todo el ancho. */
+.sections {
+    position: sticky; top: 64px; z-index: 30;
+    margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter);
+    background: var(--surface);
+    border-top: 1px solid var(--line-strong);
+}
+.sections__list { display: flex; gap: clamp(2px, 1vw, 10px); overflow-x: auto; scrollbar-width: none; }
+.sections__list::-webkit-scrollbar { display: none; }
+.sections [role="tab"] {
+    position: relative; flex: none;
+    display: inline-flex; align-items: center; gap: 10px;
+    min-height: 56px; padding: 0 clamp(12px, 1.6vw, 22px);
+    border: 0; background: transparent; color: var(--ink-2);
+    font-size: var(--fs-md); font-weight: 600; white-space: nowrap;
+    transition: color 160ms, background-color 160ms;
+}
+.sections [role="tab"] .icon { width: 1.2em; height: 1.2em; color: var(--ink-3); transition: color 160ms; }
+.sections [role="tab"]:hover { color: var(--black); background: var(--green-50); }
+.sections [role="tab"]::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px;
+    border-radius: 3px 3px 0 0; background: var(--green-700);
+    transform: scaleX(0); transition: transform 220ms var(--ease-out);
+}
+.sections [role="tab"][aria-selected="true"] { color: var(--black); font-weight: 700; }
+.sections [role="tab"][aria-selected="true"] .icon { color: var(--green-700); }
+.sections [role="tab"][aria-selected="true"]::after { transform: scaleX(1); }
+.sections [role="tab"]:focus-visible { outline-offset: -4px; }
+@media (max-width: 560px) {
+    .sections [role="tab"] { min-height: 52px; padding: 0 12px; font-size: var(--fs-sm); gap: 8px; }
+}
+.admin-sec:not([hidden]) { animation: view-in 220ms var(--ease-out) both; }
+#admin-content.stack { gap: 0; }
+
 /* ==================== Movimiento ==================== */
 @keyframes view-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
 @keyframes pop-in { from { opacity: 0; scale: 0.96; translate: 0 8px; } to { opacity: 1; scale: 1; translate: 0 0; } }
