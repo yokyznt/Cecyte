@@ -393,16 +393,33 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .agenda__time { font-size: var(--fs-sm); font-weight: 700; color: var(--black); font-variant-numeric: tabular-nums; }
 .agenda__subject { font-size: var(--fs-sm); font-weight: 600; color: var(--black); line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
 .agenda__subject small { display: block; font-size: var(--fs-cap); font-weight: 500; color: var(--ink-2); }
-.agenda__tag { font-size: var(--fs-cap); font-weight: 700; color: var(--green-800); }
-.agenda__item.is-past .agenda__time,
-.agenda__item.is-past .agenda__subject { color: var(--ink-3); }
-.agenda__item.is-past .agenda__subject { text-decoration: line-through; text-decoration-color: var(--line-strong); }
-.agenda__item.is-free .agenda__subject, .agenda__item.is-recess .agenda__subject { color: var(--ink-3); font-weight: 500; }
-.agenda__item.is-recess { background: var(--paper); }
-.agenda__item.is-now { background: var(--green-700); }
-.agenda__item.is-now .agenda__time, .agenda__item.is-now .agenda__subject, .agenda__item.is-now .agenda__tag { color: #fff; }
-.agenda__item.is-now .agenda__subject small { color: var(--green-100); }
-.agenda__item.is-next { background: var(--green-50); box-shadow: inset 0 0 0 1px var(--green-200); }
+.agenda__tag:not(:empty) { padding: 3px 11px; border-radius: 99px; font-size: var(--fs-cap); font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* Ya pasó: tachado grueso y oscuro, que se note de lejos */
+.agenda__item.is-past .agenda__time { color: var(--ink-2); }
+.agenda__item.is-past .agenda__subject { color: var(--ink-2); }
+.agenda__item.is-past .agenda__subject,
+.agenda__item.is-past .agenda__subject small {
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--black);
+}
+.agenda__item.is-free .agenda__subject { color: var(--ink-3); font-weight: 500; }
+
+/* Receso: banda verde suave con borde punteado */
+.agenda__item.is-recess { background: var(--green-100); box-shadow: inset 0 0 0 1.5px var(--green-300); }
+.agenda__item.is-recess .agenda__subject { color: var(--green-900); font-weight: 700; letter-spacing: 0.04em; }
+
+/* Ahora: relleno verde sólido, texto blanco y sombra */
+.agenda__item.is-now { background: var(--green-700); box-shadow: 0 10px 20px -12px oklch(0.47 0.12 153 / 0.9); }
+.agenda__item.is-now .agenda__time, .agenda__item.is-now .agenda__subject { color: #fff; font-weight: 800; }
+.agenda__item.is-now .agenda__subject small { color: var(--green-100); font-weight: 600; }
+.agenda__item.is-now .agenda__tag { background: #fff; color: var(--green-800); }
+
+/* Sigue: marco verde de 2 px y fondo verde claro */
+.agenda__item.is-next { background: var(--green-100); box-shadow: inset 0 0 0 2px var(--green-600); }
+.agenda__item.is-next .agenda__subject { font-weight: 800; }
+.agenda__item.is-next .agenda__tag { background: var(--green-700); color: #fff; }
 .agenda__empty { padding: 26px 14px; text-align: center; font-size: var(--fs-sm); color: var(--ink-2); }
 .agenda__empty strong { display: block; color: var(--black); font-family: var(--font-display); font-size: var(--fs-md); margin-bottom: 2px; }
 
