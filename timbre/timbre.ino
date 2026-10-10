@@ -468,7 +468,7 @@ void tareaInternet(void*) {
   for (auto& red : REDES) wifiMulti.addAP(red[0], red[1]);
 
   for (;;) {
-    if (wifiMulti.run(8000) == WL_CONNECTED) {
+    if (wifiMulti.run(8000, true) == WL_CONNECTED) {   // true = también prueba redes ocultas
       static bool avisado = false;
       if (!avisado) { avisado = true; Serial.print("WiFi conectado, IP: "); Serial.println(WiFi.localIP()); }
       consultarServidor();
