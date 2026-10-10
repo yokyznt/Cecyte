@@ -447,7 +447,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
     padding: 18px 20px;
     border-bottom: 1px solid var(--line);
 }
-.panel__title { display: flex; align-items: center; gap: 10px; font-size: var(--fs-lg); font-weight: 700; line-height: 1.2; color: var(--black); }
+.panel__title { display: flex; align-items: center; gap: 10px; font-size: var(--fs-xl); font-weight: 800; line-height: 1.2; color: var(--black); }
 .panel__title .icon { color: var(--green-700); }
 .panel__body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
 .panel__sub { font-size: var(--fs-sm); font-weight: 700; color: var(--black); }
