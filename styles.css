@@ -65,7 +65,7 @@
 /* ==================== Base ==================== */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; background: var(--page); }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; background: var(--surface); }
 
 /* Fondo: lavado menta arriba + cuadrícula de cuaderno que se desvanece hacia abajo */
 body {
@@ -81,15 +81,7 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     caret-color: var(--green-700);
-    background-color: var(--page);
-    background-image:
-        linear-gradient(to bottom, oklch(0.94 0.026 152 / 0) 0, var(--page) 720px),
-        linear-gradient(var(--grid) 1px, transparent 1px),
-        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-        radial-gradient(120% 70% at 85% -10%, var(--mint) 0, oklch(0.905 0.05 152 / 0) 60%);
-    background-size: 100% 100%, 28px 28px, 28px 28px, 100% 900px;
-    background-repeat: no-repeat, repeat, repeat, no-repeat;
-    background-position: 0 0, -1px -1px, -1px -1px, 0 0;
+    background: var(--surface);
 }
 
 h1, h2, h3, h4, h5, p { margin: 0; }
