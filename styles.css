@@ -952,9 +952,9 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-sw { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); cursor: pointer; transition: scale 120ms var(--ease-out); }
 .rb-sw:hover { scale: 1.08; }
 
-.rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 4px 16px; }
+.rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
 .rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.rb-instalar ol { margin: 4px 0 14px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.rb-instalar ol { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
 .rb-instalar a { color: var(--green-800); font-weight: 700; }
 
 @media print {
