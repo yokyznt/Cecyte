@@ -104,7 +104,7 @@ function updateCurrentClassCard() {
         timeEl.innerText = '—';
         setState('none', 'Sin clase');
         percentEl.innerText = '—';
-        barEl.style.width = '0%';
+        barEl.style.clipPath = 'inset(0 100% 0 0 round 99px)';
         trackEl.setAttribute('aria-valuenow', '0');
         countdownEl.innerText = '--:--';
         nextEl.innerText = findNextClassLabel(day) || 'Sin más clases';
@@ -142,7 +142,7 @@ function updateCurrentClassCard() {
 
     timeEl.innerText = `${slot.key} hrs`;
     percentEl.innerText = `${percent}%`;
-    barEl.style.width = `${percent}%`;
+    barEl.style.clipPath = `inset(0 ${100 - percent}% 0 0 round 99px)`;
     trackEl.setAttribute('aria-valuenow', String(percent));
     countdownEl.innerText = `${remMin}:${remSec}`;
     nextEl.innerText = findNextClassLabel(day, slot.key) || 'Sin más clases hoy';
