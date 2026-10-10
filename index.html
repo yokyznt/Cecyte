@@ -80,19 +80,15 @@
         <!-- ==================== VISTA ESTUDIANTE ==================== -->
         <div id="view-student" class="stack view">
 
-            <div class="intro">
-                <div>
-                    <h2 class="intro__title">Panel de Control Estudiantil</h2>
-                </div>
-                <div class="group-pick">
-                    <label for="group-selector" class="field__label">Seleccionar Grupo</label>
+            <div class="today-grid">
+                <!-- Grupo: la primera decisión del alumno, antes de ver su día -->
+                <div class="group-bar">
+                    <label for="group-selector" class="group-bar__label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Mi grupo</label>
                     <select id="group-selector" onchange="changeGroup(this.value)" class="select">
                         <option value="">Cargando grupos...</option>
                     </select>
                 </div>
-            </div>
 
-            <div class="today-grid">
                 <!-- Clase en curso -->
                 <section class="now" id="now-panel" data-state="none" aria-label="Estado actual">
                     <div class="now__top">

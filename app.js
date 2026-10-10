@@ -164,6 +164,15 @@ function renderDayStrip(day, slot) {
     }).join('');
 }
 
+// Entrada escalonada de una lista: solo la primera vez que se pinta (o al cambiar de grupo), no en cada repintado
+function animarUnaVez(el, hijo, clave = currentStudentGroup) {
+    if (!el || el.dataset.animada === String(clave)) return;
+    if (hijo && !el.querySelector(hijo)) return;
+    el.dataset.animada = String(clave);
+    el.classList.add('is-entering');
+    setTimeout(() => el.classList.remove('is-entering'), 1400);
+}
+
 // Agenda de "Hoy": todos los bloques del dia real, con pasado / ahora / siguiente
 function renderTodayAgenda() {
     const list = document.getElementById('today-agenda');
@@ -205,6 +214,7 @@ function renderTodayAgenda() {
             : 'Hora libre';
         return `<li class="${cls}"><span class="agenda__time">${start}</span><span class="agenda__subject">${subject}</span><span class="agenda__tag">${tag}</span></li>`;
     }).join('');
+    animarUnaVez(list);
 }
 
 // Busca la siguiente materia asignada despues del bloque actual (o desde el inicio si no hay bloque activo)
@@ -506,6 +516,7 @@ function renderStudentSchedule() {
         }).join('');
         return `<tr class="${isNowRow ? 'is-now-row' : ''}">${timeCell}${cells}</tr>`;
     }).join('');
+    animarUnaVez(tbody, ".slot");
 
     // Grupo sin materias: avisa en vez de dejar una cuadricula vacia sin explicacion
     const emptyEl = document.getElementById('schedule-empty');
@@ -561,6 +572,7 @@ function renderMobileSchedule() {
         }
         return `<li class="day-row${slot.receso ? ' is-recess' : ''}${isNowRow ? ' is-now' : ''}">${time}${body}</li>`;
     }).join('');
+    animarUnaVez(list, ".slot", currentStudentGroup + mobileActiveDay); // al cambiar de dia vuelve a entrar
 }
 
 // Render Admin Table

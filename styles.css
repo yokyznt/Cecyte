@@ -842,6 +842,75 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .admin-sec:not([hidden]) { animation: view-in 220ms var(--ease-out) both; }
 #admin-content.stack { gap: 0; }
 
+/* ==================== Color en lo importante ====================
+   Verde = ahora y estado correcto. Naranja (el del logo) = lo que sigue y la acción que se hace a propósito. */
+:root {
+    --orange-100: oklch(0.955 0.045 70);
+    --orange-500: oklch(0.69 0.17 48);
+    --orange-700: oklch(0.52 0.15 45);
+    --orange-800: oklch(0.45 0.14 45);
+}
+.page { padding-top: 0; }
+.admin-head { padding-top: 24px; }
+.page .today-grid:first-child { border-top: 0; }
+
+/* Selector de grupo, al inicio de la zona de hoy */
+.group-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.group-bar__label { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-md); font-weight: 800; color: var(--green-800); }
+.group-bar .select {
+    width: auto; min-width: min(100%, 320px); min-height: 50px;
+    font-size: var(--fs-md); font-weight: 700;
+    border: 2px solid var(--green-600); background: var(--green-50);
+    transition: background-color 160ms, box-shadow 160ms, border-color 160ms;
+}
+.group-bar .select:hover { background: var(--green-100); box-shadow: 0 6px 16px -10px oklch(0.47 0.12 153 / 0.7); }
+
+/* "Sigue" en naranja, "Ahora" sigue en verde */
+.agenda__item.is-next { background: var(--orange-100); box-shadow: inset 0 0 0 2px var(--orange-500); }
+.agenda__item.is-next .agenda__tag { background: var(--orange-700); color: #fff; }
+.now__next strong { color: var(--orange-700); }
+.now__next-label { color: var(--orange-800); }
+
+/* La acción que suena de verdad: naranja intenso, no negro */
+.btn--bell { background: var(--orange-700); box-shadow: 0 10px 22px -12px oklch(0.52 0.15 45 / 0.8); }
+.btn--bell .icon { color: #fff; }
+.btn--bell:hover:not(:disabled) { background: var(--orange-800); }
+.notify__icon { background: var(--orange-100); color: var(--orange-700); }
+
+/* Hoy en la tabla semanal y el contador, en verde fuerte */
+.week th.is-today { background: var(--green-700); }
+.week th .today-tag { color: #fff; }
+.now__count { color: var(--green-800); }
+.strip__seg.is-now { background: var(--green-700); box-shadow: 0 0 0 3px var(--green-200); }
+
+/* ==================== Animaciones ==================== */
+@keyframes rise { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+@keyframes swing { 0%, 100% { rotate: 0deg; } 20% { rotate: 16deg; } 40% { rotate: -14deg; } 60% { rotate: 9deg; } 80% { rotate: -5deg; } }
+
+/* Las listas entran una por una la primera vez (la clase .is-entering la pone app.js) */
+.is-entering > * { animation: rise 480ms var(--ease-out) both; }
+.is-entering > :nth-child(2) { animation-delay: 45ms; }
+.is-entering > :nth-child(3) { animation-delay: 90ms; }
+.is-entering > :nth-child(4) { animation-delay: 135ms; }
+.is-entering > :nth-child(5) { animation-delay: 180ms; }
+.is-entering > :nth-child(6) { animation-delay: 225ms; }
+.is-entering > :nth-child(7) { animation-delay: 270ms; }
+.is-entering > :nth-child(8) { animation-delay: 315ms; }
+.is-entering > :nth-child(9) { animation-delay: 360ms; }
+.is-entering > :nth-child(n+10) { animation-delay: 405ms; }
+
+/* La barra de progreso crece suave; el punto de "AHORA" late */
+.track__bar { transition: width 700ms var(--ease-out); }
+.agenda__item.is-now .agenda__tag::before {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px;
+    border-radius: 50%; background: var(--green-700); animation: beat 1.6s ease-in-out infinite;
+}
+
+/* Botones: se levantan un poco al pasar; la campana del timbre se agita */
+.btn, .pill { transition-property: background-color, border-color, color, box-shadow, translate, transform; }
+.btn:hover:not(:disabled), .pill:hover { translate: 0 -1px; }
+.btn--bell:hover:not(:disabled) .icon { animation: swing 700ms ease-in-out; transform-origin: 50% 12%; }
+
 /* ==================== Movimiento ==================== */
 @keyframes view-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
 @keyframes pop-in { from { opacity: 0; scale: 0.96; translate: 0 8px; } to { opacity: 1; scale: 1; translate: 0 0; } }

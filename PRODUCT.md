@@ -31,7 +31,7 @@ Schedule blocks are fixed: 07:00-08:00, 08:00-08:45, 08:45-09:15 (receso), 09:15
 - All copy is Spanish (es-MX). Keep every existing feature, id and behavior.
 
 ## Brand Commitments
-CECyTE institutional green stays the primary brand color (confirmed by the user). Palette is green and white with some black, light, friendly but formal (user request, 2026-09-29); no other accent hues. Name shown: "CECyTE Plantel 18". No official logo asset in the repo; do not fabricate one.
+CECyTE institutional green stays the primary brand color (confirmed by the user). Palette is green and white with some black, light, friendly but formal (user request, 2026-09-29). The orange of the official logo is allowed only to mark what comes next and the deliberate ring-the-bell action (user asked for colors on important things, 2026-10-10); no other accent hues. Name shown: "CECyTE Plantel 18". No official logo asset in the repo; do not fabricate one.
 
 ## Evidence on Hand
 No logo, photos or testimonials in the repo. Do not invent any.
