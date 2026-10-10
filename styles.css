@@ -740,6 +740,62 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .tag { padding: 2px 10px; border-radius: 99px; background: var(--green-100); color: var(--green-900); font-size: var(--fs-cap); font-weight: 700; }
 .tag--manual { background: var(--black); color: #fff; }
 
+/* ==================== Pantalla completa ====================
+   Sin ancho máximo ni tarjetas sueltas: cada sección es una banda de borde a borde,
+   separada por una línea fina. El margen lateral (--gutter) crece con la ventana. */
+.container { --gutter: clamp(16px, 3vw, 56px); max-width: none; padding-inline: var(--gutter); }
+.page { padding-block: 24px 0; gap: 0; }
+.view.stack, .admin-grid, .admin-top, .admin-col { gap: 0; }
+.intro, .admin-head { padding-bottom: 24px; }
+
+.page .panel, .page .notify, .page .today-grid {
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    background: var(--surface);
+    border: 0;
+    border-top: 1px solid var(--line-strong);
+    border-radius: 0;
+    box-shadow: none;
+}
+.page .panel__head, .page .panel__body, .page .toolbar { padding-inline: 0; }
+.page .panel__body { padding-block: 20px 28px; }
+.page .notify { padding-block: 16px; }
+
+/* Ahora + agenda: una sola banda, sin tarjeta dentro de tarjeta */
+.page .today-grid { padding-block: 28px; gap: 28px 48px; }
+@media (min-width: 1000px) { .today-grid { grid-template-columns: minmax(0, 1fr) minmax(340px, 28vw); } }
+.page .today-grid { align-items: start; }
+.today-grid .now { background: none; box-shadow: none; border-radius: 0; padding: 0; }
+
+/* Tabla semanal: celdas planas separadas por líneas finas, sin cajitas */
+.page .week td + td { border-left: 1px solid var(--line); }
+.page .slot { border: 0; border-radius: 0; background: transparent; padding: 10px 12px; }
+.page .slot:hover { background: var(--green-50); }
+.page .slot.is-now { background: var(--green-700); box-shadow: none; }
+.page .today-grid .panel { margin: 0; padding: 0; border: 0; background: none; }
+@media (min-width: 1000px) { .page .today-grid .panel { padding-left: 40px; border-left: 1px solid var(--line); } }
+.page .today-grid .panel__head { padding-block: 0 8px; border-bottom: 0; }
+
+/* Lista por día en celular: el margen ya lo da la banda */
+.page .day-tabs { padding-inline: 0; }
+.page .day-row { padding-inline: 0; }
+@media (max-width: 719px) { .page .data tbody tr:not(.row-empty) { padding-inline: 0; } }
+
+/* Admin: dentro de cada banda, el contenido se reparte en columnas según el ancho disponible */
+@media (min-width: 1100px) {
+    .admin-top .panel__body {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px 64px;
+        align-items: start;
+    }
+    .admin-top .panel__body > .divider, .admin-top .panel__body > .row-between,
+    .admin-top .panel__body > .seg, .admin-top .panel__body > .tl, .admin-top .panel__body > .msg,
+    .admin-top .panel__body > .btn-row, .admin-top .panel__body > [data-rtab],
+    .admin-top .panel__body > .stack:last-child { grid-column: 1 / -1; }
+    .admin-top .btn--block { width: auto; justify-self: start; min-width: 280px; }
+}
+
 /* ==================== Movimiento ==================== */
 @keyframes view-in { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
 @keyframes pop-in { from { opacity: 0; scale: 0.96; translate: 0 8px; } to { opacity: 1; scale: 1; translate: 0 0; } }
