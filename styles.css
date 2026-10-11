@@ -963,6 +963,19 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-instalar ol { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
 .rb-instalar a { color: var(--green-800); font-weight: 700; }
 
+/* Funciones por modelo: una tarjeta por función, la elegida resaltada */
+.rb-fn-grupo { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.rb-fn-lista { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.rb-fn { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); cursor: pointer; }
+.rb-fn:hover { background: var(--green-50); }
+.rb-fn:has(input:checked) { border-color: var(--green-700); background: var(--green-50); }
+.rb-fn:has(input:focus-visible) { outline: 3px solid var(--green-700); outline-offset: 2px; }
+.rb-fn input { flex: none; width: 20px; height: 20px; margin-top: 2px; accent-color: var(--green-700); }
+.rb-fn span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rb-fn b { font-size: var(--fs-sm); }
+.rb-fn small { font-size: var(--fs-cap); color: var(--ink-2); }
+.rb-fn em { font-style: normal; font-weight: 700; color: var(--green-800); }
+
 @media print {
     .site-header, .site-footer, .notify, .toasts, .intro .group-pick, .agenda { display: none !important; }
     body { background: #fff; }

@@ -529,4 +529,56 @@ for (const c of R.CANCIONES) {
     assert(/anchoPermil\(\)/.test(ino) && !/volumen \* volumen/.test(ino), 'tono usa la tabla');
 }
 
+// 23) Funciones por modelo: catálogo coherente, pasos con segundos/grados, curvas y repetición continua
+{
+    const ids = R.VARIANTES.map(v => v.id);
+    assert.deepStrictEqual(ids, ['tanque', 'raptor', 'pajaro']);
+    assert.strictEqual(new Set(R.FUNCIONES.map(f => f.id)).size, R.FUNCIONES.length, 'ids repetidos');
+    for (const f of R.FUNCIONES) {
+        assert(f.v.length && f.v.every(v => ids.includes(v)), f.id + ': modelo desconocido');
+        assert(f.nombre && f.desc, f.id);
+        if (f.modo) assert([1, 2].includes(f.modo), f.id + ': modos 1 (esquivar) y 2 (seguir) del robot');
+        else {
+            assert(R.pasosDeFuncion(f.pasos).length > 0, f.id + ': sin pasos');
+            // todo el texto de pasos es "MOV número[°]": nada se pierde en silencio
+            assert.strictEqual(f.pasos.split(/\s+/).length % 2, 0, f.id);
+            assert.strictEqual(R.pasosDeFuncion(f.pasos, 500, 60, 0).length, f.pasos.split(/\s+/).length / 2, f.id);
+        }
+    }
+    for (const id of ids) assert(R.FUNCIONES.filter(f => f.v.includes(id)).length >= 3, id + ' lleva al menos 3 funciones');
+    assert(R.FUNCIONES.filter(f => f.v.length === 1).length >= 6, 'cada modelo tiene funciones propias');
+    assert(R.FUNCIONES.some(f => f.id === 'avanzar' && ids.every(v => f.v.includes(v))), 'seguir avanzando está en los tres');
+
+    // segundos y grados: a 120 bpm entran 2 tiempos por segundo; 90° = lo que valga giro90
+    const unaVuelta = R.pasosDeFuncion('AD 2 GD 90°', 500, 120, 0);
+    assert.deepStrictEqual(unaVuelta, [{ mov: 'AD', beats: 4 }, { mov: 'GD', beats: 1 }]);
+    assert.strictEqual(R.pasosDeFuncion('GI 360°', 400, 60, 0)[0].beats, 1.6);
+    // se repite hasta cubrir 30 s (2,5 s por vuelta -> 12 vueltas)
+    assert.strictEqual(R.pasosDeFuncion('AD 2 GD 90°', 500, 120).length, 24);
+    assert.deepStrictEqual(R.pasosDeFuncion('texto sin pasos'), []);
+
+    // curvas: la rueda del lado de la curva va al 40 %, y los números salen enteros
+    assert.deepStrictEqual(R.leerBaile('CI/2 CD/4').errores, []);
+    const curva = R.compilar({ pasos: R.pasosDeFuncion('CI 1 CD 1', 500, 120, 0), bpm: 120, vel: 115, continuo: true });
+    assert.deepStrictEqual(curva.cmds.map(c => c.l).filter(l => l[0] === 'M'), ['M 46 115', 'M 115 46']);
+
+    // continuo: no termina en S (parar) para empalmar vueltas; sin continuo sí (como los bailes)
+    const sin = R.compilar({ pasos: R.pasosDeFuncion('AD 2', 500, 120, 0), bpm: 120, vel: 110 });
+    const con = R.compilar({ pasos: R.pasosDeFuncion('AD 2', 500, 120, 0), bpm: 120, vel: 110, continuo: true });
+    assert.strictEqual(sin.cmds[sin.cmds.length - 1].l, 'S');
+    assert(!con.cmds.some(c => c.l === 'S'));
+    assert.strictEqual(con.ms, 2000);
+
+    // con música: la canción manda en la duración y el movimiento la acompaña sin parar
+    const { notas } = R.leerNotas('C4/4 D4/4 E4/4 F4/4');
+    const conMusica = R.compilar({ notas, pasos: R.pasosDeFuncion('AD 1 PA 0.5', 500, 120), bpm: 120, vel: 100, continuo: true });
+    assert.strictEqual(conMusica.ms, 2000);
+    assert(conMusica.cmds.some(c => c.l.startsWith('T ')) && conMusica.cmds.some(c => c.l === 'M 100 100') && conMusica.cmds.some(c => c.l === 'M 0 0'));
+
+    // el firmware entiende los modos que usan las funciones autónomas y la página los manda con MODE
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/case 1: esquivar\(\);/.test(ino) && /case 2: seguir\(\);/.test(ino), 'modos 1 y 2 del robot');
+    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_MAX/.test(ino));
+}
+
 console.log('robot.test.js: todo bien');
