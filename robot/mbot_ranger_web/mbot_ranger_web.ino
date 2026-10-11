@@ -131,7 +131,7 @@ void motorPwm(uint8_t m, int pwm) {
   analogWrite(MOT_PWM[m], abs(pwm));
 }
 
-const int VEL = 120;                 // 0 a 255, para los modos del botón
+const int VEL = 100;                 // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
 const int DIST_OBSTACULO = 20;       // cm
 const int PIN_BUZZER = 45;
@@ -166,6 +166,7 @@ unsigned long ultimaOrden = 0;
 // USB podría perder bytes, pero la página no manda nada mientras espera el OK.
 const unsigned long FX_MS = 60;
 const unsigned long FX_QUIETO_MS = 40;
+bool luzPropia = false;                // hay luces guardadas: esquivar y seguir la mano las respetan
 uint8_t fxModo = 0;                  // 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota
 uint8_t fxBrillo = 40;               // 0..100
 uint8_t volumen = 100;               // volumen del zumbador, 0..100 (orden VOL)
@@ -214,8 +215,10 @@ void rampa() {
   if (moviendo && t - bateriaT > 50) { bateriaT = t; notaBateria(); }
   if ((izqAct == izqObj && derAct == derObj) || t - rampaT < 12) return;
   rampaT = t;
-  izqAct += constrain(izqObj - izqAct, -30, 30);
-  derAct += constrain(derObj - derAct, -30, 30);
+  // arranque suave: con 30 por paso los motores pedían de golpe tanta corriente que, a pilas y sin USB, el
+  // voltaje caía a ~4 V, el regulador de 5 V se hundía y la placa se reiniciaba al segundo de andar
+  izqAct += constrain(izqObj - izqAct, -8, 8);
+  derAct += constrain(derObj - derAct, -8, 8);
   motorPwm(0, -izqAct);
   motorPwm(1, derAct);
 }
@@ -248,12 +251,19 @@ void aplicaModo() {
   lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
   lnEstado = 255;
 #endif
-  if (modo < MODO_WEB) fxModo = 0;     // los colores de los modos mandan sobre el efecto
-  switch (modo) {
-    case 0: color(0, 0, 40);   break;
-    case 1: color(0, 40, 0);   break;
-    case 2: color(40, 30, 0);  break;
-    case 3: color(40, 0, 0);   break;
+  // los colores de los modos del botón mandan sobre el efecto, salvo en esquivar y seguir la mano cuando
+  // el usuario guardó sus luces: ahí siguen con su efecto
+  const bool conserva = luzPropia && (modo == 1 || modo == 2);
+  if (modo < MODO_WEB && !conserva) fxModo = 0;
+  if (conserva) {
+    fxDibuja();
+  } else {
+    switch (modo) {
+      case 0: color(0, 0, 40);   break;
+      case 1: color(0, 40, 0);   break;
+      case 2: color(40, 30, 0);  break;
+      case 3: color(40, 0, 0);   break;
+    }
   }
   if (modo < MODO_WEB) tono(500 + modo * 200, 120);
 }
@@ -515,6 +525,7 @@ const int EE_DIR = 3000;
 const uint8_t EE_MAGICO = 0xA7;
 
 void fxGuardar() {
+  luzPropia = true;
   EEPROM.update(EE_DIR, EE_MAGICO);
   EEPROM.update(EE_DIR + 1, fxModo);
   EEPROM.update(EE_DIR + 2, fxBrillo);
@@ -527,6 +538,7 @@ void fxRestaurar() {
   if (EEPROM.read(EE_DIR) != EE_MAGICO) return;
   uint8_t m = EEPROM.read(EE_DIR + 1), b = EEPROM.read(EE_DIR + 2);
   if (m > 4 || b > 100) return;
+  luzPropia = true;
   for (int i = 0; i < 36; i++) fxBase[i / 3][i % 3] = EEPROM.read(EE_DIR + 3 + i);
   uint8_t v = EEPROM.read(EE_DIR + 39);
   fxVel = (v >= 10 && v <= 150) ? v * 2 : 100;
@@ -633,7 +645,7 @@ void lineaConfig(const char *k, int v) {
 void lineaEstado(uint8_t e) {
   if (e == lnEstado) return;
   lnEstado = e;
-  if (lnAvisos) { if (e == 0) color(40, 0, 0); else color(0, 40, 0); }
+  if (lnAvisos && fxModo == 0) { if (e == 0) color(40, 0, 0); else color(0, 40, 0); }   // con un efecto, el efecto manda
 }
 
 void seguirLinea() {
