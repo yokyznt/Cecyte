@@ -1286,9 +1286,8 @@ function iniciarFuncion(reinicio) {
         S.autonomo = f.modo;
         S.ultimaActividad = Date.now();
         if (f.linea) {
-            // el robot pinta verde/rojo según la línea: las luces de la pantalla se dejan antes, en fijo y sin brillo
-            const luz = S.funLuces && S.linea.avisos ? fxLinea('fijo', 0, coloresBase(), 100) : lineaLuces();
-            S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(lineaEnRobot()), [{ l: luz, ex: true }, 'VOL ' + S.vol, { l: 'MODE 6', ex: true }]));
+            // el robot pinta verde/rojo según la línea solo si las luces son fijas; con un efecto, sigue el efecto
+            S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(lineaEnRobot()), [{ l: lineaLuces(), ex: true }, 'VOL ' + S.vol, { l: 'MODE 6', ex: true }]));
         } else {
             S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
         }
