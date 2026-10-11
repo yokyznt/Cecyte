@@ -100,6 +100,14 @@ const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
+#define SEGUIDOR_LINEA 0             // 1 = incluye el modo 6 (seguidor de línea, orden LINEA); desactivado por ahora
+#if SEGUIDOR_LINEA
+const int MODO_MAX = 6;              // 6 = seguir la línea con el módulo Me Line Follower
+unsigned long lnT0 = 0;              // cuándo empezó a seguir la línea (0 = no ha empezado)
+uint8_t lnEstado = 255;              // 0 perdida, 1 en la línea, 2 cruce (para no redibujar las luces sin necesidad)
+#else
+const int MODO_MAX = MODO_SHOW;
+#endif
 const unsigned long SIN_ORDENES_MS = 3000;
 
 // Show guardado: cabecera de 4 bytes en la EEPROM y luego las órdenes, una detrás de otra:
@@ -198,6 +206,10 @@ void color(int r, int g, int b) {
 
 void aplicaModo() {
   parar();
+#if SEGUIDOR_LINEA
+  lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
+  lnEstado = 255;
+#endif
   if (modo < MODO_WEB) fxModo = 0;     // los colores de los modos mandan sobre el efecto
   switch (modo) {
     case 0: color(0, 0, 40);   break;
@@ -548,6 +560,79 @@ void correShow() {
   Serial.println(F("SHOW fin"));
 }
 
+#if SEGUIDOR_LINEA
+// ---------- Seguidor de línea (módulo Me Line Follower: dos sensores digitales) ----------
+// Puertos con dos pines digitales: 6, 7 y 8 (el 9 es el botón de la placa y el 10 el ultrasonido).
+const uint8_t LN_S1[3] = { A10, A9, A8 };
+const uint8_t LN_S2[3] = { A15, A14, A13 };
+uint8_t lnPuerto = 0, lnColor = 0, lnVel = 80, lnGiro = 50, lnPerdida = 1, lnCruce = 0, lnObst = 0, lnAvisos = 1;
+uint16_t lnBuscarMs = 1500, lnDurS = 0;
+unsigned long lnPerdidoDesde = 0;
+int8_t lnLado = 1;                   // hacia dónde vio la línea por última vez (-1 izquierda, 1 derecha)
+
+void lineaConfig(const char *k, int v) {
+  if (!strcmp(k, "puerto")) lnPuerto = constrain(v, 6, 8) - 6;
+  else if (!strcmp(k, "color")) lnColor = v ? 1 : 0;
+  else if (!strcmp(k, "vel")) lnVel = constrain(v, 40, 150);
+  else if (!strcmp(k, "giro")) lnGiro = constrain(v, 10, 100);
+  else if (!strcmp(k, "perdida")) lnPerdida = constrain(v, 0, 2);
+  else if (!strcmp(k, "buscar")) lnBuscarMs = constrain(v, 0, 10000);
+  else if (!strcmp(k, "cruce")) lnCruce = constrain(v, 0, 3);
+  else if (!strcmp(k, "obst")) lnObst = constrain(v, 0, 200);
+  else if (!strcmp(k, "dur")) lnDurS = constrain(v, 0, 3600);
+  else if (!strcmp(k, "avisos")) lnAvisos = v ? 1 : 0;
+}
+
+void lineaEstado(uint8_t e) {
+  if (e == lnEstado) return;
+  lnEstado = e;
+  if (lnAvisos) { if (e == 0) color(40, 0, 0); else color(0, 40, 0); }
+}
+
+void seguirLinea() {
+  if (lnT0 == 0) {
+    lnT0 = millis();
+    pinMode(LN_S1[lnPuerto], INPUT);
+    pinMode(LN_S2[lnPuerto], INPUT);
+  }
+  if ((lnDurS && millis() - lnT0 > lnDurS * 1000UL) || (lnObst && distanciaCm() < lnObst)) {
+    parar();
+    modo = 0;
+    aplicaModo();
+    return;
+  }
+  // el módulo da LOW sobre una línea negra; con línea blanca se invierte
+  const bool s1 = (digitalRead(LN_S1[lnPuerto]) == LOW) != (lnColor == 1);
+  const bool s2 = (digitalRead(LN_S2[lnPuerto]) == LOW) != (lnColor == 1);
+  const int c = (int)lnVel * lnGiro / 100;           // cuánto se frena la rueda de adentro (x2)
+  if (s1 && s2) {                                    // cruce
+    lnPerdidoDesde = 0;
+    lineaEstado(2);
+    if (lnCruce == 0) motores(lnVel, lnVel);
+    else if (lnCruce == 1) parar();
+    else if (lnCruce == 2) motores(-lnVel, lnVel);
+    else motores(lnVel, -lnVel);
+  } else if (s1) {                                   // la línea está a la izquierda: corrige hacia allí
+    lnLado = -1;
+    lnPerdidoDesde = 0;
+    lineaEstado(1);
+    motores(lnVel - 2 * c, lnVel);
+  } else if (s2) {
+    lnLado = 1;
+    lnPerdidoDesde = 0;
+    lineaEstado(1);
+    motores(lnVel, lnVel - 2 * c);
+  } else {                                           // perdida
+    if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
+    lineaEstado(0);
+    if (lnPerdida == 0) parar();
+    else if (lnPerdida == 2) motores(lnVel, lnVel);
+    else if (millis() - lnPerdidoDesde < lnBuscarMs) motores(lnLado * lnVel, -lnLado * lnVel);   // gira hacia donde la vio
+    else parar();
+  }
+}
+#endif
+
 // ---------- Órdenes ----------
 void ok()  { Serial.println(F("OK")); }
 void err(const __FlashStringHelper *motivo) { Serial.print(F("ERR ")); Serial.println(motivo); }
@@ -608,6 +693,11 @@ void ejecuta(char *s) {
       fxDibuja();
       ok();
     }
+#if SEGUIDOR_LINEA
+  } else if (!strcmp(cmd, "LINEA") && a && b) {      // LINEA clave valor: ajustes del seguidor (en RAM)
+    lineaConfig(a, atoi(b));
+    ok();
+#endif
   } else if (!strcmp(cmd, "VOL") && a) {
     volumen = constrain(atoi(a), 0, 100);
     ok();
@@ -649,7 +739,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
-    if (n < 0 || n > MODO_SHOW) { err(F("modo")); }
+    if (n < 0 || n > MODO_MAX) { err(F("modo")); }
     else {
       modo = n;
       aplicaModo();
@@ -753,6 +843,9 @@ void loop() {
     case 2: seguir();      break;
     case 3: testMotores(); break;
     case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
+#if SEGUIDOR_LINEA
+    case 6: seguirLinea(); break;
+#endif
     default: break;
   }
 
