@@ -157,4 +157,16 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   puestas y el interruptor encendido: solo por USB la lectura del botón puede quedar
   flotando (el firmware ya ignora ese ruido y no cambia de modo solo).
 - **Afinar:** si las notas salen bajas o altas, ajusta `AJUSTE_US` en el `.ino`.
+- **Diagnóstico:** al conectar, la página muestra la batería y lo que el robot anotó solo
+  (arranques, cambios de modo con el botón, pasadas del show, voltaje mínimo con las ruedas
+  andando); "Borrar este aviso" lo pone en cero.
+- **Subir el firmware a esta placa (importante):** el bootloader de este robot borra, en cada
+  escritura de página, la página que marca un puntero interno que arranca en 0 al iniciar la
+  sesión, no la que se le pide. Subir en orden 0, 1, 2… una sola vez cada página (como hace
+  avrdude) funciona; saltarse páginas, reintentar o reescribir una página deja en blanco las
+  primeras (sin vectores de interrupción) y el programa no arranca aunque la verificación de
+  cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
+  nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
+  `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa ~16 KB.
 - **Pruebas:** `node test/robot.test.js`.
