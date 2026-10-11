@@ -936,7 +936,7 @@ function mostrarBateria(v) {
         el.dataset.nivel = 'sin';
         $('rb-bat-pct').textContent = 'Sin pilas';
         $('rb-bat-v').textContent = 'solo USB';
-        $('rb-bat-fill').style.width = '0%';
+        $('rb-bat-fill').style.transform = 'scaleX(0)';
         $('rb-bat-tiempo').textContent = '';
         el.title = 'El robot no está viendo las pilas: está alimentado solo por el USB, o el interruptor está apagado.';
         return;
@@ -949,7 +949,7 @@ function mostrarBateria(v) {
     el.dataset.nivel = nivel;
     $('rb-bat-pct').textContent = pct + ' %';
     $('rb-bat-v').textContent = v.toFixed(2) + ' V';
-    $('rb-bat-fill').style.width = pct + '%';
+    $('rb-bat-fill').style.transform = `scaleX(${pct / 100})`;
     el.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
     $('rb-bat-tiempo').textContent = t ? `≈ ${formatoDuracion(t.minutos)} de uso (${t.fuente})` : '';
     el.title = `${v.toFixed(2)} V, pilas ${NOMBRE_PILAS[b.quimica]} de ${b.capacidad} mAh`;
