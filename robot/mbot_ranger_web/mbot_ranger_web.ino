@@ -26,7 +26,9 @@
     PCLR             empieza a guardar un show nuevo (borra el anterior)
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
     PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
-    MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página)
+    MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página; 6 = seguir la línea)
+    FSAVE m [1]      guarda la función m (1 esquivar, 2 seguir la mano, 6 línea, con los ajustes LINEA de ese momento);
+                     con 1 arranca sola 2,5 s después de encender. FCLR la borra
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
@@ -598,7 +600,7 @@ void correShow() {
       fxPaso();
       if (showCortar()) break;
     }
-    parar();
+    if (!repite) parar();                    // repitiendo, no se frena entre vuelta y vuelta
   } while (repite && modo == MODO_SHOW && !abortar && colaN == 0);
   parar();
   if (modo == MODO_SHOW) modo = 0;           // las luces siguen: no se llama a aplicaModo()
@@ -677,6 +679,55 @@ void seguirLinea() {
   }
 }
 #endif
+
+// ---------- Función guardada (esquivar, seguir la mano o seguir la línea) ----------
+// Al encenderlo (si se marcó) o con el botón de la placa, el robot la hace sin la página.
+// 15 bytes: magia, modo, arranca solo y los ajustes de la línea, que se cargan al encender.
+const int FN_DIR = 2950;
+const uint8_t FN_MAGICO = 0xC3;
+int fnModo = 0;                       // 0 = no hay función guardada
+unsigned long fnEspera = 0;           // si no es 0, arranca a esta hora (para dejarlo en el piso)
+
+void fnGuardar(int m, bool solo) {
+  EEPROM.update(FN_DIR + 1, m);
+  EEPROM.update(FN_DIR + 2, solo ? 1 : 0);
+#if SEGUIDOR_LINEA
+  EEPROM.update(FN_DIR + 3, lnPuerto);
+  EEPROM.update(FN_DIR + 4, lnColor);
+  EEPROM.update(FN_DIR + 5, lnVel);
+  EEPROM.update(FN_DIR + 6, lnGiro);
+  EEPROM.update(FN_DIR + 7, lnPerdida);
+  EEPROM.update(FN_DIR + 8, lnCruce);
+  EEPROM.update(FN_DIR + 9, lnObst);
+  EEPROM.update(FN_DIR + 10, lnAvisos);
+  EEPROM.update(FN_DIR + 11, lnBuscarMs & 0xFF);
+  EEPROM.update(FN_DIR + 12, lnBuscarMs >> 8);
+  EEPROM.update(FN_DIR + 13, lnDurS & 0xFF);
+  EEPROM.update(FN_DIR + 14, lnDurS >> 8);
+#endif
+  EEPROM.update(FN_DIR, FN_MAGICO);     // al final: nunca queda a medias
+  fnModo = m;
+}
+
+void fnCargar() {
+  if (EEPROM.read(FN_DIR) != FN_MAGICO) return;
+  int m = EEPROM.read(FN_DIR + 1);
+  if (m != 1 && m != 2 && m != 6) return;
+  if (m > MODO_MAX) return;
+  fnModo = m;
+#if SEGUIDOR_LINEA
+  lnPuerto = constrain(EEPROM.read(FN_DIR + 3), 0, 2);
+  lnColor = EEPROM.read(FN_DIR + 4) ? 1 : 0;
+  lnVel = constrain(EEPROM.read(FN_DIR + 5), 40, 150);
+  lnGiro = constrain(EEPROM.read(FN_DIR + 6), 10, 100);
+  lnPerdida = constrain(EEPROM.read(FN_DIR + 7), 0, 2);
+  lnCruce = constrain(EEPROM.read(FN_DIR + 8), 0, 3);
+  lnObst = constrain(EEPROM.read(FN_DIR + 9), 0, 200);
+  lnAvisos = EEPROM.read(FN_DIR + 10) ? 1 : 0;
+  lnBuscarMs = constrain(EEPROM.read(FN_DIR + 11) | (EEPROM.read(FN_DIR + 12) << 8), 0, 10000);
+  lnDurS = constrain(EEPROM.read(FN_DIR + 13) | (EEPROM.read(FN_DIR + 14) << 8), 0, 3600);
+#endif
+}
 
 // ---------- Órdenes ----------
 void ok()  { Serial.println(F("OK")); }
@@ -783,6 +834,14 @@ void ejecuta(char *s) {
     EEPROM.update(PGM_DIR + 3, pgmFin >> 8);
     EEPROM.update(PGM_DIR, pgmFin > 0 ? PGM_MAGICO : 0);   // al final: así nunca queda un show a medias
     ok();
+  } else if (!strcmp(cmd, "FSAVE") && a) {           // FSAVE modo [1 = arranca sola al encender]
+    int m = atoi(a);
+    if ((m != 1 && m != 2 && m != 6) || m > MODO_MAX) { err(F("modo")); }
+    else { fnGuardar(m, b && atoi(b) != 0); ok(); }
+  } else if (!strcmp(cmd, "FCLR")) {
+    EEPROM.update(FN_DIR, 0);
+    fnModo = 0;
+    ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
     if (n < 0 || n > MODO_MAX) { err(F("modo")); }
@@ -852,6 +911,8 @@ void setup() {
     modo = MODO_SHOW;
     showT0 = millis() + 2500;
   }
+  fnCargar();
+  if (fnModo && EEPROM.read(FN_DIR + 2)) fnEspera = millis() + 2500;   // arranca sola, a los 2,5 s
   sumaEE(EE_BOOT);
   uint8_t minimo = EEPROM.read(EE_MIN);
   Serial.print(F("INFO BOOT="));
@@ -878,10 +939,18 @@ void loop() {
     ultimoBoton = millis();
     sumaEE(EE_BTN);
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
+    else if ((modo == 3 || modo == MODO_SHOW) && fnModo == 6) modo = 6;   // la línea guardada, tras el show
     else modo = (modo >= 3) ? 0 : modo + 1;
     aplicaModo();
     Serial.print(F("BTN "));
     Serial.println(modo);
+  }
+
+  if (modo != 0) fnEspera = 0;         // si la página o el botón tomaron el control, no arranca sola
+  if (fnEspera && millis() >= fnEspera) {
+    fnEspera = 0;
+    modo = fnModo;
+    aplicaModo();
   }
 
   switch (modo) {

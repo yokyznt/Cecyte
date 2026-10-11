@@ -844,6 +844,16 @@
                                         <div class="btn-row">
                                             <button type="button" id="rb-fn-iniciar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Iniciar la función</button>
                                         </div>
+                                        <div class="rb-card">
+                                            <h4 class="panel__sub">Guardarla en el robot</h4>
+                                            <p class="hint">Se guarda en el robot con las luces y la música marcadas arriba, y la hace sin USB ni computadora: con el botón de la placa o, si lo marcas, sola 2,5 s después de encenderlo. Mientras esté conectado a la página no arranca sola. Comparte lugar con el show guardado: guardar una borra la otra.</p>
+                                            <label class="rb-check"><input type="checkbox" id="rb-fn-auto"><span>Que empiece sola al encenderlo</span></label>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-fn-guardar" class="btn btn--primary btn--sm" disabled>Guardar la función en el robot</button>
+                                                <button type="button" id="rb-fn-borrar" class="btn btn--secondary btn--sm" disabled>Borrar lo guardado en el robot</button>
+                                            </div>
+                                            <p id="rb-fn-info" class="msg" role="status"></p>
+                                        </div>
                                         <p class="hint">Esquivar obstáculos, Seguir mi mano y Seguir la línea las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
                                     </div>
                                 </div>
