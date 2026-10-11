@@ -133,8 +133,18 @@ el ESP32 ha consultado en el último minuto.
 
 ## 9. Robot mBot Ranger (USB, sin servidor)
 
-En Admin hay una pestaña **Robot**. Todo ocurre entre el navegador y el robot por
-USB (Web Serial, Chrome o Edge en una computadora); no usa Vercel ni variables nuevas.
+El panel de Admin tiene tres apartados, cada uno con sus secciones:
+
+- **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
+- **Timbre:** Timbre, Ritmo y ESP32.
+- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Luces, Show guardado e Instalar.
+  La conexión, el paro y el progreso están siempre arriba. El volumen del robot está en Música.
+
+Se puede abrir una sección directo con `#admin-<sección>` (por ejemplo `#admin-robot-luces`;
+`#admin-robot` abre Música). `node test/admin-secciones.test.js` revisa que el HTML y el script coincidan.
+
+Todo lo del robot ocurre entre el navegador y el robot por USB (Web Serial, Chrome o Edge en una
+computadora); no usa Vercel ni variables nuevas.
 
 Una sola vez hay que subirle al robot `robot/mbot_ranger_web/mbot_ranger_web.ino`
 con el IDE de Arduino (placa "Arduino Mega or Mega 2560", librería Makeblock). Es el

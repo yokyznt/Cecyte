@@ -425,7 +425,10 @@ for (const c of R.CANCIONES) {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/fxVel = d \? constrain\(atoi\(d\), 20, 300\)/.test(ino), 'FX acepta la velocidad como 4.º dato');
     assert(/EE_DIR \+ 39/.test(ino), 'la velocidad se guarda junto al efecto');
-    assert(/TCCR5A = _BV\(COM5B0\)/.test(ino) && /OCR5A = OCR5B/.test(ino), 'el tono sale del Timer5');
+    assert(/TCCR5A = _BV\(COM5B1\) \| _BV\(WGM51\)/.test(ino) && /ICR5 = tope/.test(ino), 'el tono sale del Timer5 en PWM rápido');
+    // volumen: el ancho del pulso; 0 calla, se guarda con SAVE y la página lo manda con VOL
+    assert(/strcmp\(cmd, "VOL"\)/.test(ino) && /OCR5B = \(uint16_t\)ancho/.test(ino) && /EE_DIR \+ 40/.test(ino), 'el firmware entiende VOL y lo guarda');
+    assert(/if \(volumen == 0\)/.test(ino), 'volumen 0 no suena');
     assert(!/digitalWrite\(PIN_BUZZER, HIGH\)/.test(ino), 'el tono ya no se hace a mano');
 }
 
