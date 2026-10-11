@@ -367,6 +367,66 @@ for (const c of R.CANCIONES) {
 
     // y la ficha resultante es una canción que la página sabe tocar
     assert(R.leerNotas(r1.texto).notas.length === 6);
+
+    // voz con vibrato (con sus armónicos) + bajo + acordes + golpes de percusión: sigue a la voz,
+    // no al bajo ni a los acordes (la fase se integra: el vibrato no puede acumular desvío)
+    const mel = [67, 69, 71, 72, 71, 69, 67, 64, 67, 69, 71, 74, 72, 71, 69, 67];
+    const bajo = [43, 43, 48, 48, 43, 43, 50, 50, 43, 43, 48, 48, 43, 43, 50, 50];
+    const seg = 0.5, N = Math.round(sr * seg * mel.length), mezcla = new Float32Array(N);
+    let semilla = 1;
+    const azar = () => { semilla = (semilla * 1664525 + 1013904223) >>> 0; return semilla / 4294967296 - 0.5; };
+    let ph = 0, phb = 0;
+    for (let i = 0; i < N; i++) {
+        const t = i / sr, k = Math.min(mel.length - 1, Math.floor(t / seg));
+        ph += 2 * Math.PI * 440 * Math.pow(2, (mel[k] - 69) / 12) * (1 + 0.012 * Math.sin(2 * Math.PI * 5.5 * t)) / sr;
+        phb += 2 * Math.PI * 440 * Math.pow(2, (bajo[k] - 69) / 12) / sr;
+        let v = 0, b = 0;
+        for (let h = 1; h <= 8; h++) v += 0.7 / h * Math.sin(h * ph);
+        for (let h = 1; h <= 4; h++) b += 0.9 / (h * h) * Math.sin(h * phb);
+        const acorde = 0.25 * (Math.sin(2 * Math.PI * 261.6 * t) + Math.sin(2 * Math.PI * 329.6 * t) + Math.sin(2 * Math.PI * 392 * t));
+        mezcla[i] = 0.35 * (v + b + acorde) + 0.3 * ((i % 4000) < 300 ? azar() * 1.2 : 0) + 0.04 * azar();
+    }
+    const r3 = R.melodiaDeAudio(mezcla, sr, { fMin: 110, fMax: 1000, tonalidad: false, subir: false });
+    const esperado = mel.map(m => R.nombreMidi(m));
+    let en = 0;
+    for (const n of nombres(r3)) if (n === esperado[en]) en++;
+    assert(en >= 14, `la voz debe recuperarse (${en}/16): ${r3.texto}`);
+}
+
+// 19) Teclado: lo tocado se vuelve texto de notas con sus milisegundos y silencios; velocidad de luces
+{
+    const g = R.grabacionATexto([{ n: 'C4', s: 0, e: 250 }, { n: 'E4', s: 300, e: 520 }, { n: 'G4', s: 530, e: 900 }]);
+    assert.strictEqual(g.texto, 'C4:250 R:50 E4:220 G4:370', g.texto);   // 10 ms de hueco no cuentan como silencio
+    assert.strictEqual(g.notas, 3);
+    assert.strictEqual(g.ms, 900);
+    assert.deepStrictEqual(g.intervalos, [[0, 250], [300, 520], [530, 900]]);
+    // lo grabado es una canción que la página sabe leer, con las mismas duraciones
+    const leidas = R.leerNotas(g.texto);
+    assert.deepStrictEqual(leidas.errores, []);
+    assert.deepStrictEqual(leidas.notas.map(n => [n.nombre.split(':')[0], n.ms]), [['C4', 250], ['R', 50], ['E4', 220], ['G4', 370]]);
+    assert.strictEqual(R.grabacionATexto([]).texto, '');
+    // sostenidos: C#4 también se entiende
+    assert.deepStrictEqual(R.leerNotas(R.grabacionATexto([{ n: 'C#4', s: 0, e: 100 }]).texto).errores, []);
+
+    // el teclado de la computadora cubre 25 semitonos sin repetir ninguno
+    const semis = Object.values(R.TECLAS_PIANO);
+    assert.strictEqual(new Set(semis).size, semis.length);
+    assert.strictEqual(Math.min(...semis), 0);
+    assert.strictEqual(Math.max(...semis), 24);
+
+    // velocidad de las luces: opcional, acotada de 20 a 300 %
+    const azulFx = Array.from({ length: 12 }, () => [0, 0, 255]);
+    assert.strictEqual(R.fxLinea('arcoiris', 40, azulFx), 'FX 1 40 ' + '0000ff'.repeat(12));
+    assert(R.fxLinea('arcoiris', 40, azulFx, 150).endsWith(' 150'));
+    assert(R.fxLinea('arcoiris', 40, azulFx, 5).endsWith(' 20'));
+    assert(R.fxLinea('arcoiris', 40, azulFx, 999).endsWith(' 300'));
+
+    // el firmware: velocidad guardada en la EEPROM y zumbador por hardware (el anillo ya no lo entrecorta)
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/fxVel = d \? constrain\(atoi\(d\), 20, 300\)/.test(ino), 'FX acepta la velocidad como 4.º dato');
+    assert(/EE_DIR \+ 39/.test(ino), 'la velocidad se guarda junto al efecto');
+    assert(/TCCR5A = _BV\(COM5B0\)/.test(ino) && /OCR5A = OCR5B/.test(ino), 'el tono sale del Timer5');
+    assert(!/digitalWrite\(PIN_BUZZER, HIGH\)/.test(ino), 'el tono ya no se hace a mano');
 }
 
 console.log('robot.test.js: todo bien');

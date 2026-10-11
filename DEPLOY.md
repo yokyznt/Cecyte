@@ -156,7 +156,18 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   después del rojo) o solo, 2,5 s tras encenderlo si lo marcas. Úsalo con las baterías
   puestas y el interruptor encendido: solo por USB la lectura del botón puede quedar
   flotando (el firmware ya ignora ese ruido y no cambia de modo solo).
-- **Afinar:** si las notas salen bajas o altas, ajusta `AJUSTE_US` en el `.ino`.
+- **Melodía de un audio:** además del ritmo, "Sacar la melodía" sigue la línea dominante
+  (la voz si la canción la tiene, o el instrumento principal si es solo instrumental): suma los
+  armónicos de cada altura posible y un Viterbi elige el camino que más suena y menos salta.
+  Se afina con el registro (medio, agudo, grave) y la sensibilidad; las notas se ajustan a la
+  tonalidad y se suben al registro donde el zumbador suena bien. En un MIDI se ignora la batería.
+- **Teclado:** tocas con el ratón o con Z X C V B N M / Q W E R T Y U (y S D G H J / 2 3 5 6 7
+  para las negras); "Grabar" registra cada nota con su duración y sus silencios en tiempo real,
+  y la grabación se usa como canción o se guarda con nombre en la biblioteca.
+- **Velocidad de las luces:** el efecto (arcoíris, respirar, persecución) corre del 20 % al
+  300 % y se guarda en el robot junto con el efecto.
+- **Sonido sin entrecortes:** el zumbador suena por hardware (Timer5, pin 45), así el anillo de
+  LEDs no corta la nota cada vez que dibuja un cuadro.
 - **Diagnóstico:** al conectar, la página muestra la batería y lo que el robot anotó solo
   (arranques, cambios de modo con el botón, pasadas del show, voltaje mínimo con las ruedas
   andando); "Borrar este aviso" lo pone en cero.

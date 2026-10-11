@@ -254,10 +254,37 @@ function marcoHex(colores, brillo) {
 const MODOS_FX = { fijo: 0, arcoiris: 1, respirar: 2, persecucion: 3, musica: 4 };
 
 // Orden FX: los 12 colores base van sin brillo y el robot aplica el brillo (0 a 100).
-function fxLinea(nombre, brillo, colores) {
+// vel (opcional) = velocidad del efecto en % (20 a 300, 100 = normal); un robot con programa viejo la ignora.
+function fxLinea(nombre, brillo, colores, vel) {
     const m = MODOS_FX[nombre] !== undefined ? MODOS_FX[nombre] : 0;
-    return `FX ${m} ${Math.round(clamp(Number(brillo) || 0, 0, 100))} ${marcoHex(colores, 100)}`;
+    const v = vel === undefined ? '' : ' ' + Math.round(clamp(Number(vel) || 100, 20, 300));
+    return `FX ${m} ${Math.round(clamp(Number(brillo) || 0, 0, 100))} ${marcoHex(colores, 100)}${v}`;
 }
+
+// ---------- Teclado: grabar notas tocadas en tiempo real ----------
+// eventos: [{ n: 'C#4', s, e }] en ms desde la primera tecla, uno detrás de otro (el zumbador toca una
+// nota a la vez). Devuelve el texto de notas con milisegundos y los intervalos [inicio, fin] de cada una.
+function grabacionATexto(eventos) {
+    const fichas = [], intervalos = [];
+    let fin = 0;
+    for (const ev of eventos) {
+        const ini = Math.round(ev.s), dur = clamp(Math.round(ev.e - ev.s), 10, 60000);
+        const hueco = ini - fin;
+        if (fichas.length && hueco >= 30) fichas.push('R:' + Math.min(hueco, 60000));
+        fichas.push(`${ev.n}:${dur}`);
+        intervalos.push([ini, ini + dur]);
+        fin = ini + dur;
+    }
+    return { texto: fichas.join(' '), notas: eventos.length, ms: fin, intervalos };
+}
+
+// Semitonos sobre la tecla Z (C de la octava elegida) de cada tecla del teclado de la computadora:
+// dos filas como en un piano (Z X C V B N M con S D G H J, y Q W E R T Y U con 2 3 5 6 7).
+const TECLAS_PIANO = {
+    KeyZ: 0, KeyS: 1, KeyX: 2, KeyD: 3, KeyC: 4, KeyV: 5, KeyG: 6, KeyB: 7, KeyH: 8, KeyN: 9, KeyJ: 10, KeyM: 11,
+    KeyQ: 12, Digit2: 13, KeyW: 14, Digit3: 15, KeyE: 16, KeyR: 17, Digit5: 18, KeyT: 19, Digit6: 20, KeyY: 21, Digit7: 22, KeyU: 23,
+    KeyI: 24,
+};
 
 // ---------- Biblioteca ----------
 // Solo melodías tradicionales o de dominio público. Duraciones: /4 = un tiempo, /8 = medio, /2 = dos.
@@ -472,23 +499,39 @@ function melodiaATexto(midi, hopMs, op) {
 }
 
 // x: muestras mono en [-1, 1]; sr: su frecuencia de muestreo.
-// op: fMin y fMax (Hz) del registro a seguir, sens (0 a 100), minNotaMs, tonalidad, subir.
+// op: fMin y fMax (Hz) del registro de la melodía, sens (0 a 100), minNotaMs, tonalidad, subir.
+//
+// Sigue la línea melódica dominante (la voz si la hay, o el instrumento principal):
+//  1. espectro por cuadro, comprimido y "blanqueado" (se queda con los picos, no con el ruido
+//     ni con la batería);
+//  2. para cada altura candidata (pasos de un tercio de semitono) se suman sus armónicos: la
+//     voz y los instrumentos tienen muchos, un golpe de batería o un bajo suelto no;
+//  3. Viterbi: elige el camino de alturas que más suena y menos salta, con un estado "sin
+//     melodía" para los silencios y las partes sin línea clara.
 function melodiaDeAudio(x, sr, op = {}) {
-    const o = Object.assign({ fMin: 200, fMax: 1000, sens: 50 }, op);
+    const o = Object.assign({ fMin: 110, fMax: 1000, sens: 50 }, op);
     const k = Math.max(1, Math.round(sr / 16000)), sr2 = sr / k;
     const n2 = Math.floor(x.length / k);
     const y = new Float32Array(n2);
     for (let i = 0; i < n2; i++) { let s = 0; for (let j = 0; j < k; j++) s += x[i * k + j]; y[i] = s / k; }
 
-    const N = 2048, hop = 512;
+    const N = 2048, hop = 512, M = N / 2;
     const frames = Math.floor((n2 - N) / hop);
     if (frames < 4) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
-    const hopMs = hop / sr2 * 1000;
-    const kLo = Math.max(2, Math.floor(o.fMin * N / sr2)), kHi = Math.min(N / 2 - 2, Math.ceil(o.fMax * N / sr2));
-    const umbral = 9 - 0.06 * clamp(Number(o.sens) || 0, 0, 100);   // más sensibilidad = acepta picos menos marcados
+    const hopMs = hop / sr2 * 1000, binHz = sr2 / N;
+    const fTop = Math.min(3500, sr2 / 2 - 200);
+    const kTop = Math.floor(fTop / binHz);
+
+    const cand = [];
+    for (let f = Math.max(40, o.fMin); f <= Math.min(o.fMax, fTop / 2); f *= Math.pow(2, 1 / 36)) cand.push(f);
+    const nC = cand.length;
+    if (nC < 4) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    const H = 10, peso = Array.from({ length: H + 1 }, (_, h) => Math.pow(0.84, Math.max(0, h - 1)));
+    // preferencia suave por el registro de la voz (alrededor de 320 Hz); ayuda a no irse a octavas raras
+    const previa = cand.map(f => { const z = Math.log2(f / 320) / 1.1; return 0.85 + 0.15 * Math.exp(-0.5 * z * z); });
+
     const ventana = new Float32Array(N);
     for (let i = 0; i < N; i++) ventana[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
-
     const energia = new Float32Array(frames);
     let maxE = 0;
     for (let f = 0; f < frames; f++) {
@@ -498,23 +541,89 @@ function melodiaDeAudio(x, sr, op = {}) {
         if (energia[f] > maxE) maxE = energia[f];
     }
 
-    const re = new Float32Array(N), im = new Float32Array(N), mag = new Float32Array(N / 2);
-    const midi = new Float32Array(frames).fill(NaN);
+    const re = new Float32Array(N), im = new Float32Array(N);
+    const lm = new Float32Array(M + 2), blanco = new Float32Array(M + 2), suma = new Float64Array(M + 3);
+    const W = Math.max(8, Math.round(250 / binHz));
+    const sal = new Float32Array(frames * nC);
+    const maxFrame = new Float32Array(frames);
     for (let f = 0; f < frames; f++) {
         if (energia[f] < 0.03 * maxE) continue;
         for (let i = 0; i < N; i++) { re[i] = y[f * hop + i] * ventana[i]; im[i] = 0; }
         fftEnSitio(re, im);
-        let mejor = -1, pico = 0, media = 0;
-        for (let b = kLo - 1; b <= kHi + 1; b++) mag[b] = Math.hypot(re[b], im[b]);
-        for (let b = kLo; b <= kHi; b++) {
-            media += mag[b];
-            if (mag[b] > pico && mag[b] >= mag[b - 1] && mag[b] >= mag[b + 1]) { pico = mag[b]; mejor = b; }
+        let mx = 1e-9;
+        for (let b = 2; b <= kTop + 2; b++) { const m = Math.hypot(re[b], im[b]); lm[b] = m; if (m > mx) mx = m; }
+        suma[0] = 0;
+        for (let b = 0; b <= kTop + 2; b++) {
+            lm[b] = b < 2 ? 0 : Math.sqrt(lm[b] / mx);          // raíz: se oyen los picos débiles sin que el más fuerte aplaste
+            suma[b + 1] = suma[b] + lm[b];
         }
-        media /= (kHi - kLo + 1);
-        if (mejor < 0 || pico / (media + 1e-9) < umbral) continue;
-        const a = mag[mejor - 1], c = mag[mejor + 1], den = a + c - 2 * pico;
-        const d = den !== 0 ? 0.5 * (a - c) / den : 0;
-        midi[f] = 69 + 12 * Math.log2(((mejor + d) * sr2 / N) / 440);
+        for (let b = 2; b <= kTop + 2; b++) {
+            const a = Math.max(0, b - W), c = Math.min(kTop + 3, b + W + 1);
+            blanco[b] = Math.max(0, lm[b] - (suma[c] - suma[a]) / (c - a));
+        }
+        let mejor = 0;
+        for (let c = 0; c < nC; c++) {
+            let s = 0;
+            for (let h = 1; h <= H; h++) {
+                const fr = cand[c] * h;
+                if (fr > fTop) break;
+                // tolerancia proporcional: con vibrato los armónicos altos se corren varios bins
+                // y un peso que premia caer justo en el bin: a 130 Hz un bin ya mide casi un semitono
+                const pos = fr / binHz, bin = Math.round(pos), tol = Math.max(1, Math.ceil(0.012 * pos));
+                let v = 0;
+                for (let d = -tol; d <= tol; d++) {
+                    const w = blanco[bin + d] * (1 - 0.3 * Math.abs(bin + d - pos) / (tol + 0.5));
+                    if (w > v) v = w;
+                }
+                s += peso[h] * v;
+            }
+            s *= previa[c];
+            sal[f * nC + c] = s;
+            if (s > mejor) mejor = s;
+        }
+        maxFrame[f] = mejor;
+    }
+
+    // referencia de "fuerte": el percentil 90 de lo mejor de cada cuadro con sonido
+    const con = Array.from(maxFrame).filter(v => v > 0).sort((p, q) => p - q);
+    if (!con.length) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    const ref = con[Math.min(con.length - 1, Math.floor(con.length * 0.9))] || 1;
+    const theta = 0.5 - 0.0035 * clamp(Number(o.sens) || 0, 0, 100);   // costo de "no hay melodía"
+
+    // Viterbi: estados = alturas candidatas + "sin melodía" (U)
+    const nS = nC + 1, U = nC, VENT = 24;           // hasta 8 semitonos de salto con costo suave
+    const costoPaso = 0.004, costoSalto = 0.22, costoVoz = 0.05;
+    let prev = new Float32Array(nS), cur = new Float32Array(nS);
+    const atras = new Int16Array(frames * nS);
+    for (let f = 0; f < frames; f++) {
+        let ip = 0;
+        for (let s = 1; s < nS; s++) if (prev[s] > prev[ip]) ip = s;
+        let ipVoz = 0;
+        for (let s = 1; s < nC; s++) if (prev[s] > prev[ipVoz]) ipVoz = s;
+        for (let c = 0; c < nC; c++) {
+            let mejor = prev[ip] - costoSalto, de = ip;
+            const lo = Math.max(0, c - VENT), hi = Math.min(nC - 1, c + VENT);
+            for (let j = lo; j <= hi; j++) {
+                const v = prev[j] - costoPaso * Math.abs(j - c);
+                if (v > mejor) { mejor = v; de = j; }
+            }
+            const vu = prev[U] - costoVoz;
+            if (vu > mejor) { mejor = vu; de = U; }
+            cur[c] = mejor + Math.min(1.5, sal[f * nC + c] / ref);
+            atras[f * nS + c] = de;
+        }
+        let mejorU = prev[U], deU = U;
+        if (prev[ipVoz] - costoVoz > mejorU) { mejorU = prev[ipVoz] - costoVoz; deU = ipVoz; }
+        cur[U] = mejorU + theta;
+        atras[f * nS + U] = deU;
+        const t = prev; prev = cur; cur = t;
+    }
+    let s = 0;
+    for (let i = 1; i < nS; i++) if (prev[i] > prev[s]) s = i;
+    const midi = new Float32Array(frames).fill(NaN);
+    for (let f = frames - 1; f >= 0; f--) {
+        if (s !== U) midi[f] = 69 + 12 * Math.log2(cand[s] / 440);
+        s = atras[f * nS + s];
     }
 
     // mediana móvil de 5 cuadros sobre los que tienen tono
@@ -565,7 +674,7 @@ const lib = {
     PGM_MAX,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
-    melodiaDeAudio, melodiaDeMidi, nombreMidi,
+    melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lib;
@@ -585,20 +694,21 @@ const S = {
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
-    brillo: 40, efecto: 'fijo', vivo: true, repetir: false,
+    brillo: 40, efecto: 'fijo', velFx: 100, vivo: true, repetir: false,
     cancion: 'estrellita', notas: '', bpm: 110, baile: 'vaiven', pasos: null, vel: 110,
     guardadas: [],            // canciones y ritmos guardados: { id, nombre, texto, bpm }
     guardarEn: 0,             // cuándo mandar SAVE al robot (ms), 0 = nada pendiente
     enShow: false,            // el robot está haciendo su show guardado: no hay que mandarle nada
     arranca: false,           // "que empiece solo al encenderlo"
+    rec: '',                // última grabación del teclado (texto de notas)
 };
 const MAX_GUARDADAS = 40;
 let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca }));
+        const { leds, brillo, efecto, velFx, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -607,6 +717,8 @@ function cargar() {
         const g = JSON.parse(localStorage.getItem(LLAVE) || 'null');
         if (g && typeof g === 'object') Object.assign(S, g);
     } catch (e) { /* datos viejos o dañados: se usan los de fábrica */ }
+    S.velFx = clamp(Number(S.velFx) || 100, 20, 300);
+    if (typeof S.rec !== 'string') S.rec = '';
     if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
     S.guardadas = (Array.isArray(S.guardadas) ? S.guardadas : [])
         .filter(g => g && typeof g.id === 'string' && typeof g.nombre === 'string' && typeof g.texto === 'string')
@@ -852,7 +964,7 @@ function actuar(conCancion, conBaile) {
     S.inicio = performance.now();
     S.total = ms;
     // El efecto de luces va primero y corre solo en el robot mientras suena todo lo demás.
-    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true };
+    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true };
     S.guardarEn = Date.now() + 2500;
     S.cola.enviar(['MODE 4', fx].concat(cmds), () => {
         if (S.actuando && S.repetir) return actuar(conCancion, conBaile);
@@ -878,7 +990,7 @@ function guardarShow() {
     const prog = programaParaRobot(cmds);
     if (!prog.cabe) return pgmInfo(`Es demasiado largo para el robot (${prog.bytes} de ${PGM_MAX} bytes). Usa un pedazo más corto o una velocidad más alta.`, 'err');
     const banderas = ($('rb-auto').checked ? 1 : 0) | (S.repetir ? 2 : 0);
-    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true };
+    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true };
     S.actuando = false;
     S.enShow = false;
     S.guardarEn = 0;
@@ -956,7 +1068,7 @@ function tickLeds() {
     if (S.sucio) {
         S.sucio = false;
         S.guardarEn = Date.now() + 2500;
-        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true }]);
+        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true }]);
     } else if (S.guardarEn && Date.now() >= S.guardarEn) {
         S.guardarEn = 0;
         S.cola.enviar([{ l: 'SAVE', ex: true }]);
@@ -999,6 +1111,8 @@ function pintarTodo() {
     $('rb-brillo').value = S.brillo;
     $('rb-brillo-v').textContent = S.brillo + ' %';
     $('rb-efecto').value = S.efecto;
+    $('rb-fxvel').value = S.velFx;
+    $('rb-fxvel-v').textContent = S.velFx + ' %';
     $('rb-vivo').checked = S.vivo;
     $('rb-repetir').checked = S.repetir;
     $('rb-auto').checked = S.arranca;
@@ -1078,26 +1192,53 @@ function estimarBpm(intervalos) {
     return Math.round(bpm);
 }
 
+// Registro donde buscar la melodía: [Hz mínimo, Hz máximo]
+const REGISTROS = { voz: [130, 1000], agudo: [260, 1800], grave: [60, 350] };
+
 function convertirAudio() {
     if (!musicaCargada) return infoAudio('Primero elige un archivo de audio o un MIDI.', 'err');
     const ini = clamp(Number($('rb-aud-ini').value) || 0, 0, Math.max(0, musicaCargada.dur - 1));
     const dur = clamp(Number($('rb-aud-dur').value) || 20, 1, 60);
-    const op = { modo: $('rb-aud-modo').value, sens: Number($('rb-aud-sens').value), golpe: 120, sep: 120 };
-    let intervalos;
-    if (musicaCargada.tipo === 'midi') {
-        const desde = ini * 1000, hasta = (ini + dur) * 1000;
-        const notas = musicaCargada.notas
-            .filter(n => n.e > desde && n.s < hasta)
-            .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde }));
-        intervalos = midiARitmo(notas, op).intervalos;
+    const desde = ini * 1000, hasta = (ini + dur) * 1000;
+    const melodia = $('rb-aud-que').value === 'melodia';
+    let texto, intervalos, aviso = '';
+
+    if (melodia) {
+        // la línea melódica dominante: la voz si la hay, o el instrumento principal si es solo instrumental
+        const reg = REGISTROS[$('rb-aud-reg').value] || REGISTROS.voz;
+        const op = { fMin: reg[0], fMax: reg[1], sens: Number($('rb-aud-sens').value), tonalidad: $('rb-aud-tonal').checked, subir: $('rb-aud-subir').checked };
+        let r;
+        if (musicaCargada.tipo === 'midi') {
+            const notas = musicaCargada.notas
+                .filter(n => n.c !== 9 && n.p !== undefined && n.e > desde && n.s < hasta)       // sin la batería
+                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p }));
+            r = melodiaDeMidi(notas, op);
+        } else {
+            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
+            r = melodiaDeAudio(x, sr, op);
+        }
+        texto = r.texto;
+        intervalos = r.intervalos;
+        if (r.tonalidad && texto) aviso = ' Tonalidad: ' + r.tonalidad + '.';
+        if (r.truncado) aviso += ' Se cortó en ' + MAX_NOTAS + ' notas.';
+        if (!texto) return infoAudio('No encontré una melodía clara en ese pedazo. Sube la sensibilidad, cambia el registro o elige otra parte.', 'err');
     } else {
-        const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
-        intervalos = audioARitmo(x, sr, op).intervalos;
+        const op = { modo: $('rb-aud-modo').value, sens: Number($('rb-aud-sens').value), golpe: 120, sep: 120 };
+        if (musicaCargada.tipo === 'midi') {
+            const notas = musicaCargada.notas
+                .filter(n => n.e > desde && n.s < hasta)
+                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde }));
+            intervalos = midiARitmo(notas, op).intervalos;
+        } else {
+            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
+            intervalos = audioARitmo(x, sr, op).intervalos;
+        }
+        texto = ritmoATexto(intervalos, TONOS_RITMO[$('rb-aud-tono').value] || TONOS_RITMO.alterna);
+        if (!texto) return infoAudio('No encontré golpes en ese pedazo. Sube la sensibilidad o elige otra parte.', 'err');
     }
-    const texto = ritmoATexto(intervalos, TONOS_RITMO[$('rb-aud-tono').value] || TONOS_RITMO.alterna);
-    if (!texto) return infoAudio('No encontré golpes en ese pedazo. Sube la sensibilidad o elige otra parte.', 'err');
+
     const n = leerNotas(texto).notas;
-    const total = n.reduce((s, x) => s + x.ms, 0);
+    const total = n.reduce((suma, x) => suma + (x.ms || 0), 0);
     const bpm = estimarBpm(intervalos);
     S.notas = texto;
     S.cancion = 'propia';
@@ -1106,7 +1247,8 @@ function convertirAudio() {
     pintarCanciones();
     pintarTodo();
     cambio('cancion');
-    infoAudio(`Listo: ${intervalos.length} golpes en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}. Escúchalo aquí o guárdalo con un nombre.`, 'ok');
+    const que = melodia ? n.filter(x => x.hz > 0).length + ' notas' : intervalos.length + ' golpes';
+    infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
 }
 
 function guardarCancion() {
@@ -1140,6 +1282,220 @@ function borrarCancion() {
     pintarTodo();
     guardar();
     mensaje('Borrado.');
+}
+
+// ---------- Teclado: tocar y grabar ----------
+
+const T = {
+    octava: 4, actual: null, abajo: new Set(), grabando: false, esperando: false, t0: 0, eventos: [],
+    ctx: null, osc: null, amp: null, ultimoEnvio: 0,
+};
+const MAX_GRABADAS = 280;     // notas por grabación (con sus silencios caben en las 600 fichas)
+const BLANCAS = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24];
+const NEGRAS = { 1: 0, 3: 1, 6: 3, 8: 4, 10: 5, 13: 7, 15: 8, 18: 10, 20: 11, 22: 12 };   // semitono -> blanca a su izquierda
+
+function infoRec(texto, tipo) {
+    const el = $('rb-rec-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function notaDeSemitono(semi) {
+    const midi = (T.octava + 1) * 12 + semi;
+    return { nombre: nombreMidi(midi), hz: clamp(Math.round(440 * Math.pow(2, (midi - 69) / 12)), 40, 8000) };
+}
+
+function pintarTeclado() {
+    const letras = {};
+    for (const [codigo, semi] of Object.entries(TECLAS_PIANO)) letras[semi] = codigo.replace(/^Key|^Digit/, '');
+    const n = BLANCAS.length;
+    const blancas = BLANCAS.map(s => `<button type="button" class="rb-tecla" data-s="${s}" aria-label="${notaDeSemitono(s).nombre}"><span>${letras[s] || ''}</span></button>`).join('');
+    const negras = Object.entries(NEGRAS).map(([s, izq]) =>
+        `<button type="button" class="rb-tecla rb-tecla--negra" data-s="${s}" style="left: calc(${(izq + 1) * 100 / n}% - 2.2%)" aria-label="${notaDeSemitono(Number(s)).nombre}"><span>${letras[s] || ''}</span></button>`).join('');
+    $('rb-piano').innerHTML = blancas + negras;
+    $('rb-tec-oct').textContent = `Octava ${T.octava}: de ${notaDeSemitono(0).nombre} a ${notaDeSemitono(24).nombre}`;
+}
+
+function pintarTecla(semi, abajo) {
+    const b = $('rb-piano').querySelector(`[data-s="${semi}"]`);
+    if (b) b.classList.toggle('is-down', abajo);
+}
+
+function sonidoTeclado(hz) {            // hz = 0 calla
+    if (!$('rb-tec-aqui').checked) return;
+    if (!T.ctx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        T.ctx = new Ctx();
+        T.osc = T.ctx.createOscillator();
+        T.amp = T.ctx.createGain();
+        T.osc.type = 'square';
+        T.amp.gain.value = 0;
+        T.osc.connect(T.amp).connect(T.ctx.destination);
+        T.osc.start();
+    }
+    if (T.ctx.state === 'suspended') T.ctx.resume();
+    const t = T.ctx.currentTime;
+    if (hz) {
+        T.osc.frequency.setValueAtTime(hz, t);
+        T.amp.gain.setTargetAtTime(0.06, t, 0.004);
+    } else {
+        T.amp.gain.setTargetAtTime(0, t, 0.012);
+    }
+}
+
+function pintarGrabacion() {
+    const g = grabacionATexto(T.eventos);
+    $('rb-rec-texto').value = g.texto;
+    const suena = T.actual ? ' (suena ' + T.actual.nombre + ')' : '';
+    infoRec(T.esperando ? 'Grabando… toca una tecla para empezar.' : `Grabando: ${g.notas} notas, ${(g.ms / 1000).toFixed(1)} s${suena}`);
+}
+
+function cerrarNotaTeclado(ahora) {
+    const a = T.actual;
+    if (!a) return;
+    T.actual = null;
+    sonidoTeclado(0);
+    pintarTecla(a.semi, false);
+    if (T.grabando && !T.esperando) {
+        T.eventos.push({ n: a.nombre, s: a.s - T.t0, e: ahora - T.t0 });
+        if (T.eventos.length >= MAX_GRABADAS) { pararGrabacion(); return; }
+    }
+    if (T.grabando) pintarGrabacion();
+}
+
+function teclaAbajo(semi) {
+    if (T.abajo.has(semi)) return;
+    T.abajo.add(semi);
+    const ahora = performance.now();
+    cerrarNotaTeclado(ahora);                           // una nota a la vez, como el zumbador
+    const n = notaDeSemitono(semi);
+    T.actual = { semi, nombre: n.nombre, hz: n.hz, s: ahora };
+    if (T.grabando && T.esperando) { T.esperando = false; T.t0 = ahora; }
+    sonidoTeclado(n.hz);
+    pintarTecla(semi, true);
+    // en el robot suena corto y espaciado para que no se acumule la cola
+    if ($('rb-tec-robot').checked && S.estado === 'listo' && !S.actuando && !S.enShow && ahora - T.ultimoEnvio > 150) {
+        T.ultimoEnvio = ahora;
+        S.cola.enviar([`T ${n.hz} 140`]);
+    }
+    if (T.grabando) pintarGrabacion();
+}
+
+function teclaArriba(semi) {
+    T.abajo.delete(semi);
+    if (T.actual && T.actual.semi === semi) cerrarNotaTeclado(performance.now());
+}
+
+function soltarTodas() {
+    [...T.abajo].forEach(teclaArriba);
+    cerrarNotaTeclado(performance.now());
+}
+
+function pararGrabacion() {
+    cerrarNotaTeclado(performance.now());
+    if (!T.grabando) return;
+    T.grabando = false;
+    T.esperando = false;
+    const g = grabacionATexto(T.eventos);
+    S.rec = g.texto;
+    $('rb-rec-texto').value = g.texto;
+    $('rb-rec-boton').textContent = '● Grabar';
+    infoRec(g.notas ? `Grabadas ${g.notas} notas en ${(g.ms / 1000).toFixed(1)} s. Úsala como la canción o guárdala con un nombre.` : 'No se grabó ninguna nota.', g.notas ? 'ok' : 'err');
+    guardar();
+}
+
+function grabarTeclado() {
+    if (T.grabando) return pararGrabacion();
+    T.grabando = true;
+    T.esperando = true;
+    T.eventos = [];
+    $('rb-rec-boton').textContent = '■ Parar';
+    pintarGrabacion();
+}
+
+function limpiarGrabacion() {
+    if (T.grabando) { T.grabando = false; T.esperando = false; $('rb-rec-boton').textContent = '● Grabar'; }
+    cerrarNotaTeclado(performance.now());
+    T.eventos = [];
+    S.rec = '';
+    $('rb-rec-texto').value = '';
+    infoRec('');
+    guardar();
+}
+
+// La grabación pasa a ser la canción de la pantalla (con el tempo estimado para que el baile la siga)
+function usarGrabacion() {
+    if (T.grabando) pararGrabacion();
+    const texto = S.rec.trim();
+    const notas = leerNotas(texto).notas;
+    if (!notas.length) { infoRec('Todavía no hay una grabación: pulsa Grabar y toca algunas teclas.', 'err'); return false; }
+    const intervalos = [];
+    let t = 0;
+    for (const n of notas) {
+        const dur = n.ms !== undefined ? n.ms : 0;
+        if (n.hz > 0) intervalos.push([t, t + dur]);
+        t += dur;
+    }
+    const bpm = estimarBpm(intervalos);
+    S.notas = texto;
+    S.cancion = 'propia';
+    if (bpm) S.bpm = bpm;
+    $('rb-nombre').value = '';
+    pintarCanciones();
+    pintarTodo();
+    cambio('cancion');
+    return true;
+}
+
+function guardarGrabacion() {
+    if (!usarGrabacion()) return;
+    $('rb-nombre').value = $('rb-rec-nombre').value.trim();
+    guardarCancion();
+    infoRec(`Grabación guardada como «${$('rb-nombre').value}». Sale en la lista de canciones.`, 'ok');
+}
+
+function iniciarTeclado() {
+    pintarTeclado();
+    $('rb-rec-texto').value = S.rec;
+    const piano = $('rb-piano');
+    piano.addEventListener('pointerdown', e => {
+        const b = e.target.closest('.rb-tecla');
+        if (!b) return;
+        e.preventDefault();
+        const semi = Number(b.dataset.s);
+        teclaAbajo(semi);
+        const suelta = () => {
+            teclaArriba(semi);
+            window.removeEventListener('pointerup', suelta);
+            window.removeEventListener('pointercancel', suelta);
+        };
+        window.addEventListener('pointerup', suelta);
+        window.addEventListener('pointercancel', suelta);
+    });
+    const cambiaOctava = d => { soltarTodas(); T.octava = clamp(T.octava + d, 2, 6); pintarTeclado(); };
+    $('rb-tec-oct-menos').addEventListener('click', () => cambiaOctava(-1));
+    $('rb-tec-oct-mas').addEventListener('click', () => cambiaOctava(1));
+    $('rb-rec-boton').addEventListener('click', grabarTeclado);
+    $('rb-rec-limpiar').addEventListener('click', limpiarGrabacion);
+    $('rb-rec-usar').addEventListener('click', () => { if (usarGrabacion()) infoRec('Lista como la canción de la pantalla: escúchala o cántala en el robot.', 'ok'); });
+    $('rb-rec-guardar').addEventListener('click', guardarGrabacion);
+
+    // teclas del teclado de la computadora, sin estorbar cuando se está escribiendo en un cuadro
+    const escribiendo = el => el && (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+        || (el.tagName === 'INPUT' && !/^(range|checkbox|radio|button|file)$/.test(el.type)));
+    document.addEventListener('keydown', e => {
+        if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || $('sec-robot').hidden || escribiendo(e.target)) return;
+        const semi = TECLAS_PIANO[e.code];
+        if (semi === undefined) return;
+        e.preventDefault();
+        teclaAbajo(semi);
+    });
+    document.addEventListener('keyup', e => {
+        const semi = TECLAS_PIANO[e.code];
+        if (semi !== undefined) teclaArriba(semi);
+    });
+    window.addEventListener('blur', soltarTodas);
 }
 
 function iniciar() {
@@ -1250,6 +1606,12 @@ function iniciar() {
         cambio('led');
     });
     $('rb-efecto').addEventListener('change', e => { S.efecto = e.target.value; cambio('led'); });
+    $('rb-fxvel').addEventListener('input', e => {
+        S.velFx = Number(e.target.value);
+        $('rb-fxvel-v').textContent = S.velFx + ' %';
+        cambio('led');
+    });
+    iniciarTeclado();
 
     setInterval(tickLeds, 100);
 

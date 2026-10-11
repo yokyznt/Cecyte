@@ -163,11 +163,11 @@ function parseMidi(b) {
                 const tp = s >> 4, k = (s & 15) * 128 + b[p++], vel = tp === 0xc || tp === 0xd ? 0 : b[p++];
                 if (tp === 9 && vel > 0) { if (!activas.has(k)) activas.set(k, tick); }
                 else if (tp === 8 || (tp === 9 && vel === 0)) {
-                    if (activas.has(k)) { notas.push({ s: activas.get(k), e: tick }); activas.delete(k); }
+                    if (activas.has(k)) { notas.push({ s: activas.get(k), e: tick, p: k % 128, c: (k / 128) | 0 }); activas.delete(k); }
                 }
             }
         }
-        activas.forEach(ini => notas.push({ s: ini, e: tick }));
+        activas.forEach((ini, k) => notas.push({ s: ini, e: tick, p: k % 128, c: (k / 128) | 0 }));
         p = fin;
     }
 
@@ -181,7 +181,8 @@ function parseMidi(b) {
         }
         return ms + ((tick - ult.tick) * ult.us) / div / 1000;
     };
-    return notas.map(n => ({ s: aMs(n.s), e: aMs(n.e) })).sort((a, b2) => a.s - b2.s);
+    // p = número de nota MIDI y c = canal (el 9 es la batería), para sacar la melodía
+    return notas.map(n => ({ s: aMs(n.s), e: aMs(n.e), p: n.p, c: n.c })).sort((a, b2) => a.s - b2.s);
 }
 
 // Notas MIDI (ya recortadas a la ventana, en ms desde el inicio) -> ritmo.

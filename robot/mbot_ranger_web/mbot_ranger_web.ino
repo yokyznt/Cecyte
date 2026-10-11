@@ -17,9 +17,10 @@
     S                para los motores
     L i r g b        un LED (i = 1..12) o todos (i = 0)
     LS <72 hex>      los 12 LEDs de golpe: RRGGBB x 12
-    FX m b <72 hex>  efecto de luces que corre solo en el robot, también mientras suena una nota:
+    FX m b <72 hex> [v]  efecto de luces que corre solo en el robot, también mientras suena una nota:
                      m = 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota;
-                     b = brillo 0..100; los 12 colores base van en hex como en LS
+                     b = brillo 0..100; los 12 colores base van en hex como en LS;
+                     v = velocidad del efecto en % (20..300, 100 = normal; opcional)
     SAVE             guarda el último FX en la EEPROM: al encender, el robot lo vuelve a poner
     PCLR             empieza a guardar un show nuevo (borra el anterior)
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
@@ -96,7 +97,6 @@ const int VEL_MAX = 180;             // tope de lo que puede pedir la página
 const int DIST_OBSTACULO = 20;       // cm
 const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
-const int AJUSTE_US = 4;             // lo que tarda un digitalWrite; si las notas salen bajas, súbelo
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
 const unsigned long SIN_ORDENES_MS = 3000;
@@ -121,6 +121,8 @@ const unsigned long FX_MS = 60;
 const unsigned long FX_QUIETO_MS = 40;
 uint8_t fxModo = 0;                  // 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota
 uint8_t fxBrillo = 40;               // 0..100
+uint16_t fxVel = 100;                // velocidad del efecto en %, 20..300
+unsigned long fxT = 0, fxTprev = 0;  // tiempo del efecto (corre al ritmo de fxVel)
 uint8_t fxBase[12][3];               // colores base de cada LED
 uint8_t fxMatiz = 0;                 // modo 4: color de la última nota
 bool fxHayNota = false;
@@ -311,32 +313,31 @@ void drenar() {
 }
 
 // ---------- Sonido y esperas (revisan el USB y el paro mientras pasan) ----------
-void tono(int hz, int ms) {
-  long periodo = 1000000L / hz;                       // µs
-  long medio = periodo / 2 - AJUSTE_US;
-  if (medio < 1) medio = 1;
-  unsigned long fin = micros() + (unsigned long)ms * 1000UL;
-  unsigned long ultimoDrenaje = micros();
-  pinMode(PIN_BUZZER, OUTPUT);
-  while (!abortar && !(modo == MODO_SHOW && colaN > 0) && (long)(fin - micros()) > 0) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    delayMicroseconds(medio);
-    digitalWrite(PIN_BUZZER, LOW);
-    delayMicroseconds(medio);
-    if (micros() - ultimoDrenaje > 4000UL) {
-      drenar();
-      fxPaso();
-      ultimoDrenaje = micros();
-    }
-  }
-}
-
 void espera(unsigned long ms) {
   unsigned long fin = millis() + ms;
   while (!abortar && !(modo == MODO_SHOW && colaN > 0) && (long)(fin - millis()) > 0) {
     drenar();
     fxPaso();
   }
+}
+
+// El zumbador (pin 45 = OC5B) suena por hardware con el Timer5 en CTC: el pin conmuta solo en cada
+// vuelta del contador. Así el anillo de LEDs, que apaga las interrupciones unos 0,4 ms al dibujar
+// cada cuadro, ya no entrecorta el sonido (antes la onda se hacía a mano y se cortaba en cada cuadro).
+//   frecuencia = F_CPU / (2 * prescaler * (1 + OCR5A))
+void tono(int hz, int ms) {
+  unsigned long ciclos = 8000000UL / (unsigned long)hz;     // con prescaler 1
+  uint8_t cs = 1;
+  if (ciclos > 65536UL) { cs = 2; ciclos /= 8; }            // graves: prescaler 8
+  pinMode(PIN_BUZZER, OUTPUT);
+  TCCR5A = _BV(COM5B0);
+  TCCR5B = _BV(WGM52) | cs;
+  OCR5A = OCR5B = (uint16_t)(ciclos - 1);
+  TCNT5 = 0;
+  espera(ms);
+  TCCR5B = 0;
+  TCCR5A = 0;
+  digitalWrite(PIN_BUZZER, LOW);
 }
 
 // ---------- LEDs desde la página ----------
@@ -397,7 +398,11 @@ bool fxCarga(const char *h) {
 }
 
 void fxDibuja() {
-  unsigned long t = millis();
+  // reloj del efecto: corre al ritmo de fxVel (100 = normal, 200 = el doble de rápido)
+  unsigned long ahora = millis();
+  fxT += (ahora - fxTprev) * fxVel / 100UL;
+  fxTprev = ahora;
+  unsigned long t = fxT;
   for (int i = 0; i < 12; i++) {
     uint8_t r = fxBase[i][0], g = fxBase[i][1], b = fxBase[i][2];
     uint8_t k = 255;
@@ -446,6 +451,7 @@ void fxGuardar() {
   EEPROM.update(EE_DIR + 1, fxModo);
   EEPROM.update(EE_DIR + 2, fxBrillo);
   for (int i = 0; i < 36; i++) EEPROM.update(EE_DIR + 3 + i, fxBase[i / 3][i % 3]);
+  EEPROM.update(EE_DIR + 39, (uint8_t)(fxVel / 2));            // velocidad, a la mitad para que quepa en un byte
 }
 
 void fxRestaurar() {
@@ -453,6 +459,8 @@ void fxRestaurar() {
   uint8_t m = EEPROM.read(EE_DIR + 1), b = EEPROM.read(EE_DIR + 2);
   if (m > 4 || b > 100) return;
   for (int i = 0; i < 36; i++) fxBase[i / 3][i % 3] = EEPROM.read(EE_DIR + 3 + i);
+  uint8_t v = EEPROM.read(EE_DIR + 39);
+  fxVel = (v >= 10 && v <= 150) ? v * 2 : 100;
   fxModo = m;
   fxBrillo = b;
   fxHayNota = false;
@@ -581,6 +589,7 @@ void ejecuta(char *s) {
     else {
       fxModo = m;
       fxBrillo = br;
+      fxVel = d ? constrain(atoi(d), 20, 300) : 100;   // 4.º dato opcional: velocidad del efecto en %
       fxHayNota = false;
       fxSucio = false;
       fxUltimo = millis();
