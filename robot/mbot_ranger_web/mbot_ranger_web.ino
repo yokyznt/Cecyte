@@ -39,13 +39,57 @@
 
 #include <MeAuriga.h>
 #include <EEPROM.h>
-#include <math.h>
+#include <avr/wdt.h>
 
-MeEncoderOnBoard motorIzq(SLOT1);
-MeEncoderOnBoard motorDer(SLOT2);
-MeUltrasonicSensor ultrasonico(PORT_10);
+// Todo lo de esta placa tiene que caber en menos de 64 páginas de flash (16 KB): el bootloader borra
+// mal las páginas altas, y cualquier subida que las toque puede dejar vacías las primeras (sin
+// vectores de interrupción) y el programa no arranca. Por eso no se usan floats, math.h, random(),
+// la clase de encoders ni el zumbador de Makeblock: los motores van por sus pines.
+
+// El bootloader de esta placa puede dejar el watchdog armado al lanzar el programa; si el sketch no
+// lo apaga lo primero, la placa se reinicia en bucle (sin hablar y a veces corrompiendo la EEPROM).
+// Va en .init3 para correr antes que cualquier otra cosa (patrón de avr-libc).
+void apagaWatchdog(void) __attribute__((naked)) __attribute__((used)) __attribute__((section(".init3")));
+void apagaWatchdog(void) {
+  MCUSR = 0;
+  wdt_disable();
+}
+
 MeRGBLed leds(0, 12);
-MeBuzzer buzzer;
+
+// Sensor ultrasónico del puerto 10 (señal en A11): igual que la librería, pero sin floats
+int distanciaCm() {                        // 400 si no hay eco
+  pinMode(A11, OUTPUT);
+  digitalWrite(A11, LOW);
+  delayMicroseconds(2);
+  digitalWrite(A11, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(A11, LOW);
+  pinMode(A11, INPUT);
+  unsigned long us = pulseIn(A11, HIGH, 30000UL);
+  return us == 0 ? 400 : (int)(us / 58);
+}
+
+// Motores del Auriga (SLOT1 = izquierdo, SLOT2 = derecho): pines PWM, H1 y H2 de MeAuriga.h
+const uint8_t MOT_PWM[2] = { 11, 10 };
+const uint8_t MOT_H1[2]  = { 49, 47 };
+const uint8_t MOT_H2[2]  = { 48, 46 };
+int motUltimo[2] = { 1000, 1000 };
+void motorPwm(uint8_t m, int pwm) {
+  pwm = constrain(pwm, -255, 255);
+  if (pwm == motUltimo[m]) return;
+  motUltimo[m] = pwm;
+  if (pwm < 0) {
+    digitalWrite(MOT_H1[m], LOW);
+    delayMicroseconds(5);
+    digitalWrite(MOT_H2[m], HIGH);
+  } else {
+    digitalWrite(MOT_H1[m], HIGH);
+    delayMicroseconds(5);
+    digitalWrite(MOT_H2[m], LOW);
+  }
+  analogWrite(MOT_PWM[m], abs(pwm));
+}
 
 const int VEL = 120;                 // 0 a 255, para los modos del botón
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
@@ -83,19 +127,17 @@ bool fxHayNota = false;
 bool fxSucio = false;                // modo 4: hay un color nuevo por dibujar
 unsigned long fxUltimo = 0;
 
-// ---------- Interrupciones de los encoders ----------
-void isrIzq(void) {
-  if (digitalRead(motorIzq.getPortB()) == 0) motorIzq.pulsePosMinus();
-  else motorIzq.pulsePosPlus();
-}
-void isrDer(void) {
-  if (digitalRead(motorDer.getPortB()) == 0) motorDer.pulsePosMinus();
-  else motorDer.pulsePosPlus();
-}
-
 // ---------- Movimiento ----------
-// Voltaje de la batería (A4 mide un tercio, como en el firmware de fábrica)
-float bateria() { return analogRead(A4) / 1024.0 * 15.0; }
+// Voltaje de la batería en centésimas de volt (A4 mide un tercio, como en el firmware de fábrica)
+int bateriaCv() { return (int)((long)analogRead(A4) * 1500L / 1024L); }
+void imprimeDec(int centesimas, int decimales) {          // 742 -> "7.42" (2 decimales) o 74 -> "7.4" (1)
+  int div = decimales == 2 ? 100 : 10;
+  Serial.print(centesimas / div);
+  Serial.print('.');
+  int resto = centesimas % div;
+  if (decimales == 2 && resto < 10) Serial.print('0');
+  Serial.print(resto);
+}
 
 // Diagnóstico que sobrevive a un reinicio (EEPROM, 0xFF = vacío; la página lo muestra al conectar).
 // El bootloader de esta placa borra MCUSR antes de arrancar el sketch, así que no se puede saber por
@@ -105,7 +147,7 @@ const int EE_BOOT = 2980, EE_BTN = 2981, EE_RUN = 2982, EE_MIN = 2983;
 uint8_t cuentaEE(int dir) { uint8_t v = EEPROM.read(dir); return v == 0xFF ? 0 : v; }
 void sumaEE(int dir) { uint8_t v = cuentaEE(dir); if (v < 254) EEPROM.update(dir, v + 1); }
 void notaBateria() {
-  uint8_t d = (uint8_t)constrain(bateria() * 10.0, 0, 254);
+  uint8_t d = (uint8_t)constrain(bateriaCv() / 10, 0, 254);
   uint8_t m = EEPROM.read(EE_MIN);
   if (m == 0xFF || d < m) EEPROM.update(EE_MIN, d);
 }
@@ -124,8 +166,8 @@ void rampa() {
   rampaT = t;
   izqAct += constrain(izqObj - izqAct, -30, 30);
   derAct += constrain(derObj - derAct, -30, 30);
-  motorIzq.setMotorPwm(-izqAct);
-  motorDer.setMotorPwm(derAct);
+  motorPwm(0, -izqAct);
+  motorPwm(1, derAct);
 }
 void motores(int izq, int der) {
   izqObj = izq;
@@ -139,8 +181,8 @@ void giraIzq(int v)    { motores(-v, v); }
 void giraDer(int v)    { motores(v, -v); }
 void parar() {
   izqAct = derAct = izqObj = derObj = 0;
-  motorIzq.setMotorPwm(0);
-  motorDer.setMotorPwm(0);
+  motorPwm(0, 0);
+  motorPwm(1, 0);
   moviendo = false;
 }
 
@@ -159,12 +201,20 @@ void aplicaModo() {
     case 2: color(40, 30, 0);  break;
     case 3: color(40, 0, 0);   break;
   }
-  if (modo < MODO_WEB) buzzer.tone(500 + modo * 200, 120);
+  if (modo < MODO_WEB) tono(500 + modo * 200, 120);
 }
 
 // ---------- Modos del botón ----------
+uint16_t semilla = 0xACE1;             // xorshift de 16 bits: random() de Arduino pesa casi 300 bytes
+uint16_t azar() {
+  semilla ^= semilla << 7;
+  semilla ^= semilla >> 9;
+  semilla ^= semilla << 8;
+  return semilla;
+}
+
 void esquivar() {
-  int d = ultrasonico.distanceCm();
+  int d = distanciaCm();
   if (d > DIST_OBSTACULO) {
     adelante(VEL);
   } else {
@@ -172,14 +222,14 @@ void esquivar() {
     espera(100);
     atras(VEL);
     espera(400);
-    if (random(2) == 0) giraIzq(VEL); else giraDer(VEL);
-    espera(random(350, 700));
+    if ((azar() & 1) == 0) giraIzq(VEL); else giraDer(VEL);
+    espera(350 + azar() % 350);
     parar();
   }
 }
 
 void seguir() {
-  int d = ultrasonico.distanceCm();
+  int d = distanciaCm();
   if (d > 12 && d < 40)      adelante(VEL);
   else if (d <= 8)           atras(VEL);
   else                       parar();
@@ -326,9 +376,15 @@ void hsvFx(uint8_t h, uint8_t &r, uint8_t &g, uint8_t &b) {   // matiz 0..255, c
 
 // La misma nota da el mismo color en cualquier octava
 uint8_t fxMatizDe(int hz) {
-  float s = 12.0 * log(hz / 261.63) / 0.693147;
-  s = s - 12.0 * floor(s / 12.0);
-  return (uint8_t)(s * 255.0 / 12.0);
+  // clase de nota 0..11 (Do = 0): se lleva la frecuencia a la octava de Do4 y se cuentan los umbrales
+  // entre semitonos (centésimas de Hz) que supera
+  static const uint16_t UMBRAL[12] = { 26930, 28531, 30227, 32025, 33929, 35947, 38084, 40349, 42748, 45290, 47983, 50836 };
+  long f = (long)hz * 100L;
+  while (f < 26163L) f *= 2;
+  while (f >= 52326L) f /= 2;
+  uint8_t clase = 0;
+  for (uint8_t i = 0; i < 12; i++) if (f >= UMBRAL[i]) clase++;
+  return (uint8_t)((clase % 12) * 255 / 12);
 }
 
 bool fxCarga(const char *h) {
@@ -536,7 +592,8 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "BAT")) {
     Serial.print(F("BAT "));
-    Serial.println(bateria(), 2);
+    imprimeDec(bateriaCv(), 2);
+    Serial.println();
   } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
     for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
     ok();
@@ -614,22 +671,22 @@ void atiendeUSB() {
 void setup() {
   Serial.begin(115200);
 
-  // Interrupciones de encoders
-  attachInterrupt(motorIzq.getIntNum(), isrIzq, RISING);
-  attachInterrupt(motorDer.getIntNum(), isrDer, RISING);
-
   // Configuración PWM de la placa (igual que el firmware de fábrica)
   TCCR1A = _BV(WGM10);
   TCCR1B = _BV(CS11) | _BV(WGM12);
   TCCR2A = _BV(WGM21) | _BV(WGM20);
   TCCR2B = _BV(CS21);
 
+  for (uint8_t m = 0; m < 2; m++) {
+    pinMode(MOT_PWM[m], OUTPUT);
+    pinMode(MOT_H1[m], OUTPUT);
+    pinMode(MOT_H2[m], OUTPUT);
+  }
   leds.setpin(PIN_LEDS);
-  buzzer.setpin(PIN_BUZZER);
-  randomSeed(analogRead(A0));
+  semilla ^= (uint16_t)analogRead(A0) << 3 | 1;
 
   aplicaModo();
-  buzzer.tone(800, 100);
+  tono(800, 100);
   fxRestaurar();                       // si hay luces guardadas, vuelven solas
   if (pgmValido() && (pgmBanderas() & 1)) {   // show guardado que arranca solo, a los 2,5 s
     modo = MODO_SHOW;
@@ -644,9 +701,10 @@ void setup() {
   Serial.print(F(" RUN="));
   Serial.print(cuentaEE(EE_RUN));
   Serial.print(F(" MIN="));
-  Serial.print(minimo == 0xFF ? 0.0 : minimo / 10.0, 1);
+  imprimeDec(minimo == 0xFF ? 0 : minimo, 1);
   Serial.print(F(" BAT="));
-  Serial.println(bateria(), 2);
+  imprimeDec(bateriaCv(), 2);
+  Serial.println();
   Serial.println(F("mBot Ranger web v1 listo"));
 }
 

@@ -308,14 +308,22 @@ for (const c of R.CANCIONES) {
     // y parar es inmediato; la rampa avanza en drenar(), que corre en toda espera y todo tono
     assert(!/void motores[^]*?delay\(/.test(ino.split('void adelante')[0]), 'motores() no debe bloquear con delay');
     assert(/void drenar\(\)[^]*?rampa\(\)/.test(ino), 'la rampa avanza dentro de drenar()');
-    assert(/void parar\(\) \{[^}]*setMotorPwm\(0\)/.test(ino), 'parar corta de golpe');
+    assert(/void parar\(\) \{[^}]*motorPwm\(0, 0\)/.test(ino), 'parar corta de golpe');
+    // la imagen debe caber en menos de 64 paginas de flash (el bootloader de esta placa borra mal las
+    // altas): sin floats, math.h, random() ni las clases de encoders / zumbador / ultrasonido de Makeblock
+    const sinComentarios = ino.replace(/\/\*[^]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const feo of [/\bfloat\b/, /\bdouble\b/, /\blog\(/, /\bfloor\(/, /\brandom\(/, /MeEncoderOnBoard/, /MeBuzzer/, /MeUltrasonicSensor/, /<math\.h>/]) {
+        assert(!feo.test(sinComentarios), 'el firmware no debe usar ' + feo);
+    }
     assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
     // diagnóstico que la página lee al conectar
     for (const clave of ['BTN=', 'RUN=', 'MIN=', 'BAT=']) assert(ino.includes(`F(" ${clave}")`), `INFO sin ${clave}`);
     assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
     assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
-    // el bootloader de esta placa borra MCUSR antes de arrancar el sketch: leerlo no sirve
-    assert(!/\bMCUSR\b/.test(ino.replace(/\/\/.*$/gm, '')), 'el firmware no debe fiarse de MCUSR');
+    // el bootloader de esta placa puede dejar el watchdog armado: se apaga antes que nada (.init3),
+    // y MCUSR ya no sirve para saber por que se reinicio (solo se limpia)
+    assert(/section\("\.init3"\)/.test(ino) && /wdt_disable\(\)/.test(ino) && /MCUSR = 0;/.test(ino), 'el firmware apaga el watchdog al arrancar');
+    assert(!/= MCUSR\b/.test(ino), 'el firmware no debe fiarse de leer MCUSR');
     // un falso pulso del botón (ruido de motores) no corta el show: debe seguir bajo un rato
     assert(/botonFlanco\(\) && botonSostenido\(\)/.test(ino), 'el botón exige una pulsación sostenida');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
