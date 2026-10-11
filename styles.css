@@ -969,3 +969,13 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
     .week { display: block !important; }
     .day { display: none !important; }
 }
+
+/* Teclado de notas del robot */
+.rb-piano { position: relative; display: flex; height: 150px; user-select: none; touch-action: none; }
+.rb-tecla { flex: 1 1 0; min-width: 0; padding: 0 0 8px; border: 1px solid var(--line-strong); border-radius: 0 0 8px 8px; background: #fff; color: var(--ink-2); display: flex; align-items: flex-end; justify-content: center; font-size: var(--fs-cap); font-weight: 700; cursor: pointer; }
+.rb-tecla:hover { background: var(--green-50); }
+.rb-tecla--negra { position: absolute; top: 0; z-index: 1; flex: none; width: 4.4%; height: 62%; background: #1d2b24; border-color: #1d2b24; border-radius: 0 0 6px 6px; color: #fff; }
+.rb-tecla--negra:hover { background: #2f4a3c; }
+.rb-tecla.is-down { background: var(--green-700); border-color: var(--green-700); color: #fff; }
+.rb-tecla:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; z-index: 2; }
+.rb-oct { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
