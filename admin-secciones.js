@@ -53,6 +53,8 @@ function mostrarSeccionAdmin(id, { enfocar = false, recordar = true, desplazar =
         }
     });
 
+    document.dispatchEvent(new CustomEvent('seccion-admin', { detail: { id, apartado: ap } }));   // lo escucha robot.js (barra fija)
+
     if (recordar) {
         try { history.replaceState(null, '', '#admin-' + id); } catch (e) { /* abierto como archivo */ }
         try { sessionStorage.setItem('adminSeccion', id); } catch (e) { /* sin almacenamiento */ }

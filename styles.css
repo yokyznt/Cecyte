@@ -971,7 +971,7 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 }
 
 /* Teclado de notas del robot */
-.rb-piano { position: relative; display: flex; height: 150px; user-select: none; touch-action: none; }
+.rb-piano { position: relative; display: flex; height: clamp(170px, 22vw, 240px); user-select: none; touch-action: none; }
 .rb-tecla { flex: 1 1 0; min-width: 0; padding: 0 0 8px; border: 1px solid var(--line-strong); border-radius: 0 0 8px 8px; background: #fff; color: var(--ink-2); display: flex; align-items: flex-end; justify-content: center; font-size: var(--fs-cap); font-weight: 700; cursor: pointer; }
 .rb-tecla:hover { background: var(--green-50); }
 .rb-tecla--negra { position: absolute; top: 0; z-index: 1; flex: none; width: 4.4%; height: 62%; background: #1d2b24; border-color: #1d2b24; border-radius: 0 0 6px 6px; color: #fff; }
@@ -1007,7 +1007,10 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-conexion .panel__body { display: flex; flex-direction: column; gap: 12px; }
 .rb-panel > .panel__body {
     display: grid; gap: 20px; align-items: start;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+    grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1000px) {
+    .rb-panel > .panel__body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .rb-card {
     display: flex; flex-direction: column; gap: 14px; min-width: 0;
@@ -1023,17 +1026,19 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-bateria { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .rb-bateria[hidden] { display: none; }
 .rb-bateria__linea { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
-.rb-bateria__pct { font-size: var(--fs-md); font-weight: 800; color: var(--black); }
-.rb-bateria__v { font-size: var(--fs-cap); color: var(--ink-3); }
+.rb-bateria__pct { font-size: 1.5rem; line-height: 1; font-weight: 800; color: var(--black); }
+.rb-bateria__v { font-size: var(--fs-sm); color: var(--ink-3); }
 .rb-bateria__barra {
-    position: relative; flex: 0 0 140px; height: 12px;
+    position: relative; flex: 0 0 clamp(180px, 24vw, 320px); height: 24px;
     border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); overflow: hidden;
 }
 .rb-bateria__relleno { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--green-600); transform: scaleX(0); transform-origin: left center; transition: transform 400ms var(--ease-out), background-color 200ms; }
 .rb-bateria[data-nivel="baja"] .rb-bateria__relleno { background: var(--orange-500); }
 .rb-bateria[data-nivel="critica"] .rb-bateria__relleno { background: var(--rose-700); }
 .rb-bateria[data-nivel="sin"] .rb-bateria__barra { opacity: 0.5; }
-.rb-bateria__tiempo { font-size: var(--fs-sm); color: var(--ink-2); font-weight: 600; }
+.rb-bateria__tiempo { font-size: var(--fs-md); color: var(--ink-2); font-weight: 600; }
+.rb-bateria__aviso { padding: 3px 10px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 700; background: var(--orange-100); color: var(--orange-800); }
+.rb-bateria[data-nivel="critica"] .rb-bateria__aviso { background: var(--rose-100); color: var(--rose-700); }
 @media (max-width: 560px) { .panel__head .rb-bateria { margin-left: 0; flex-basis: 100%; order: 3; } }
 
 .rb-codigo {
@@ -1043,3 +1048,14 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-ajustes { width: 100%; max-width: 720px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
 .rb-ajustes summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .rb-ajustes[open] > .stack { padding-bottom: 12px; }
+
+/* Barra fija del apartado Robot: parar y reproducir lo de la sección que se está viendo */
+.rb-barra {
+    position: sticky; bottom: 12px; z-index: 25; margin-top: 18px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 14px;
+    background: var(--surface); box-shadow: 0 8px 24px -14px rgb(0 0 0 / 0.45);
+}
+.rb-barra .btn { min-height: 48px; }
+.rb-barra__que { font-size: var(--fs-sm); color: var(--ink-2); }
+.rb-barra__que b { color: var(--black); }

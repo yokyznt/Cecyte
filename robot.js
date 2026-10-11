@@ -938,6 +938,7 @@ function mostrarBateria(v) {
         $('rb-bat-v').textContent = 'solo USB';
         $('rb-bat-fill').style.transform = 'scaleX(0)';
         $('rb-bat-tiempo').textContent = '';
+        $('rb-bat-aviso').hidden = true;
         el.title = 'El robot no está viendo las pilas: está alimentado solo por el USB, o el interruptor está apagado.';
         return;
     }
@@ -953,10 +954,11 @@ function mostrarBateria(v) {
     el.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
     $('rb-bat-tiempo').textContent = t ? `≈ ${formatoDuracion(t.minutos)} de uso (${t.fuente})` : '';
     el.title = `${v.toFixed(2)} V, pilas ${NOMBRE_PILAS[b.quimica]} de ${b.capacidad} mAh`;
-    if (nivel !== S.ultimoNivel) {
-        S.ultimoNivel = nivel;
-        if (nivel !== 'ok') mensaje(`Batería al ${pct} %: conviene cargar o cambiar las pilas pronto.`, nivel === 'critica' ? 'err' : undefined);
-    }
+    // el aviso va en el propio medidor (no en un mensaje suelto)
+    const aviso = $('rb-bat-aviso');
+    aviso.hidden = nivel === 'ok';
+    aviso.textContent = nivel === 'critica' ? '¡Cargar ya!' : 'Cargar pronto';
+    S.ultimoNivel = nivel;
 }
 
 // Una lectura nueva en reposo: se guarda para estimar el consumo real y se actualiza el medidor
@@ -1719,7 +1721,51 @@ function iniciarLinea() {
     mensaje('Siguiendo la línea… pulsa Paro para detenerlo.');
 }
 
+// ---------- Barra fija: parar y reproducir lo que haya en la sección que se ve ----------
+
+const QUE_REPRODUCE = {
+    'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-luces': 'las luces',
+    'robot-linea': 'el seguidor de líneas (desactivado)', 'robot-show': 'el show guardado', 'robot-instalar': 'nada en esta sección',
+};
+
+function seccionRobotActual() {
+    const el = [...document.querySelectorAll('[data-section^="robot-"]')].find(e => !e.hidden);
+    return el ? el.dataset.section : 'robot-musica';
+}
+
+function pintarBarra() {
+    const sec = seccionRobotActual();
+    $('rb-barra-que').textContent = QUE_REPRODUCE[sec] || 'nada';
+    $('rb-barra-play').disabled = sec === 'robot-instalar';
+}
+
+// Con el robot conectado se reproduce en el robot; si no, la música suena en la página
+function reproducirGeneral() {
+    const sec = seccionRobotActual();
+    const listo = S.estado === 'listo';
+    if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
+    if (sec === 'robot-baile') return listo ? actuar(true, true) : escucharAqui();
+    if (sec === 'robot-show') return probarShow();
+    if (sec === 'robot-linea') return iniciarLinea();
+    if (sec === 'robot-luces') {
+        if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
+        S.guardarEn = Date.now() + 2500;
+        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true }, 'VOL ' + S.vol]);
+        return mensaje('Luces enviadas al robot.', 'ok');
+    }
+    mensaje('En esta sección no hay nada que reproducir.');
+}
+
+function pararTodo() {
+    soltarTodas();            // el teclado: corta la nota que esté sonando
+    paro();                   // el robot (motores, nota y cola), el sonido de la página y el avance
+}
+
 function iniciarLineaYBateria() {
+    $('rb-barra-paro').addEventListener('click', pararTodo);
+    $('rb-barra-play').addEventListener('click', reproducirGeneral);
+    document.addEventListener('seccion-admin', pintarBarra);
+    pintarBarra();
     for (const id of ['rb-ln-puerto', 'rb-ln-color', 'rb-ln-perdida', 'rb-ln-cruce', 'rb-ln-buscar', 'rb-ln-obst', 'rb-ln-dur']) {
         $(id).addEventListener('change', cambioLinea);
     }
