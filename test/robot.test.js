@@ -601,4 +601,17 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.tiempoCarga({ pct: 50, corrienteMa: 0 }), null);
 }
 
+// 25) Función guardada en el robot: orden FSAVE/FCLR, sitio propio en la EEPROM y que no arranque con la página
+{
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(cmd, "FSAVE"\)/.test(ino) && /strcmp\(cmd, "FCLR"\)/.test(ino) && /void fnCargar\(\)/.test(ino));
+    const dir = Number(/const int FN_DIR = (\d+);/.exec(ino)[1]);
+    const pgm = Number(/const int PGM_DIR = (\d+);/.exec(ino)[1]) + 4 + Number(/const int PGM_MAX = (\d+);/.exec(ino)[1]);
+    const diag = Number(/const int EE_BOOT = (\d+)/.exec(ino)[1]);
+    assert(dir >= pgm && dir + 15 <= diag, 'la función guardada no pisa el show ni los contadores');
+    assert(/if \(modo != 0\) fnEspera = 0;/.test(ino), 'si la página toma el control, la función no arranca sola');
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');
+}
+
 console.log('robot.test.js: todo bien');

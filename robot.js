@@ -868,6 +868,7 @@ const S = {
     rec: '',                // última grabación del teclado (texto de notas)
     variante: 'tanque', funcion: '',                 // modelo del robot y función elegida ('' = ninguna)
     funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
+    funAuto: false,           // la función guardada arranca sola al encender el robot
     corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
@@ -881,8 +882,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90 } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90 }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -919,6 +920,7 @@ function cargar() {
     if (S.funcion) { S.baile = 'quieto'; S.pasos = ''; }    // con una función puesta no hay baile
     S.funLuces = S.funLuces !== false;
     S.funMusica = S.funMusica === true;
+    S.funAuto = S.funAuto === true;
     S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
     S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
 }
@@ -942,7 +944,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
         $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1054,6 +1056,7 @@ function bateriaLeida(v) {
 function alListo() {
     clearInterval(S.saludo);
     ponEstado('listo');
+    S.cola.enviar([{ l: 'MODE 4', ex: true }]);     // lo guardado que arranca solo no corre mientras la página lo controla
     mensaje('Listo. Lo que cambies aquí se aplica en el robot al instante.', 'ok');
     S.cola.enviar(['MODE 4']);
     S.sucio = true;
@@ -1297,6 +1300,57 @@ function iniciarFuncion(reinicio) {
     mensaje(`${f.nombre}: en marcha. Pulsa Paro para detenerlo.`, 'ok');
 }
 
+// ---- Guardar la función en el robot: corre sola, sin la página (comparte lugar con el show guardado) ----
+
+function funInfo(texto, tipo) {
+    const el = $('rb-fn-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function luzGuardada() {          // lo que queda guardado: las luces de la pantalla, o apagadas si la casilla está sin marcar
+    return S.funLuces ? fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx) : fxLinea('fijo', 0, coloresBase(), 100);
+}
+
+function guardarFuncion() {
+    const f = funcionActual();
+    if (!f) return funInfo('Elige una función primero.', 'err');
+    if (S.estado !== 'listo') return funInfo('Conecta el robot primero.', 'err');
+    if (S.corriendoFuncion) paro();
+    S.guardarEn = 0;
+    S.enShow = false;
+    const solo = S.funAuto ? 1 : 0;
+    const fx = { l: luzGuardada(), ex: true };
+    let ordenes;
+    if (f.modo) {
+        // la hace el propio robot con su sensor: se guarda el modo (y los ajustes de la línea) y se borra el show
+        const previo = f.linea ? lineaAOrdenes(lineaEnRobot()) : [];
+        ordenes = ['MODE 4'].concat(previo, [{ l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }, 'FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
+    } else {
+        // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
+        const n = leerNotas(S.notas);
+        const { cmds, ms } = compilar({ notas: S.funMusica ? n.notas : [], pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
+        if (!ms) return funInfo('Esa función no tiene pasos.', 'err');
+        const prog = programaParaRobot(cmds);
+        if (!prog.cabe) return funInfo(`Es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una canción más corta o quita la música.`, 'err');
+        ordenes = ['MODE 4', { l: 'FCLR', ex: true }, 'PCLR'].concat(prog.lineas, ['PEND ' + (solo | 2), 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
+    }
+    funInfo(`Guardando «${f.nombre}» en el robot… no lo desconectes.`);
+    S.cola.enviar(ordenes, () => {
+        S.sucio = true;
+        funInfo(`Listo: el robot ya sabe hacer «${f.nombre}» sin la página`
+            + (solo ? ' y la hace sola 2,5 s después de encenderlo' : '')
+            + (f.modo === 6 ? '. También sale con el botón de la placa, después del show' : f.modo ? '. Esquivar y seguir la mano también salen con el botón de la placa' : '. Con el botón de la placa se elige o se corta')
+            + '. Mientras esté conectado a la página no arranca sola.', 'ok');
+    });
+}
+
+function borrarFuncionGuardada() {
+    if (S.estado !== 'listo') return funInfo('Conecta el robot primero.', 'err');
+    S.enShow = false;
+    S.cola.enviar(['MODE 4', { l: 'FCLR', ex: true }, { l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }], () => funInfo('Se borró lo guardado en el robot (función y show).', 'ok'));
+}
+
 // Poner una función quita el baile (los dos mueven las ruedas): queda en "Solo luces" y sin pasos.
 function elegirFuncion(id) {
     if (S.corriendoFuncion) paro();
@@ -1332,6 +1386,7 @@ function pintarFunciones() {
         `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${x.id === S.funcion ? ' checked' : ''}>`
         + `<span><b>${x.nombre}</b><small>${x.desc}${x.modo ? ' <em>La hace el robot solo.</em>' : ''}</small></span></label>`).join('');
     $('rb-fn-luces').checked = S.funLuces;
+    $('rb-fn-auto').checked = S.funAuto;
     $('rb-fn-musica').checked = S.funMusica;
     $('rb-fn-giro').value = S.giro90;
     $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
@@ -2125,6 +2180,9 @@ function iniciar() {
         cambio('funcion');
     });
     $('rb-fn-iniciar').addEventListener('click', () => iniciarFuncion());
+    $('rb-fn-guardar').addEventListener('click', guardarFuncion);
+    $('rb-fn-borrar').addEventListener('click', borrarFuncionGuardada);
+    $('rb-fn-auto').addEventListener('change', e => { S.funAuto = e.target.checked; guardar(); });
 
     $('rb-anillo').addEventListener('click', e => {
         const b = e.target.closest('.rb-led');
