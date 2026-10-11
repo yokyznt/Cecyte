@@ -151,5 +151,10 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   igual al desconectarlo del USB y vuelve solo al encenderlo.
 - **Seguridad:** el botón **Paro** corta nota y motores al momento, y si la página
   deja de mandar órdenes los motores se paran solos a los 3 segundos.
+- **Show guardado:** "Guardar el show en el robot" deja la canción, el baile y las luces en
+  su EEPROM (hasta 2800 bytes). Después los hace sin USB: con el botón de la placa (modo
+  después del rojo) o solo, 2,5 s tras encenderlo si lo marcas. Úsalo con las baterías
+  puestas y el interruptor encendido: solo por USB la lectura del botón puede quedar
+  flotando (el firmware ya ignora ese ruido y no cambia de modo solo).
 - **Afinar:** si las notas salen bajas o altas, ajusta `AJUSTE_US` en el `.ino`.
 - **Pruebas:** `node test/robot.test.js`.
