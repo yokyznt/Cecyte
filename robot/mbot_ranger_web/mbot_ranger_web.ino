@@ -162,6 +162,31 @@ bool botonPresionado() {
   return analogRead(A7) < 100;
 }
 
+// Cuenta solo el instante de pulsar, y solo si el botón se vio suelto al menos una vez desde que
+// enciende. Así un botón que lee "presionado" siempre (placa sin batería, botón atorado) no cambia
+// de modo ni echa a andar los motores solo.
+// Además es estricto con el ruido: "suelto" solo cuenta si la lectura es claramente alta (> 500) y
+// "presionado" solo si se mantiene baja (< 60) durante 60 ms; los valores de en medio no cuentan.
+bool botonLiberado = false;
+bool botonAntes = false;
+unsigned long botonBajoDesde = 0;
+bool botonFlanco() {
+  int v = analogRead(A7);
+  unsigned long t = millis();
+  if (v > 500) {
+    botonLiberado = true;
+    botonBajoDesde = 0;
+  } else if (v < 60) {
+    if (botonBajoDesde == 0) botonBajoDesde = t;
+  } else {
+    botonBajoDesde = 0;
+  }
+  bool ahora = botonBajoDesde != 0 && (t - botonBajoDesde) >= 60;
+  bool pulso = ahora && !botonAntes && botonLiberado;
+  botonAntes = ahora;
+  return pulso;
+}
+
 // ---------- USB: cola de bytes ----------
 // Todo lo que llega se guarda aquí, también mientras suena una nota, y un "!" corta todo.
 const int RING = 256;
@@ -343,7 +368,7 @@ bool pgmPon(uint8_t b) {                     // un byte más de la subida
 bool showCortar() {
   drenar();
   if (abortar || colaN > 0) return true;
-  if (botonPresionado()) {
+  if (botonFlanco()) {
     ultimoBoton = millis();
     modo = 0;
     aplicaModo();
@@ -558,7 +583,7 @@ void loop() {
 
   // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
   // De 3 sin show, de 4 (página) y de 5 vuelve a 0.
-  if (botonPresionado() && millis() - ultimoBoton > 400) {
+  if (botonFlanco() && millis() - ultimoBoton > 300) {
     ultimoBoton = millis();
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
     else modo = (modo >= 3) ? 0 : modo + 1;

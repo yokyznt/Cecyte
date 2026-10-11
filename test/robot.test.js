@@ -301,6 +301,9 @@ for (const c of R.CANCIONES) {
     assert.deepStrictEqual(Object.values(R.MODOS_FX).sort(), [0, 1, 2, 3, 4]);
     assert(/m < 0 \|\| m > 4/.test(ino), 'el firmware acepta FX 0 a 4');
     assert(ino.includes('EEPROM.update'), 'SAVE guarda en la EEPROM');
+    // el botón de la placa no debe poder echar a andar los motores por ruido o por quedar "pegado"
+    assert(ino.includes('botonFlanco()') && !/if \(botonPresionado\(\) &&/.test(ino), 'el botón usa botonFlanco');
+    assert(/v > 500/.test(ino) && /v < 60/.test(ino) && />= 60/.test(ino), 'el botón es estricto: alto claro, bajo sostenido 60 ms');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
