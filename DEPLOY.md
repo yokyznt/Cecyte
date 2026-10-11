@@ -137,7 +137,7 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 
 - **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
 - **Timbre:** Timbre, Ritmo y ESP32.
-- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones, Luces, Línea, Show guardado e Instalar.
+- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones (incluye *Seguir la línea*), Luces, Show guardado e Instalar.
   La conexión, el paro, el progreso y la batería están siempre arriba. El volumen del robot está en Música.
   - **Batería:** barra con el porcentaje, el voltaje y cuánto va a durar. El robot manda su voltaje al
     conectar (`INFO ... BAT=`) y la página se lo pregunta (`BAT`) cada 10 s cuando está quieto; con los
@@ -151,10 +151,13 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
     en girar 90°"); *Esquivar* y *Seguir mi mano* usan los modos 1 y 2 que el programa del robot ya trae (`MODE 1`
     / `MODE 2`) y al parar la página manda `!` y `MODE 4`. El Nervous Bird necesita un programa de equilibrio con el
     giroscopio que este firmware no incluye: sus funciones son solo movimientos suaves.
-  - **Línea (todavía desactivado):** todos los ajustes del seguidor (puerto del módulo Me Line Follower,
-    color, velocidad, corrección, qué hacer al perder la línea o en un cruce, obstáculo, duración y avisos)
-    ya se pueden dejar listos; no se mandan al robot. Para activarlo: `SEGUIDOR_ACTIVO = true` en
-    `robot.js`, `#define SEGUIDOR_LINEA 1` en el `.ino` y volver a subir el firmware (compila: 17,4 KB).
+  - **Seguir la línea:** es una función (Land Raider y Dashing Raptor) con el módulo Me Line Follower en el puerto 6, 7 u 8.
+    Sus ajustes (color de la línea, velocidad, corrección, qué hacer al perderla o en un cruce, obstáculo, duración y
+    avisos) salen en la misma sección y se aplican en vivo con `LINEA clave valor`; arranca con `MODE 6`.
+    El firmware ya no incluye `MeAuriga.h` (enlazaba Wire, Servo, IR y encoders): el anillo de LEDs lo mueve un driver
+    propio y todo ocupa unos 13,4 KB, bajo el tope de 16 KB de esta placa (ver nota del flasheo).
+  - **Pilas:** además del tiempo de uso, la barra dice en cuánto tiempo volverían al 100 % con tu cargador
+    (corriente en "Ajustes de la batería", 500 mA por defecto; las NiMH necesitan ~140 % de su capacidad).
 
 Se puede abrir una sección directo con `#admin-<sección>` (por ejemplo `#admin-robot-luces`;
 `#admin-robot` abre Música). `node test/admin-secciones.test.js` revisa que el HTML y el script coincidan.

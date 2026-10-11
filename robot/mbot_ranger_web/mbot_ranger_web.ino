@@ -7,7 +7,7 @@
   Modos (botón de la placa):
     0 = Reposo (LEDs azules)         1 = Esquivar obstáculos (verde)
     2 = Seguir objeto con la mano (amarillo)   3 = Test de motores (rojo)
-    4 = Página (la manda la web; el botón vuelve a 0)
+    4 = Página (la manda la web; el botón vuelve a 0)   6 = Seguir la línea (solo por la página: MODE 6)
 
   Órdenes por USB, 115200 baudios, una por línea. Cada una responde OK, ERR ... o PONG:
     PING             -> PONG mbot-web 1
@@ -36,10 +36,9 @@
 
   Arduino IDE:
     Placa:  Arduino Mega or Mega 2560
-    Librería: Makeblock-Libraries (MeAuriga.h)
+    Librerías: ninguna extra (solo EEPROM, que ya trae el IDE)
 */
 
-#include <MeAuriga.h>
 #include <EEPROM.h>
 #include <avr/wdt.h>
 
@@ -57,7 +56,44 @@ void apagaWatchdog(void) {
   wdt_disable();
 }
 
-MeRGBLed leds(0, 12);
+// Anillo de 12 LEDs WS2812 en el pin 44 (PL5). Driver propio, sin la librería Makeblock: incluirla
+// aunque sea para el anillo enlaza todos sus módulos (Wire, Servo, IR, encoders, malloc...) y el
+// programa deja de caber en 16 KB. La señal es la misma rutina de la librería, a 16 MHz.
+uint8_t anillo[36];                          // G R B de cada LED, en el orden que se manda
+void ledPon(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
+  anillo[3 * i] = g; anillo[3 * i + 1] = r; anillo[3 * i + 2] = b;
+}
+void ledsTodos(uint8_t r, uint8_t g, uint8_t b) {
+  for (uint8_t i = 0; i < 12; i++) ledPon(i, r, g, b);
+}
+void ledsMuestra() {
+  uint8_t sreg = SREG;
+  cli();
+  const uint8_t alto = PORTL | _BV(PL5), bajo = PORTL & ~_BV(PL5);
+  for (uint8_t n = 0; n < 36; n++) {
+    uint8_t b = anillo[n], c;
+    asm volatile (
+      "ldi  %0,8        \n\t"
+      "1:               \n\t"
+      "st   X,%3        \n\t"     // sube la señal
+      "rjmp .+0         \n\t"
+      "sbrs %1,7        \n\t"
+      "st   X,%4        \n\t"     // bit 0: baja pronto (0,35 us)
+      "lsl  %1          \n\t"
+      "rjmp .+0         \n\t"
+      "rjmp .+0         \n\t"
+      "rjmp .+0         \n\t"
+      "brcc 2f          \n\t"
+      "st   X,%4        \n\t"     // bit 1: baja más tarde (0,9 us)
+      "2:               \n\t"
+      "rjmp .+0         \n\t"
+      "dec  %0          \n\t"
+      "brne 1b          \n\t"
+      : "=&d" (c), "+r" (b)
+      : "x" (&PORTL), "r" (alto), "r" (bajo));
+  }
+  SREG = sreg;
+}
 
 // Sensor ultrasónico del puerto 10 (señal en A11): igual que la librería, pero sin floats
 int distanciaCm() {                        // 400 si no hay eco
@@ -100,7 +136,7 @@ const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
-#define SEGUIDOR_LINEA 0             // 1 = incluye el modo 6 (seguidor de línea, orden LINEA); desactivado por ahora
+#define SEGUIDOR_LINEA 1             // 1 = incluye el modo 6 (seguidor de línea, orden LINEA)
 #if SEGUIDOR_LINEA
 const int MODO_MAX = 6;              // 6 = seguir la línea con el módulo Me Line Follower
 unsigned long lnT0 = 0;              // cuándo empezó a seguir la línea (0 = no ha empezado)
@@ -200,8 +236,8 @@ void parar() {
 
 // ---------- LEDs ----------
 void color(int r, int g, int b) {
-  leds.setColor(0, r, g, b);
-  leds.show();
+  ledsTodos(r, g, b);
+  ledsMuestra();
 }
 
 void aplicaModo() {
@@ -385,8 +421,8 @@ bool ledsHex(const char *h) {
     if (hi < 0 || lo < 0) return false;
     v[i] = hi * 16 + lo;
   }
-  for (int i = 0; i < 12; i++) leds.setColorAt(i, v[3 * i], v[3 * i + 1], v[3 * i + 2]);
-  leds.show();
+  for (int i = 0; i < 12; i++) ledPon(i, v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+  ledsMuestra();
   return true;
 }
 
@@ -455,9 +491,9 @@ void fxDibuja() {
     }
     // con las ruedas andando el anillo baja a la mitad: así le queda más corriente a los motores
     uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo / 2 : fxBrillo);   // k 0..255 por brillo 0..100
-    leds.setColorAt(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
+    ledPon(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
   }
-  leds.show();
+  ledsMuestra();
 }
 
 void fxPaso() {
@@ -681,8 +717,9 @@ void ejecuta(char *s) {
     if (i < 0 || i > 12) { err(F("led")); }
     else {
       fxModo = 0;
-      leds.setColor(i, constrain(atoi(b), 0, 255), constrain(atoi(c), 0, 255), constrain(atoi(d), 0, 255));
-      leds.show();
+      const uint8_t r = constrain(atoi(b), 0, 255), g = constrain(atoi(c), 0, 255), bl = constrain(atoi(d), 0, 255);
+      if (i == 0) ledsTodos(r, g, bl); else ledPon(i - 1, r, g, bl);
+      ledsMuestra();
       ok();
     }
   } else if (!strcmp(cmd, "LS") && a && strlen(a) == 72) {
@@ -805,7 +842,7 @@ void setup() {
     pinMode(MOT_H1[m], OUTPUT);
     pinMode(MOT_H2[m], OUTPUT);
   }
-  leds.setpin(PIN_LEDS);
+  pinMode(PIN_LEDS, OUTPUT);           // pin 44 = PL5, el que mueve ledsMuestra()
   semilla ^= (uint16_t)analogRead(A0) << 3 | 1;
 
   aplicaModo();
