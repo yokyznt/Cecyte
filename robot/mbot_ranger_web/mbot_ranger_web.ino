@@ -131,7 +131,7 @@ void motorPwm(uint8_t m, int pwm) {
   analogWrite(MOT_PWM[m], abs(pwm));
 }
 
-const int VEL = 100;                 // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
+const int VEL = 90;                  // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
 const int DIST_OBSTACULO = 20;       // cm
 const int PIN_BUZZER = 45;
@@ -501,8 +501,9 @@ void fxDibuja() {
         if (fxHayNota) hsvFx(fxMatiz, r, g, b);
         break;
     }
-    // con las ruedas andando el anillo baja a la mitad: así le queda más corriente a los motores
-    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo / 2 : fxBrillo);   // k 0..255 por brillo 0..100
+    // el anillo es lo que más gasta después de los motores (hasta ~300 mA): en reposo va al 70 % del brillo
+    // elegido y con las ruedas andando a la tercera parte, así le queda corriente a los motores y duran más las pilas
+    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo / 3 : fxBrillo * 7 / 10);   // k 0..255 por brillo 0..100
     ledPon(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
   }
   ledsMuestra();
