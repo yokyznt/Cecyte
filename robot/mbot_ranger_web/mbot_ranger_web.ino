@@ -21,7 +21,8 @@
                      m = 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota;
                      b = brillo 0..100; los 12 colores base van en hex como en LS;
                      v = velocidad del efecto en % (20..300, 100 = normal; opcional)
-    SAVE             guarda el último FX en la EEPROM: al encender, el robot lo vuelve a poner
+    VOL v            volumen del zumbador, 0..100 (se guarda con SAVE)
+    SAVE             guarda el último FX y el volumen en la EEPROM: al encender, el robot los vuelve a poner
     PCLR             empieza a guardar un show nuevo (borra el anterior)
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
     PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
@@ -121,6 +122,7 @@ const unsigned long FX_MS = 60;
 const unsigned long FX_QUIETO_MS = 40;
 uint8_t fxModo = 0;                  // 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota
 uint8_t fxBrillo = 40;               // 0..100
+uint8_t volumen = 100;               // volumen del zumbador, 0..100 (orden VOL)
 uint16_t fxVel = 100;                // velocidad del efecto en %, 20..300
 unsigned long fxT = 0, fxTprev = 0;  // tiempo del efecto (corre al ritmo de fxVel)
 uint8_t fxBase[12][3];               // colores base de cada LED
@@ -321,18 +323,25 @@ void espera(unsigned long ms) {
   }
 }
 
-// El zumbador (pin 45 = OC5B) suena por hardware con el Timer5 en CTC: el pin conmuta solo en cada
+// El zumbador (pin 45 = OC5B) suena por hardware con el Timer5 en PWM rápido: el pin sale solo en cada
 // vuelta del contador. Así el anillo de LEDs, que apaga las interrupciones unos 0,4 ms al dibujar
 // cada cuadro, ya no entrecorta el sonido (antes la onda se hacía a mano y se cortaba en cada cuadro).
-//   frecuencia = F_CPU / (2 * prescaler * (1 + OCR5A))
+//   frecuencia = F_CPU / (prescaler * (1 + ICR5))
+// El volumen es el ancho del pulso: 50 % de la onda (volumen 100) es lo más fuerte, y al bajarlo el
+// pulso se hace más angosto y suena más bajito (con curva cuadrática, para afinar los volúmenes bajos).
 void tono(int hz, int ms) {
-  unsigned long ciclos = 8000000UL / (unsigned long)hz;     // con prescaler 1
+  if (volumen == 0) { espera(ms); return; }
+  unsigned long ciclos = 16000000UL / (unsigned long)hz;    // con prescaler 1
   uint8_t cs = 1;
   if (ciclos > 65536UL) { cs = 2; ciclos /= 8; }            // graves: prescaler 8
+  uint16_t tope = (uint16_t)(ciclos - 1);
+  uint32_t ancho = (uint32_t)tope * volumen * volumen / 20000UL;
+  if (ancho < 1) ancho = 1;
   pinMode(PIN_BUZZER, OUTPUT);
-  TCCR5A = _BV(COM5B0);
-  TCCR5B = _BV(WGM52) | cs;
-  OCR5A = OCR5B = (uint16_t)(ciclos - 1);
+  TCCR5A = _BV(COM5B1) | _BV(WGM51);
+  TCCR5B = _BV(WGM53) | _BV(WGM52) | cs;
+  ICR5 = tope;
+  OCR5B = (uint16_t)ancho;
   TCNT5 = 0;
   espera(ms);
   TCCR5B = 0;
@@ -452,6 +461,7 @@ void fxGuardar() {
   EEPROM.update(EE_DIR + 2, fxBrillo);
   for (int i = 0; i < 36; i++) EEPROM.update(EE_DIR + 3 + i, fxBase[i / 3][i % 3]);
   EEPROM.update(EE_DIR + 39, (uint8_t)(fxVel / 2));            // velocidad, a la mitad para que quepa en un byte
+  EEPROM.update(EE_DIR + 40, volumen);
 }
 
 void fxRestaurar() {
@@ -461,6 +471,8 @@ void fxRestaurar() {
   for (int i = 0; i < 36; i++) fxBase[i / 3][i % 3] = EEPROM.read(EE_DIR + 3 + i);
   uint8_t v = EEPROM.read(EE_DIR + 39);
   fxVel = (v >= 10 && v <= 150) ? v * 2 : 100;
+  uint8_t vo = EEPROM.read(EE_DIR + 40);
+  if (vo <= 100) volumen = vo;                                 // 0xFF = nunca guardado: queda en 100
   fxModo = m;
   fxBrillo = b;
   fxHayNota = false;
@@ -596,6 +608,9 @@ void ejecuta(char *s) {
       fxDibuja();
       ok();
     }
+  } else if (!strcmp(cmd, "VOL") && a) {
+    volumen = constrain(atoi(a), 0, 100);
+    ok();
   } else if (!strcmp(cmd, "SAVE")) {
     fxGuardar();
     ok();

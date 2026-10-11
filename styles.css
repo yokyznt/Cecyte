@@ -979,3 +979,41 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-tecla.is-down { background: var(--green-700); border-color: var(--green-700); color: #fff; }
 .rb-tecla:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; z-index: 2; }
 .rb-oct { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
+
+/* ==================== Apartados del admin: subpestañas y tarjetas ====================
+   Arriba los tres apartados (Horario, Timbre, Robot); debajo, las secciones de cada uno en
+   pastillas más pequeñas. Las dos filas quedan fijas juntas. */
+.subsections {
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    padding-block: 8px; border-top: 1px solid var(--line);
+}
+.subsections[hidden] { display: none; }
+.subsections::-webkit-scrollbar { display: none; }
+.sections .subsections [role="tab"] {
+    flex: none; min-height: 40px; padding: 0 16px;
+    border: 1px solid transparent; border-radius: 999px;
+    font-size: var(--fs-sm); font-weight: 600; gap: 8px;
+}
+.sections .subsections [role="tab"]::after { display: none; }
+.sections .subsections [role="tab"]:hover { background: var(--green-50); }
+.sections .subsections [role="tab"][aria-selected="true"] {
+    background: var(--green-100); border-color: var(--green-300); color: var(--green-800); font-weight: 700;
+}
+
+/* El botón de nueva materia vive en la barra del horario */
+.toolbar__add { flex: none; }
+
+/* Robot: la conexión siempre arriba, y cada sección en tarjetas */
+.rb-conexion .panel__body { display: flex; flex-direction: column; gap: 12px; }
+.rb-panel > .panel__body {
+    display: grid; gap: 20px; align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+}
+.rb-card {
+    display: flex; flex-direction: column; gap: 14px; min-width: 0;
+    padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.rb-card--ancho { grid-column: 1 / -1; }
+.rb-card > .panel__sub { font-size: var(--fs-md); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.rb-card .rb-leds { margin-top: 2px; }
+.rb-apartado > .rb-conexion { margin-bottom: 18px; }

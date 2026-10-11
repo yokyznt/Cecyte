@@ -193,7 +193,7 @@ function crearCola(escribir, crudo) {
             if (abortando || !vuelo.length) return false;
             ultimoMov = Date.now();
             const e = vuelo.shift();
-            const reintentar = !!err && !e.c.reint && /^(FX|SAVE|MODE|LS|L|S)( |$)/.test(e.c.l);
+            const reintentar = !!err && !e.c.reint && /^(FX|SAVE|MODE|LS|L|S|VOL)( |$)/.test(e.c.l);
             if (reintentar) pend.unshift(Object.assign({}, e.c, { reint: 1 }));
             bombear();
             return reintentar;
@@ -694,7 +694,7 @@ const S = {
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
-    brillo: 40, efecto: 'fijo', velFx: 100, vivo: true, repetir: false,
+    brillo: 40, efecto: 'fijo', velFx: 100, vol: 100, vivo: true, repetir: false,
     cancion: 'estrellita', notas: '', bpm: 110, baile: 'vaiven', pasos: null, vel: 110,
     guardadas: [],            // canciones y ritmos guardados: { id, nombre, texto, bpm }
     guardarEn: 0,             // cuándo mandar SAVE al robot (ms), 0 = nada pendiente
@@ -707,8 +707,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -718,6 +718,7 @@ function cargar() {
         if (g && typeof g === 'object') Object.assign(S, g);
     } catch (e) { /* datos viejos o dañados: se usan los de fábrica */ }
     S.velFx = clamp(Number(S.velFx) || 100, 20, 300);
+    S.vol = clamp(Number.isFinite(Number(S.vol)) ? Number(S.vol) : 100, 0, 100);
     if (typeof S.rec !== 'string') S.rec = '';
     if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
     S.guardadas = (Array.isArray(S.guardadas) ? S.guardadas : [])
@@ -752,7 +753,10 @@ function ponEstado(est) {
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
-    if (est === 'sinprograma') $('rb-instalar').open = true;
+    if (est === 'sinprograma') {
+        $('rb-instalar').open = true;
+        if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
+    }
 }
 
 // ---------- Puerto serie ----------
@@ -921,7 +925,7 @@ function escucharAqui() {
         const [k, a, b] = c.l.split(' ');
         if (k === 'T') {
             osc.frequency.setValueAtTime(Number(a), t);
-            amp.gain.setValueAtTime(0.06, t);
+            amp.gain.setValueAtTime(0.06 * S.vol / 100, t);
             amp.gain.setValueAtTime(0, t + Number(b) / 1000);
             t += Number(b) / 1000;
         } else if (k === 'W') {
@@ -966,7 +970,7 @@ function actuar(conCancion, conBaile) {
     // El efecto de luces va primero y corre solo en el robot mientras suena todo lo demás.
     const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true };
     S.guardarEn = Date.now() + 2500;
-    S.cola.enviar(['MODE 4', fx].concat(cmds), () => {
+    S.cola.enviar(['MODE 4', fx, 'VOL ' + S.vol].concat(cmds), () => {
         if (S.actuando && S.repetir) return actuar(conCancion, conBaile);
         S.actuando = false;
         progreso(0);
@@ -996,7 +1000,7 @@ function guardarShow() {
     S.guardarEn = 0;
     pgmInfo(`Guardando en el robot (${prog.lineas.length} órdenes)… no lo desconectes.`);
     const dur = (ms / 1000).toFixed(1);
-    S.cola.enviar(['MODE 4', 'PCLR'].concat(prog.lineas, ['PEND ' + banderas, fx, { l: 'SAVE', ex: true }]), () => {
+    S.cola.enviar(['MODE 4', 'PCLR'].concat(prog.lineas, ['PEND ' + banderas, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]), () => {
         pgmInfo(`Listo: el robot ya sabe hacer su show de ${dur} s sin la página`
             + (banderas & 1 ? ' y lo hace solo 2,5 s después de encenderlo' : '')
             + (banderas & 2 ? ', repitiéndolo' : '')
@@ -1068,7 +1072,7 @@ function tickLeds() {
     if (S.sucio) {
         S.sucio = false;
         S.guardarEn = Date.now() + 2500;
-        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true }]);
+        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true }, 'VOL ' + S.vol]);
     } else if (S.guardarEn && Date.now() >= S.guardarEn) {
         S.guardarEn = 0;
         S.cola.enviar([{ l: 'SAVE', ex: true }]);
@@ -1113,6 +1117,8 @@ function pintarTodo() {
     $('rb-efecto').value = S.efecto;
     $('rb-fxvel').value = S.velFx;
     $('rb-fxvel-v').textContent = S.velFx + ' %';
+    $('rb-vol').value = S.vol;
+    $('rb-vol-v').textContent = S.vol + ' %';
     $('rb-vivo').checked = S.vivo;
     $('rb-repetir').checked = S.repetir;
     $('rb-auto').checked = S.arranca;
@@ -1338,7 +1344,7 @@ function sonidoTeclado(hz) {            // hz = 0 calla
     const t = T.ctx.currentTime;
     if (hz) {
         T.osc.frequency.setValueAtTime(hz, t);
-        T.amp.gain.setTargetAtTime(0.06, t, 0.004);
+        T.amp.gain.setTargetAtTime(0.06 * S.vol / 100, t, 0.004);
     } else {
         T.amp.gain.setTargetAtTime(0, t, 0.012);
     }
@@ -1609,6 +1615,11 @@ function iniciar() {
     $('rb-fxvel').addEventListener('input', e => {
         S.velFx = Number(e.target.value);
         $('rb-fxvel-v').textContent = S.velFx + ' %';
+        cambio('led');
+    });
+    $('rb-vol').addEventListener('input', e => {
+        S.vol = Number(e.target.value);
+        $('rb-vol-v').textContent = S.vol + ' %';
         cambio('led');
     });
     iniciarTeclado();

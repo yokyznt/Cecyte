@@ -214,14 +214,10 @@
 
                 <div class="admin-head">
                     <div>
-                        <h2 class="admin-head__title">Gestión de Horarios y Grupos</h2>
-                        <p class="admin-head__text">Agrega, edita o elimina materias. Todos ven los cambios.</p>
+                        <h2 class="admin-head__title">Panel de administración</h2>
+                        <p class="admin-head__text">Horario, timbre y robot en un solo lugar. Lo que cambies en el horario lo ven todos.</p>
                     </div>
                     <div class="admin-head__actions">
-                        <button type="button" onclick="openAddModal()" class="btn btn--primary">
-                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                            Nueva Materia / Bloque
-                        </button>
                         <button type="button" onclick="logoutAdmin()" class="btn btn--secondary">
                             <svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>
                             Cerrar sesión
@@ -229,22 +225,21 @@
                     </div>
                 </div>
 
-                <nav class="sections" aria-label="Secciones del panel de administración">
-                    <div class="sections__list" role="tablist" aria-orientation="horizontal">
-                        <button type="button" role="tab" id="tab-horarios" data-section-tab="horarios" aria-controls="sec-horarios" aria-selected="true">
-                            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>Horarios</span>
+                <nav class="sections" aria-label="Apartados del panel de administración">
+                    <div class="sections__list" role="tablist" aria-label="Apartados">
+                        <button type="button" role="tab" id="tab-ap-horario" data-apartado-tab="horario" aria-controls="ap-horario" aria-selected="true">
+                            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>Horario</span>
                         </button>
-                        <button type="button" role="tab" id="tab-timbre" data-section-tab="timbre" aria-controls="sec-timbre" aria-selected="false" tabindex="-1">
+                        <button type="button" role="tab" id="tab-ap-timbre" data-apartado-tab="timbre" aria-controls="ap-timbre" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span>Timbre</span>
                         </button>
-                        <button type="button" role="tab" id="tab-ritmo" data-section-tab="ritmo" aria-controls="sec-ritmo" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Ritmo</span>
-                        </button>
-                        <button type="button" role="tab" id="tab-esp32" data-section-tab="esp32" aria-controls="sec-esp32" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>ESP32</span>
-                        </button>
-                        <button type="button" role="tab" id="tab-robot" data-section-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                        <button type="button" role="tab" id="tab-ap-robot" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
+                        </button>
+                    </div>
+                    <div class="subsections" data-apartado-sub="horario" role="tablist" aria-label="Horario">
+                        <button type="button" role="tab" id="tab-horarios" data-section-tab="horarios" aria-controls="sec-horarios" aria-selected="true">
+                            <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>Horarios</span>
                         </button>
                         <button type="button" role="tab" id="tab-grupos" data-section-tab="grupos" aria-controls="sec-grupos" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span>Grupos</span>
@@ -253,14 +248,139 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span>Alertas</span>
                         </button>
                     </div>
+                    <div class="subsections" data-apartado-sub="timbre" role="tablist" aria-label="Timbre" hidden>
+                        <button type="button" role="tab" id="tab-timbre" data-section-tab="timbre" aria-controls="sec-timbre" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg><span>Timbre</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-ritmo" data-section-tab="ritmo" aria-controls="sec-ritmo" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Ritmo</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-esp32" data-section-tab="esp32" aria-controls="sec-esp32" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>ESP32</span>
+                        </button>
+                    </div>
+                    <div class="subsections" data-apartado-sub="robot" role="tablist" aria-label="Robot" hidden>
+                        <button type="button" role="tab" id="tab-robot-musica" data-section-tab="robot-musica" aria-controls="sec-robot-musica" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Música</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot-baile" data-section-tab="robot-baile" aria-controls="sec-robot-baile" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Baile</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot-show" data-section-tab="robot-show" aria-controls="sec-robot-show" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Show guardado</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot-instalar" data-section-tab="robot-instalar" aria-controls="sec-robot-instalar" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span>Instalar</span>
+                        </button>
+                    </div>
                 </nav>
 
                 <div class="admin-grid">
 
-                    <!-- Timbre, grupos y alertas: arriba, a todo el ancho -->
-                    <div class="admin-top">
+                    <!-- Apartado Horario: horarios, grupos y alertas -->
+                    <div class="admin-top" id="ap-horario" data-apartado="horario">
+                        <div class="admin-col admin-sec" id="sec-horarios" data-section="horarios" role="tabpanel" aria-label="Horarios">
 
-                        <!-- Timbre escolar (ESP32) -->
+                        <section class="panel" aria-label="Registros del horario">
+                            <div class="toolbar">
+                                <div class="input-icon">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+                                    <label class="sr-only" for="admin-search">Buscar materia o docente</label>
+                                    <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="input">
+                                </div>
+                                <label class="sr-only" for="admin-group-filter">Filtrar por grupo</label>
+                                <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="select">
+                                    <option value="ALL">Todos los Grupos</option>
+                                </select>
+                                <button type="button" onclick="openAddModal()" class="btn btn--primary toolbar__add">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                    Nueva Materia / Bloque
+                                </button>
+                                <p class="toolbar__count">Mostrando <b id="admin-count">0</b> registros en base de datos</p>
+                            </div>
+                            <div class="data-wrap">
+                                <table class="data">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Grupo</th>
+                                            <th scope="col">Día</th>
+                                            <th scope="col">Hora</th>
+                                            <th scope="col">Materia</th>
+                                            <th scope="col">Docente</th>
+                                            <th scope="col" style="text-align:right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-table-body"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                        <details class="panel fold admin-sec" data-section="horarios">
+                            <summary>
+                                <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
+                                <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                            </summary>
+                            <div class="panel__body">
+                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
+                                <label class="sr-only" for="import-json">Código del horario (JSON)</label>
+                                <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
+  { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
+]'></textarea>
+                                <div class="row-between">
+                                    <p id="import-status" class="msg" role="status"></p>
+                                    <button type="button" onclick="importSchedule()" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                                        Importar y Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <section class="panel admin-sec" id="sec-grupos" data-section="grupos" role="tabpanel" aria-labelledby="groups-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
+                            </div>
+                            <div class="panel__body">
+                                <p class="hint">Borrar un grupo también borra sus materias del horario.</p>
+                                <form onsubmit="addGroup(event)" class="inline-form">
+                                    <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
+                                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
+                                    <button type="submit" class="btn btn--primary">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                        Agregar Grupo
+                                    </button>
+                                </form>
+                                <div id="groups-list" class="chips"></div>
+                            </div>
+                        </section>
+
+                        <section class="panel admin-sec" id="sec-alertas" data-section="alertas" role="tabpanel" aria-labelledby="alerts-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
+                            </div>
+                            <div class="panel__body" style="padding-bottom:0">
+                                <p class="hint">Al cambiar de bloque se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa en su dispositivo, en la vista de Alumnos.</p>
+                                <h4 class="panel__sub">Registro de Alertas</h4>
+                            </div>
+                            <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
+                                <table class="log">
+                                    <thead>
+                                        <tr><th scope="col">Hora</th><th scope="col">Terminó</th><th scope="col">Sigue</th></tr>
+                                    </thead>
+                                    <tbody id="alert-log-body">
+                                        <tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Apartado Timbre: timbre, ritmo y ESP32 -->
+                    <div class="admin-top" id="ap-timbre" data-apartado="timbre" hidden>
                         <section class="panel admin-sec" id="sec-timbre" data-section="timbre" role="tabpanel" aria-labelledby="bell-heading" hidden>
                             <div class="panel__head">
                                 <h3 id="bell-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> Timbre Escolar</h3>
@@ -347,39 +467,6 @@
                             </div>
                         </section>
 
-                        <!-- Estado del ESP32, historial y firmware -->
-                        <section class="panel admin-sec" id="sec-esp32" data-section="esp32" role="tabpanel" aria-labelledby="esp-heading" hidden>
-                            <div class="panel__head">
-                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
-                            </div>
-                            <div class="panel__body">
-                                <ul id="esp-info" class="plain-list"></ul>
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Últimos toques</h4>
-                                    <ul id="bell-log" class="log"></ul>
-                                </div>
-
-                                <hr class="divider">
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
-                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
-                                    <div class="grid-2">
-                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
-                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
-                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
-                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
-                                    </div>
-                                    <div class="row-between">
-                                        <p id="fw-msg" class="msg" role="status"></p>
-                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Ritmo del timbre -->
                         <section class="panel admin-sec" id="sec-ritmo" data-section="ritmo" role="tabpanel" aria-labelledby="rhythm-heading" hidden>
                             <div class="panel__head">
                                 <h3 id="rhythm-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Ritmo del timbre</h3>
@@ -509,8 +596,43 @@
                             </div>
                         </section>
 
-                        <!-- Robot mBot Ranger (Me Auriga) por USB: canciones, baile y LEDs -->
-                        <section class="panel admin-sec" id="sec-robot" data-section="robot" role="tabpanel" aria-labelledby="robot-heading" hidden>
+                        <section class="panel admin-sec" id="sec-esp32" data-section="esp32" role="tabpanel" aria-labelledby="esp-heading" hidden>
+                            <div class="panel__head">
+                                <h3 id="esp-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> ESP32: estado y firmware</h3>
+                            </div>
+                            <div class="panel__body">
+                                <ul id="esp-info" class="plain-list"></ul>
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Últimos toques</h4>
+                                    <ul id="bell-log" class="log"></ul>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Actualizar el firmware sin cable</h4>
+                                    <p class="hint">En Arduino IDE sube <b>FW_VERSION</b> en timbre.ino y usa Programa → Exportar binario compilado. Sube aquí el archivo <b>timbre.ino.bin</b> (no el bootloader, partitions ni merged) con ese mismo número de versión.</p>
+                                    <div class="grid-2">
+                                        <div class="field"><label class="field__label" for="fw-file">Archivo .bin</label>
+                                            <input type="file" id="fw-file" accept=".bin" class="input"></div>
+                                        <div class="field"><label class="field__label" for="fw-version">Versión</label>
+                                            <input type="number" id="fw-version" min="1" max="9999" step="1" value="2" class="input"></div>
+                                    </div>
+                                    <div class="row-between">
+                                        <p id="fw-msg" class="msg" role="status"></p>
+                                        <button type="button" id="fw-btn" onclick="publicarFirmware()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Publicar firmware</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Apartado Robot: mBot Ranger por USB -->
+                    <div class="admin-top rb-apartado" id="sec-robot" data-apartado="robot" hidden>
+
+                        <!-- Conexión: siempre a la vista dentro del apartado Robot -->
+                        <section class="panel rb-conexion" aria-labelledby="robot-heading">
                             <div class="panel__head">
                                 <h3 id="robot-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Robot mBot Ranger</h3>
                                 <span id="rb-bat" class="badge badge--idle" hidden></span>
@@ -529,9 +651,15 @@
                                 <p id="rb-msg" class="msg" role="status"></p>
                                 <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
 
-                                <!-- Canción -->
-                                <div class="stack">
+                                </div>
+                        </section>
+
+                        <!-- Música: canción, teclado y melodía de un audio -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-musica" data-section="robot-musica" role="tabpanel" aria-label="Música del robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card">
                                     <h4 class="panel__sub">Canción</h4>
+                                    <div class="stack">
                                     <div class="field">
                                         <label class="field__label" for="rb-cancion">Elige una canción</label>
                                         <select id="rb-cancion" class="select"></select>
@@ -554,15 +682,21 @@
                                         <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
                                         <input type="range" id="rb-bpm" min="50" max="220" step="1">
                                     </div>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-vol">Volumen del robot: <span id="rb-vol-v"></span></label>
+                                        <input type="range" id="rb-vol" min="0" max="100" step="5">
+                                    </div>
                                     <div class="btn-row">
                                         <button type="button" id="rb-escuchar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar aquí</button>
                                         <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
                                         <button type="button" id="rb-tocar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Cantar en el robot</button>
                                     </div>
 
-                                    <details class="rb-audio" open>
-                                        <summary>Teclado: toca y graba tus notas</summary>
-                                        <div class="stack">
+                                    </div>
+                                </div>
+                                <div class="rb-card">
+                                    <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
+                                    <div class="stack">
                                             <p class="hint">Toca las teclas de abajo o las de tu computadora: <b>Z X C V B N M</b> (con <b>S D G H J</b> para las negras) son una octava y <b>Q W E R T Y U</b> (con <b>2 3 5 6 7</b>) la siguiente. Pulsa <b>Grabar</b> y las notas se van registrando solas, con su duración y sus silencios.</p>
                                             <div id="rb-piano" class="rb-piano" role="group" aria-label="Teclado de notas"></div>
                                             <div class="btn-row">
@@ -592,11 +726,10 @@
                                             </div>
                                             <p id="rb-rec-info" class="msg" role="status"></p>
                                         </div>
-                                    </details>
-
-                                    <details class="rb-audio">
-                                        <summary>Sacar la melodía o el ritmo de un audio o un MIDI</summary>
-                                        <div class="stack">
+                                </div>
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Melodía o ritmo de un audio o un MIDI</h4>
+                                    <div class="stack">
                                             <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Puede sacar <b>la melodía</b> (la voz si la canción la tiene, o el instrumento principal si es solo instrumental) o solo <b>el ritmo</b>. El archivo no sale de tu navegador. Después puedes editarlo, escucharlo y guardarlo con un nombre.</p>
                                             <div class="grid-2">
                                                 <div class="field"><label class="field__label" for="rb-aud-que">Qué sacar</label>
@@ -647,12 +780,16 @@
                                             </div>
                                             <p id="rb-aud-info" class="msg" role="status"></p>
                                         </div>
-                                    </details>
                                 </div>
+                            </div>
+                        </section>
 
-                                <!-- Baile -->
-                                <div class="stack">
+                        <!-- Baile -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-baile" data-section="robot-baile" role="tabpanel" aria-label="Baile del robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Baile</h4>
+                                    <div class="stack">
                                     <div class="field">
                                         <label class="field__label" for="rb-baile">Elige un baile</label>
                                         <select id="rb-baile" class="select"></select>
@@ -673,26 +810,15 @@
                                     </div>
                                     <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
 
-                                    <details class="rb-audio">
-                                        <summary>Que lo haga solo, sin la página (desconectado)</summary>
-                                        <div class="stack">
-                                            <p class="hint">Guarda en el robot la canción y el baile que tengas en pantalla, más las luces. Después lo hace sin USB ni computadora: se elige con el botón de la placa (después del modo rojo, con las luces del efecto) o, si lo marcas, arranca solo 2,5 s después de encenderlo. El botón de la placa lo corta.</p>
-                                            <label class="rb-check"><input type="checkbox" id="rb-auto"><span>Que empiece solo al encenderlo</span></label>
-                                            <p class="hint">Se repite sin parar si marcas "Repetir hasta pulsar Paro" de arriba. Caben unos 2800 bytes (más o menos 350 notas).</p>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-pgm-guardar" class="btn btn--primary btn--sm" disabled>Guardar el show en el robot</button>
-                                                <button type="button" id="rb-pgm-probar" class="btn btn--secondary btn--sm" disabled>Probar el show guardado</button>
-                                                <button type="button" id="rb-pgm-borrar" class="btn btn--secondary btn--sm" disabled>Borrar el show del robot</button>
-                                            </div>
-                                            <p id="rb-pgm-info" class="msg" role="status"></p>
-                                        </div>
-                                    </details>
+                                    </div>
                                 </div>
+                            </div>
+                        </section>
 
-                                <hr class="divider">
-
-                                <!-- Luces -->
-                                <div class="stack rb-full">
+                        <!-- Luces -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-luces" data-section="robot-luces" role="tabpanel" aria-label="Luces del robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Luces del anillo (12 LEDs)</h4>
                                     <div class="rb-leds">
                                         <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
@@ -724,9 +850,34 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </section>
 
-                                <!-- Instalación del programa -->
-                                <details id="rb-instalar" class="rb-full rb-instalar">
+                        <!-- Show guardado en el robot -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-show" data-section="robot-show" role="tabpanel" aria-label="Show guardado en el robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Que lo haga solo, sin la página (desconectado)</h4>
+                                    <div class="stack">
+                                            <p class="hint">Guarda en el robot la canción y el baile que tengas en pantalla, más las luces. Después lo hace sin USB ni computadora: se elige con el botón de la placa (después del modo rojo, con las luces del efecto) o, si lo marcas, arranca solo 2,5 s después de encenderlo. El botón de la placa lo corta.</p>
+                                            <label class="rb-check"><input type="checkbox" id="rb-auto"><span>Que empiece solo al encenderlo</span></label>
+                                            <p class="hint">Se repite sin parar si marcas "Repetir hasta pulsar Paro" de arriba. Caben unos 2800 bytes (más o menos 350 notas).</p>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-pgm-guardar" class="btn btn--primary btn--sm" disabled>Guardar el show en el robot</button>
+                                                <button type="button" id="rb-pgm-probar" class="btn btn--secondary btn--sm" disabled>Probar el show guardado</button>
+                                                <button type="button" id="rb-pgm-borrar" class="btn btn--secondary btn--sm" disabled>Borrar el show del robot</button>
+                                            </div>
+                                            <p id="rb-pgm-info" class="msg" role="status"></p>
+                                        </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Instalar el programa -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-instalar" data-section="robot-instalar" role="tabpanel" aria-label="Instalar el programa en el robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
+                                    <details id="rb-instalar" class="rb-instalar" open>
                                     <summary>Instalar el programa en el robot (una sola vez)</summary>
                                     <ol>
                                         <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
@@ -735,102 +886,7 @@
                                         <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
                                     </ol>
                                 </details>
-                            </div>
-                        </section>
-
-                        <!-- Gestión de grupos -->
-                        <section class="panel admin-sec" id="sec-grupos" data-section="grupos" role="tabpanel" aria-labelledby="groups-heading" hidden>
-                            <div class="panel__head">
-                                <h3 id="groups-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestión de Grupos</h3>
-                            </div>
-                            <div class="panel__body">
-                                <p class="hint">Borrar un grupo también borra sus materias del horario.</p>
-                                <form onsubmit="addGroup(event)" class="inline-form">
-                                    <label class="sr-only" for="new-group-name">Nombre del grupo nuevo</label>
-                                    <input type="text" id="new-group-name" required placeholder="Ej. 502 Contabilidad" class="input">
-                                    <button type="submit" class="btn btn--primary">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                        Agregar Grupo
-                                    </button>
-                                </form>
-                                <div id="groups-list" class="chips"></div>
-                            </div>
-                        </section>
-
-                        <!-- Notificaciones automáticas -->
-                        <section class="panel admin-sec" id="sec-alertas" data-section="alertas" role="tabpanel" aria-labelledby="alerts-heading" hidden>
-                            <div class="panel__head">
-                                <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
-                            </div>
-                            <div class="panel__body" style="padding-bottom:0">
-                                <p class="hint">Al cambiar de bloque se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa en su dispositivo, en la vista de Alumnos.</p>
-                                <h4 class="panel__sub">Registro de Alertas</h4>
-                            </div>
-                            <div class="data-wrap" style="margin-top:12px;border-top:1px solid var(--line)">
-                                <table class="log">
-                                    <thead>
-                                        <tr><th scope="col">Hora</th><th scope="col">Terminó</th><th scope="col">Sigue</th></tr>
-                                    </thead>
-                                    <tbody id="alert-log-body">
-                                        <tr><td colspan="3" class="log-empty">Todavía no se ha registrado ninguna alerta.</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-
-                        <details class="panel fold admin-sec" data-section="horarios">
-                            <summary>
-                                <span class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Importar Horario (pega el código)</span>
-                                <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                            </summary>
-                            <div class="panel__body">
-                                <p class="hint">Pega aquí un JSON con las materias y pulsa "Importar y Guardar". Los grupos que no existan se crean solos.</p>
-                                <label class="sr-only" for="import-json">Código del horario (JSON)</label>
-                                <textarea id="import-json" rows="7" class="textarea" spellcheck="false" placeholder='[
-  { &quot;group&quot;: &quot;502 Contabilidad&quot;, &quot;day&quot;: &quot;Lunes&quot;, &quot;time&quot;: &quot;07:00 - 08:00&quot;, &quot;subject&quot;: &quot;Contabilidad I&quot;, &quot;teacher&quot;: &quot;CP. Ana Ruiz&quot; }
-]'></textarea>
-                                <div class="row-between">
-                                    <p id="import-status" class="msg" role="status"></p>
-                                    <button type="button" onclick="importSchedule()" class="btn btn--primary">
-                                        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-                                        Importar y Guardar
-                                    </button>
                                 </div>
-                            </div>
-                        </details>
-                    </div>
-
-                    <!-- Registros del horario -->
-                    <div class="admin-col admin-sec" id="sec-horarios" data-section="horarios" role="tabpanel" aria-label="Horarios">
-
-                        <section class="panel" aria-label="Registros del horario">
-                            <div class="toolbar">
-                                <div class="input-icon">
-                                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-                                    <label class="sr-only" for="admin-search">Buscar materia o docente</label>
-                                    <input type="text" id="admin-search" oninput="filterAdminTable(this.value)" placeholder="Buscar materia o docente..." class="input">
-                                </div>
-                                <label class="sr-only" for="admin-group-filter">Filtrar por grupo</label>
-                                <select id="admin-group-filter" onchange="filterAdminTable(document.getElementById('admin-search').value)" class="select">
-                                    <option value="ALL">Todos los Grupos</option>
-                                </select>
-                                <p class="toolbar__count">Mostrando <b id="admin-count">0</b> registros en base de datos</p>
-                            </div>
-                            <div class="data-wrap">
-                                <table class="data">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Grupo</th>
-                                            <th scope="col">Día</th>
-                                            <th scope="col">Hora</th>
-                                            <th scope="col">Materia</th>
-                                            <th scope="col">Docente</th>
-                                            <th scope="col" style="text-align:right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="admin-table-body"></tbody>
-                                </table>
                             </div>
                         </section>
                     </div>
