@@ -332,10 +332,28 @@ function ritmoATexto(intervalos, tonos = TONOS_RITMO.alterna) {
     return out.join(' ');
 }
 
+// Show guardado en el robot: la canción y el baile compilados, para que los haga solo, sin la página.
+// Espacio en su EEPROM: nota 5 bytes, espera 3, motores 3, parar 1 (igual que PGM_MAX del firmware).
+const PGM_MAX = 2800;
+const BYTES_ORDEN = { T: 5, W: 3, M: 3, S: 1 };
+
+function programaParaRobot(cmds) {
+    const lineas = [];
+    let bytes = 0;
+    for (const c of cmds) {
+        const n = BYTES_ORDEN[c.l.split(' ')[0]];
+        if (!n) continue;                       // las luces no van en el show: ya se guardan con SAVE
+        bytes += n;
+        lineas.push('PADD ' + c.l);
+    }
+    return { lineas, bytes, cabe: bytes <= PGM_MAX };
+}
+
 const lib = {
     BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
+    PGM_MAX,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
-    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto,
+    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lib;
@@ -359,14 +377,16 @@ const S = {
     cancion: 'estrellita', notas: '', bpm: 110, baile: 'vaiven', pasos: null, vel: 110,
     guardadas: [],            // canciones y ritmos guardados: { id, nombre, texto, bpm }
     guardarEn: 0,             // cuándo mandar SAVE al robot (ms), 0 = nada pendiente
+    enShow: false,            // el robot está haciendo su show guardado: no hay que mandarle nada
+    arranca: false,           // "que empiece solo al encenderlo"
 };
 const MAX_GUARDADAS = 40;
 let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas }));
+        const { leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -407,7 +427,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') $('rb-instalar').open = true;
 }
 
@@ -429,6 +449,10 @@ function alLinea(l) {
         S.vioArranque = true;   // el programa viejo (tanquecito): no habla con la página
     } else if (l === 'ABORTED') {
         S.cola.abortado();
+    } else if (/^SHOW fin/.test(l)) {
+        if (S.enShow) mensaje('El show guardado terminó.', 'ok');
+        S.enShow = false;
+        S.sucio = true;
     } else if (l === 'WDT') {
         mensaje('El robot se detuvo solo porque la página dejó de mandarle órdenes.', 'err');
     } else if (/^BTN \d/.test(l)) {
@@ -492,6 +516,7 @@ async function cerrar() {
     clearInterval(S.saludo);
     S.cola.reiniciar();
     S.actuando = false;
+    S.enShow = false;
     detenerAudio();
     const { lector, escritor, puerto } = S;
     S.puerto = S.escritor = S.lector = null;
@@ -602,8 +627,52 @@ function actuar(conCancion, conBaile) {
     mensaje(conBaile ? 'Bailando…' : 'Cantando…');
 }
 
+// ---------- Show guardado en el robot ----------
+
+function pgmInfo(texto, tipo) {
+    const el = $('rb-pgm-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function guardarShow() {
+    if (S.estado !== 'listo') return pgmInfo('Conecta el robot primero.', 'err');
+    const { cmds, ms } = armar(true, true);
+    if (!ms) return pgmInfo('No hay nada que guardar: la canción y el baile están vacíos.', 'err');
+    const prog = programaParaRobot(cmds);
+    if (!prog.cabe) return pgmInfo(`Es demasiado largo para el robot (${prog.bytes} de ${PGM_MAX} bytes). Usa un pedazo más corto o una velocidad más alta.`, 'err');
+    const banderas = ($('rb-auto').checked ? 1 : 0) | (S.repetir ? 2 : 0);
+    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true };
+    S.actuando = false;
+    S.enShow = false;
+    S.guardarEn = 0;
+    pgmInfo(`Guardando en el robot (${prog.lineas.length} órdenes)… no lo desconectes.`);
+    const dur = (ms / 1000).toFixed(1);
+    S.cola.enviar(['MODE 4', 'PCLR'].concat(prog.lineas, ['PEND ' + banderas, fx, { l: 'SAVE', ex: true }]), () => {
+        pgmInfo(`Listo: el robot ya sabe hacer su show de ${dur} s sin la página`
+            + (banderas & 1 ? ' y lo hace solo 2,5 s después de encenderlo' : '')
+            + (banderas & 2 ? ', repitiéndolo' : '')
+            + '. Con el botón de la placa se elige o se corta.', 'ok');
+    });
+}
+
+function probarShow() {
+    if (S.estado !== 'listo') return pgmInfo('Conecta el robot primero.', 'err');
+    S.actuando = false;
+    S.enShow = true;
+    S.cola.enviar([{ l: 'MODE 5', ex: true }]);
+    pgmInfo('El robot hace su show guardado por su cuenta. Pulsa Paro para cortarlo.');
+}
+
+function borrarShow() {
+    if (S.estado !== 'listo') return pgmInfo('Conecta el robot primero.', 'err');
+    S.enShow = false;
+    S.cola.enviar([{ l: 'MODE 4', ex: true }, { l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }], () => pgmInfo('Show borrado del robot.', 'ok'));
+}
+
 function paro() {
     S.actuando = false;
+    S.enShow = false;
     detenerAudio();
     S.cola.abortar();
     progreso(0);
@@ -647,7 +716,7 @@ function tickLeds() {
         mensaje('El robot dejó de contestar. Si no reacciona, pulsa Desconectar y vuelve a conectar.', 'err');
         return;
     }
-    if (S.estado !== 'listo' || !S.vivo || S.actuando || !visible || S.cola.ocupado()) return;
+    if (S.estado !== 'listo' || !S.vivo || S.actuando || S.enShow || !visible || S.cola.ocupado()) return;
     if (S.sucio) {
         S.sucio = false;
         S.guardarEn = Date.now() + 2500;
@@ -696,6 +765,7 @@ function pintarTodo() {
     $('rb-efecto').value = S.efecto;
     $('rb-vivo').checked = S.vivo;
     $('rb-repetir').checked = S.repetir;
+    $('rb-auto').checked = S.arranca;
     $('rb-cancion').value = S.cancion;
     $('rb-baile').value = S.baile;
     $('rb-borrar').disabled = !S.cancion.startsWith('g:');
@@ -857,6 +927,10 @@ function iniciar() {
 
     $('rb-vivo').addEventListener('change', e => { S.vivo = e.target.checked; S.sucio = true; guardar(); });
     $('rb-repetir').addEventListener('change', e => { S.repetir = e.target.checked; guardar(); });
+    $('rb-auto').addEventListener('change', e => { S.arranca = e.target.checked; guardar(); });
+    $('rb-pgm-guardar').addEventListener('click', guardarShow);
+    $('rb-pgm-probar').addEventListener('click', probarShow);
+    $('rb-pgm-borrar').addEventListener('click', borrarShow);
 
     $('rb-cancion').addEventListener('change', e => {
         S.cancion = e.target.value;

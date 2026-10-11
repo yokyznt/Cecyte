@@ -234,6 +234,25 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(enviadas.length, 2);
 }
 
+// 16g) Show guardado en el robot: solo notas, esperas, motores y paro; con su tamaño en la EEPROM
+{
+    const { notas } = R.leerNotas('C4/4 D4/4');                     // 4 órdenes: T W T W
+    const { pasos } = R.leerBaile('AD/2 AT/2');
+    const { cmds } = R.compilar({ notas, pasos, bpm: 120, vel: 100, luz: () => 'ab'.repeat(36) });
+    const p = R.programaParaRobot(cmds);
+    assert(p.lineas.every(l => /^PADD (T \d+ \d+|W \d+|M -?\d+ -?\d+|S)$/.test(l)), 'solo órdenes del show');
+    assert(!p.lineas.some(l => l.startsWith('PADD LS')), 'las luces no van en el show');
+    const esperado = cmds.filter(c => /^[TWMS]( |$)/.test(c.l)).reduce((s, c) => s + { T: 5, W: 3, M: 3, S: 1 }[c.l[0]], 0);
+    assert.strictEqual(p.bytes, esperado);
+    assert.strictEqual(p.cabe, true);
+    // una canción larguísima no cabe y la página avisa antes de mandarla
+    const muchas = R.leerNotas('C5:100 '.repeat(400)).notas;          // 400 notas, cada una con su silencio: 3200 bytes
+    const grande = R.programaParaRobot(R.compilar({ notas: muchas }).cmds);
+    assert(grande.bytes > R.PGM_MAX && grande.cabe === false, 'bytes: ' + grande.bytes);
+    // lo mismo que acepta el firmware (velocidades pares, que se guardan a la mitad)
+    assert(p.lineas.every(l => !/^PADD M/.test(l) || l.split(' ').slice(2).every(n => Math.abs(Number(n)) <= R.VEL_MAX)));
+}
+
 // 16e) Cola: "sin novedad" solo cuenta mientras hay algo esperando respuesta
 {
     const cola = R.crearCola(() => {}, () => {});
@@ -273,9 +292,11 @@ for (const c of R.CANCIONES) {
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)
 {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    for (const cmd of ['PING', 'T', 'W', 'M', 'S', 'L', 'LS', 'FX', 'SAVE', 'MODE']) {
+    for (const cmd of ['PING', 'T', 'W', 'M', 'S', 'L', 'LS', 'FX', 'SAVE', 'PCLR', 'PADD', 'PEND', 'MODE']) {
         assert(ino.includes(`strcmp(cmd, "${cmd}")`), `el firmware no entiende ${cmd}`);
     }
+    assert(new RegExp(`PGM_MAX = ${R.PGM_MAX};`).test(ino), 'PGM_MAX distinto entre página y firmware');
+    for (const sub of ['"T"', '"W"', '"M"', '"S"']) assert(ino.includes(`strcmp(a, ${sub})`), `PADD no acepta ${sub}`);
     // los modos de efecto de la página coinciden con los que dibuja el firmware (0 a 4)
     assert.deepStrictEqual(Object.values(R.MODOS_FX).sort(), [0, 1, 2, 3, 4]);
     assert(/m < 0 \|\| m > 4/.test(ino), 'el firmware acepta FX 0 a 4');
