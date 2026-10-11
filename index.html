@@ -273,9 +273,6 @@
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
                         </button>
-                        <button type="button" role="tab" id="tab-robot-linea" data-section-tab="robot-linea" aria-controls="sec-robot-linea" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-route"/></svg><span>Línea</span>
-                        </button>
                         <button type="button" role="tab" id="tab-robot-show" data-section-tab="robot-show" aria-controls="sec-robot-show" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Show guardado</span>
                         </button>
@@ -646,6 +643,7 @@
                                     <span class="rb-bateria__linea"><b id="rb-bat-pct" class="rb-bateria__pct">--</b> <span id="rb-bat-v" class="rb-bateria__v"></span></span>
                                     <span class="rb-bateria__barra" role="progressbar" aria-label="Carga de la batería" aria-valuemin="0" aria-valuemax="100"><span id="rb-bat-fill" class="rb-bateria__relleno"></span></span>
                                     <span id="rb-bat-tiempo" class="rb-bateria__tiempo"></span>
+                                    <span id="rb-bat-carga" class="rb-bateria__tiempo"></span>
                                     <span id="rb-bat-aviso" class="rb-bateria__aviso" hidden></span>
                                 </div>
                                 <span id="rb-badge" class="badge badge--idle rb-badge-conectar" role="button" tabindex="0" title="Ir a Instalar para conectar el robot"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
@@ -846,7 +844,62 @@
                                         <div class="btn-row">
                                             <button type="button" id="rb-fn-iniciar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Iniciar la función</button>
                                         </div>
-                                        <p class="hint">Esquivar obstáculos y Seguir mi mano las hace el robot solo con su sensor: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
+                                        <p class="hint">Esquivar obstáculos, Seguir mi mano y Seguir la línea las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
+                                    </div>
+                                </div>
+                                <div id="rb-ln-panel" class="rb-ln-panel" hidden>
+                                    <p class="hint">Necesita el módulo <b>Me Line Follower</b> (dos sensores) en un puerto del Auriga. El robot avanza y corrige hacia el lado donde un sensor ve la línea. Los cambios se aplican en cuanto los haces, aunque ya esté andando.</p>
+    <div class="rb-card">
+                                        <h4 class="panel__sub">Sensor y línea</h4>
+                                        <div class="field"><label class="field__label" for="rb-ln-puerto">Puerto del módulo</label>
+                                            <select id="rb-ln-puerto" class="select">
+                                                <option value="6">Puerto 6</option>
+                                                <option value="7">Puerto 7</option>
+                                                <option value="8">Puerto 8</option>
+                                            </select>
+                                            <p class="hint">El 9 es el botón de la placa y el 10 lo usa el ultrasonido.</p></div>
+                                        <div class="field"><label class="field__label" for="rb-ln-color">Color de la línea</label>
+                                            <select id="rb-ln-color" class="select">
+                                                <option value="negra">Línea negra sobre fondo claro</option>
+                                                <option value="blanca">Línea blanca sobre fondo oscuro</option>
+                                            </select></div>
+                                    </div>
+                                    <div class="rb-card">
+                                        <h4 class="panel__sub">Movimiento</h4>
+                                        <div class="field"><label class="field__label" for="rb-ln-vel">Velocidad: <span id="rb-ln-vel-v"></span></label>
+                                            <input type="range" id="rb-ln-vel" min="40" max="150" step="5"></div>
+                                        <div class="field"><label class="field__label" for="rb-ln-giro">Fuerza de la corrección al girar: <span id="rb-ln-giro-v"></span></label>
+                                            <input type="range" id="rb-ln-giro" min="10" max="100" step="5">
+                                            <p class="hint">Más alta gira más fuerte (sirve en curvas cerradas); más baja es más suave.</p></div>
+                                    </div>
+                                    <div class="rb-card">
+                                        <h4 class="panel__sub">Qué hacer si…</h4>
+                                        <div class="field"><label class="field__label" for="rb-ln-perdida">Pierde la línea</label>
+                                            <select id="rb-ln-perdida" class="select">
+                                                <option value="buscar">Buscarla girando hacia el último lado</option>
+                                                <option value="parar">Pararse</option>
+                                                <option value="recto">Seguir recto</option>
+                                            </select></div>
+                                        <div class="field" id="rb-ln-buscar-campo"><label class="field__label" for="rb-ln-buscar">Buscar durante (ms)</label>
+                                            <input type="number" id="rb-ln-buscar" class="input" min="0" max="10000" step="100"></div>
+                                        <div class="field"><label class="field__label" for="rb-ln-cruce">Llega a un cruce (los dos sensores en la línea)</label>
+                                            <select id="rb-ln-cruce" class="select">
+                                                <option value="recto">Seguir recto</option>
+                                                <option value="parar">Pararse</option>
+                                                <option value="izquierda">Girar a la izquierda</option>
+                                                <option value="derecha">Girar a la derecha</option>
+                                            </select></div>
+                                    </div>
+                                    <div class="rb-card">
+                                        <h4 class="panel__sub">Seguridad y avisos</h4>
+                                        <div class="field"><label class="field__label" for="rb-ln-obst">Pararse si hay algo a menos de (cm, 0 = apagado)</label>
+                                            <input type="number" id="rb-ln-obst" class="input" min="0" max="200" step="1"></div>
+                                        <div class="field"><label class="field__label" for="rb-ln-dur">Detenerse solo después de (segundos, 0 = sin límite)</label>
+                                            <input type="number" id="rb-ln-dur" class="input" min="0" max="3600" step="5"></div>
+                                        <label class="rb-check"><input type="checkbox" id="rb-ln-avisos"><span>Luces de estado: verde en la línea, rojo si la perdió</span></label>
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-ln-reset" class="btn btn--secondary btn--sm">Restablecer los ajustes de la línea</button>
                                     </div>
                                 </div>
                             </div>
@@ -885,74 +938,6 @@
                                             </div>
                                             <p class="hint">Las luces se guardan en el robot: siguen igual (y en movimiento) aunque lo desconectes del USB, y vuelven solas al encenderlo.</p>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Seguidor de líneas (todavía desactivado) -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-linea" data-section="robot-linea" role="tabpanel" aria-label="Seguidor de líneas del robot" hidden>
-                            <div class="panel__body">
-                                <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Seguidor de líneas</h4>
-                                    <p id="rb-ln-aviso" class="msg msg--err">Todavía desactivado: puedes dejar todo listo, pero el robot no seguirá líneas hasta que se active.</p>
-                                    <p class="hint">Necesita el módulo <b>Me Line Follower</b> (dos sensores) en un puerto del Auriga. El robot avanza y corrige hacia el lado donde un sensor ve la línea.</p>
-                                </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Sensor y línea</h4>
-                                    <div class="field"><label class="field__label" for="rb-ln-puerto">Puerto del módulo</label>
-                                        <select id="rb-ln-puerto" class="select">
-                                            <option value="6">Puerto 6</option>
-                                            <option value="7">Puerto 7</option>
-                                            <option value="8">Puerto 8</option>
-                                        </select>
-                                        <p class="hint">El 9 es el botón de la placa y el 10 lo usa el ultrasonido.</p></div>
-                                    <div class="field"><label class="field__label" for="rb-ln-color">Color de la línea</label>
-                                        <select id="rb-ln-color" class="select">
-                                            <option value="negra">Línea negra sobre fondo claro</option>
-                                            <option value="blanca">Línea blanca sobre fondo oscuro</option>
-                                        </select></div>
-                                </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Movimiento</h4>
-                                    <div class="field"><label class="field__label" for="rb-ln-vel">Velocidad: <span id="rb-ln-vel-v"></span></label>
-                                        <input type="range" id="rb-ln-vel" min="40" max="150" step="5"></div>
-                                    <div class="field"><label class="field__label" for="rb-ln-giro">Fuerza de la corrección al girar: <span id="rb-ln-giro-v"></span></label>
-                                        <input type="range" id="rb-ln-giro" min="10" max="100" step="5">
-                                        <p class="hint">Más alta gira más fuerte (sirve en curvas cerradas); más baja es más suave.</p></div>
-                                </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Qué hacer si…</h4>
-                                    <div class="field"><label class="field__label" for="rb-ln-perdida">Pierde la línea</label>
-                                        <select id="rb-ln-perdida" class="select">
-                                            <option value="buscar">Buscarla girando hacia el último lado</option>
-                                            <option value="parar">Pararse</option>
-                                            <option value="recto">Seguir recto</option>
-                                        </select></div>
-                                    <div class="field" id="rb-ln-buscar-campo"><label class="field__label" for="rb-ln-buscar">Buscar durante (ms)</label>
-                                        <input type="number" id="rb-ln-buscar" class="input" min="0" max="10000" step="100"></div>
-                                    <div class="field"><label class="field__label" for="rb-ln-cruce">Llega a un cruce (los dos sensores en la línea)</label>
-                                        <select id="rb-ln-cruce" class="select">
-                                            <option value="recto">Seguir recto</option>
-                                            <option value="parar">Pararse</option>
-                                            <option value="izquierda">Girar a la izquierda</option>
-                                            <option value="derecha">Girar a la derecha</option>
-                                        </select></div>
-                                </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Seguridad y avisos</h4>
-                                    <div class="field"><label class="field__label" for="rb-ln-obst">Pararse si hay algo a menos de (cm, 0 = apagado)</label>
-                                        <input type="number" id="rb-ln-obst" class="input" min="0" max="200" step="1"></div>
-                                    <div class="field"><label class="field__label" for="rb-ln-dur">Detenerse solo después de (segundos, 0 = sin límite)</label>
-                                        <input type="number" id="rb-ln-dur" class="input" min="0" max="3600" step="5"></div>
-                                    <label class="rb-check"><input type="checkbox" id="rb-ln-avisos"><span>Luces de estado: verde en la línea, rojo si la perdió</span></label>
-                                </div>
-                                <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Órdenes que se le mandarían al robot</h4>
-                                    <pre id="rb-ln-ordenes" class="rb-codigo"></pre>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-ln-iniciar" class="btn btn--primary btn--sm" disabled>Iniciar seguidor</button>
-                                        <button type="button" id="rb-ln-reset" class="btn btn--secondary btn--sm">Restablecer ajustes</button>
                                     </div>
                                 </div>
                             </div>
@@ -1016,6 +1001,9 @@
                                                     <option value="alcalina">Alcalinas desechables</option>
                                                     <option value="mixta">No sé / mezcladas</option>
                                                 </select></div>
+                                            <div class="field"><label class="field__label" for="rb-bat-carga-ma">Corriente de tu cargador (mA)</label>
+                                                <input type="number" id="rb-bat-carga-ma" class="input" min="100" max="3000" step="50">
+                                                <p class="hint">Sirve para estimar en cuánto tiempo vuelven al 100 %. Está en la etiqueta del cargador; 500 mA es lo común en los lentos.</p></div>
                                             <div class="field"><label class="field__label" for="rb-bat-cap">Capacidad de cada pila (mAh)</label>
                                                 <input type="number" id="rb-bat-cap" class="input" min="500" max="10000" step="100"></div>
                                         </div>

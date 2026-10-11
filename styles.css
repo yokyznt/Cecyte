@@ -975,6 +975,9 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-fn b { font-size: var(--fs-sm); }
 .rb-fn small { font-size: var(--fs-cap); color: var(--ink-2); }
 .rb-fn em { font-style: normal; font-weight: 700; color: var(--green-800); }
+.rb-ln-panel { grid-column: 1 / -1; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.rb-ln-panel[hidden] { display: none; }
+.rb-ln-panel > .hint, .rb-ln-panel > .btn-row { grid-column: 1 / -1; }
 
 @media print {
     .site-header, .site-footer, .notify, .toasts, .intro .group-pick, .agenda { display: none !important; }

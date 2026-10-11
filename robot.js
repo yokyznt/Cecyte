@@ -195,7 +195,7 @@ function crearCola(escribir, crudo) {
             if (abortando || !vuelo.length) return false;
             ultimoMov = Date.now();
             const e = vuelo.shift();
-            const reintentar = !!err && !e.c.reint && /^(FX|SAVE|MODE|LS|L|S|VOL)( |$)/.test(e.c.l);
+            const reintentar = !!err && !e.c.reint && /^(FX|SAVE|MODE|LS|L|S|VOL|LINEA)( |$)/.test(e.c.l);
             if (reintentar) pend.unshift(Object.assign({}, e.c, { reint: 1 }));
             bombear();
             return reintentar;
@@ -340,6 +340,7 @@ const FUNCIONES = [
     { id: 'avanzar', v: ['tanque', 'raptor', 'pajaro'], nombre: 'Seguir avanzando', desc: 'Avanza en línea recta sin parar hasta que pulses Paro.', pasos: 'AD 4' },
     { id: 'esquivar', v: ['tanque', 'raptor'], nombre: 'Esquivar obstáculos', desc: 'Avanza solo; si algo está a menos de 20 cm, retrocede y gira hacia un lado al azar. Usa su sensor ultrasónico.', modo: 1 },
     { id: 'mano', v: ['tanque', 'raptor'], nombre: 'Seguir mi mano', desc: 'Se acerca si tu mano está entre 12 y 40 cm, retrocede si la pones a menos de 8 cm y se queda quieto si no hay nada.', modo: 2 },
+    { id: 'linea', v: ['tanque', 'raptor'], nombre: 'Seguir la línea', desc: 'Sigue una línea negra (o blanca) en el piso con el módulo Me Line Follower; sus ajustes salen más abajo.', modo: 6, linea: true },
     { id: 'cuadrado', v: ['tanque', 'raptor'], nombre: 'Patrulla cuadrada', desc: 'Avanza, gira 90° y repite: recorre un cuadrado una y otra vez.', pasos: 'AD 1.5 GD 90°' },
     { id: 'idavuelta', v: ['tanque'], nombre: 'Ida y vuelta', desc: 'Avanza 2 s, para, retrocede 2 s y vuelve a empezar, como un guardia en su pasillo.', pasos: 'AD 2 PA 0.5 AT 2 PA 0.5' },
     { id: 'vigilante', v: ['tanque'], nombre: 'Vigilante', desc: 'Sin moverse del sitio, barre a un lado y al otro con pausas, como mirando que todo esté bien.', pasos: 'GI 45° PA 1 GD 90° PA 1 GI 45° PA 1' },
@@ -773,6 +774,14 @@ function tiempoRestante({ pct, capacidadMah = 2000, historial = [], uso = 'repos
     return { minutos: Math.round(restanteMah / ma * 60), fuente: 'estimado' };
 }
 
+// Minutos para volver al 100 % con un cargador de corrienteMa. Las NiMH necesitan ~140 % de su capacidad
+// (parte se va en calor). Las alcalinas no se recargan: null. Con pct = 100 da 0.
+function tiempoCarga({ pct, capacidadMah = 2000, corrienteMa = 500, quimica = 'nimh' }) {
+    if (quimica === 'alcalina' || pct === null || pct === undefined || !(pct >= 0) || !(corrienteMa > 0)) return null;
+    const faltante = capacidadMah * (100 - Math.min(pct, 100)) / 100;
+    return Math.round(faltante * 1.4 / corrienteMa * 60);
+}
+
 function formatoDuracion(min) {
     if (!(min >= 0)) return '';
     if (min < 1) return 'menos de 1 min';
@@ -782,10 +791,10 @@ function formatoDuracion(min) {
     return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-// ---------- Seguidor de líneas (todavía desactivado) ----------
+// ---------- Seguidor de líneas (la función «Seguir la línea») ----------
 // Con el módulo Me Line Follower (dos sensores). Puertos con dos pines digitales: 6, 7 y 8; el 9 es el
-// botón de la placa y el 10 lo usa el ultrasonido.
-const SEGUIDOR_ACTIVO = false;
+// botón de la placa y el 10 lo usa el ultrasonido. El programa del robot lo trae como modo 6.
+const SEGUIDOR_ACTIVO = true;
 const LINEA_DEFECTO = { puerto: 6, color: 'negra', velocidad: 80, giro: 50, perdida: 'buscar', buscarMs: 1500, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
 const LINEA_PERDIDA = { parar: 0, buscar: 1, recto: 2 };
 const LINEA_CRUCE = { recto: 0, parar: 1, izquierda: 2, derecha: 3 };
@@ -829,7 +838,7 @@ const lib = {
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
-    porcentajeBateria, tiempoRestante, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
+    porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
     lineaNormaliza, lineaAOrdenes, LINEA_DEFECTO, SEGUIDOR_ACTIVO,
 };
 
@@ -889,6 +898,7 @@ function cargar() {
     S.bateria = {
         quimica: b.quimica in CURVAS_BATERIA ? b.quimica : 'nimh',
         capacidad: clamp(Math.round(Number(b.capacidad) || CAPACIDAD_DEFECTO.nimh), 500, 10000),
+        cargador: clamp(Math.round(Number(b.cargador) || 500), 100, 3000),     // mA del cargador (para el tiempo de carga)
         hist: (Array.isArray(b.hist) ? b.hist : []).filter(p => Array.isArray(p) && p.length === 2 && p[0] > 0 && p[1] > 0).slice(-200),
     };
     S.linea = lineaNormaliza(S.linea);
@@ -933,7 +943,6 @@ function ponEstado(est) {
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
-    if ($('rb-ln-iniciar')) $('rb-ln-iniciar').disabled = !SEGUIDOR_ACTIVO || est !== 'listo';
     if (est === 'sinprograma') {
         $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1001,6 +1010,7 @@ function mostrarBateria(v) {
         $('rb-bat-v').textContent = 'solo USB';
         $('rb-bat-fill').style.transform = 'scaleX(0)';
         $('rb-bat-tiempo').textContent = '';
+        $('rb-bat-carga').textContent = '';
         $('rb-bat-aviso').hidden = true;
         el.title = 'El robot no está viendo las pilas: está alimentado solo por el USB, o el interruptor está apagado.';
         return;
@@ -1016,6 +1026,9 @@ function mostrarBateria(v) {
     $('rb-bat-fill').style.transform = `scaleX(${pct / 100})`;
     el.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
     $('rb-bat-tiempo').textContent = t ? `≈ ${formatoDuracion(t.minutos)} de uso (${t.fuente})` : '';
+    const carga = tiempoCarga({ pct, capacidadMah: b.capacidad, corrienteMa: b.cargador, quimica: b.quimica });
+    $('rb-bat-carga').textContent = carga === null ? '' : carga < 1 ? 'Cargada al 100 %'
+        : `≈ ${formatoDuracion(carga)} en cargar al 100 % (cargador de ${b.cargador} mA)`;
     el.title = `${v.toFixed(2)} V, pilas ${NOMBRE_PILAS[b.quimica]} de ${b.capacidad} mAh`;
     // el aviso va en el propio medidor (no en un mensaje suelto)
     const aviso = $('rb-bat-aviso');
@@ -1220,6 +1233,11 @@ function actuar(conCancion, conBaile) {
 // mano las hace el propio robot con su sensor (modos 1 y 2), y entonces la música suena en la página
 // porque el robot no puede mirar el sensor mientras toca una nota.
 
+// Los ajustes de la línea tal como van al robot: sin luces de estado si la función va "sin luces".
+function lineaEnRobot() {
+    return Object.assign({}, S.linea, { avisos: S.linea.avisos && S.funLuces });
+}
+
 function funcionActual() {
     return FUNCIONES.find(f => f.id === S.funcion && f.v.includes(S.variante)) || null;
 }
@@ -1264,7 +1282,13 @@ function iniciarFuncion(reinicio) {
         S.corriendoFuncion = true;
         S.autonomo = f.modo;
         S.ultimaActividad = Date.now();
-        S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+        if (f.linea) {
+            // el robot pinta verde/rojo según la línea: las luces de la pantalla se dejan antes, en fijo y sin brillo
+            const luz = S.funLuces && S.linea.avisos ? fxLinea('fijo', 0, coloresBase(), 100) : lineaLuces();
+            S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(lineaEnRobot()), [{ l: luz, ex: true }, 'VOL ' + S.vol, { l: 'MODE 6', ex: true }]));
+        } else {
+            S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+        }
         if (S.funMusica) escucharAqui();
         return mensaje(`${f.nombre}: lo hace el robot solo con su sensor. Pulsa Paro para detenerlo.`, 'ok');
     }
@@ -1316,6 +1340,7 @@ function pintarFunciones() {
     $('rb-fn-vel').disabled = $('rb-fn-giro').disabled = !!(f && f.modo);   // esas usan su propia velocidad
     const op = $('rb-cancion').selectedOptions[0];
     $('rb-fn-cancion').textContent = op ? op.textContent : '';
+    $('rb-ln-panel').hidden = !(f && f.linea);
 }
 
 // ---------- Show guardado en el robot ----------
@@ -1879,9 +1904,6 @@ function pintarLinea() {
     $('rb-ln-obst').value = c.obstaculoCm;
     $('rb-ln-dur').value = c.duracionS;
     $('rb-ln-avisos').checked = c.avisos;
-    $('rb-ln-ordenes').textContent = lineaAOrdenes(c).join('\n');
-    $('rb-ln-iniciar').disabled = !SEGUIDOR_ACTIVO || S.estado !== 'listo';
-    $('rb-ln-aviso').hidden = SEGUIDOR_ACTIVO;
 }
 
 function cambioLinea() {
@@ -1894,15 +1916,9 @@ function cambioLinea() {
     });
     pintarLinea();
     guardar();
-}
-
-function iniciarLinea() {
-    if (!SEGUIDOR_ACTIVO) return mensaje('El seguidor de líneas todavía está desactivado.', 'err');
-    if (S.estado !== 'listo') return mensaje('Conecta el robot primero.', 'err');
-    S.actuando = false;
-    S.ultimaActividad = Date.now();
-    S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(S.linea), [{ l: 'MODE 6', ex: true }]));
-    mensaje('Siguiendo la línea… pulsa Paro para detenerlo.');
+    if (S.corriendoFuncion && S.autonomo === 6 && S.estado === 'listo' && !S.cola.ocupado()) {
+        S.cola.enviar(lineaAOrdenes(lineaEnRobot()));          // el robot lee estos valores en cada vuelta
+    }
 }
 
 // ---------- Barra fija: parar y reproducir lo que haya en la sección que se ve ----------
@@ -1910,7 +1926,7 @@ function iniciarLinea() {
 const QUE_REPRODUCE = {
     'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-funciones': 'la función elegida',
     'robot-luces': 'las luces',
-    'robot-linea': 'el seguidor de líneas (desactivado)', 'robot-show': 'el show guardado', 'robot-instalar': 'nada en esta sección',
+    'robot-show': 'el show guardado', 'robot-instalar': 'nada en esta sección',
 };
 
 function seccionRobotActual() {
@@ -1932,7 +1948,6 @@ function reproducirGeneral() {
     if (sec === 'robot-baile') return listo ? actuar(true, true) : escucharAqui();
     if (sec === 'robot-funciones') return iniciarFuncion();
     if (sec === 'robot-show') return probarShow();
-    if (sec === 'robot-linea') return iniciarLinea();
     if (sec === 'robot-luces') {
         if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
         S.guardarEn = Date.now() + 2500;
@@ -1964,11 +1979,17 @@ function iniciarLineaYBateria() {
     for (const id of ['rb-ln-vel', 'rb-ln-giro']) $(id).addEventListener('input', cambioLinea);
     $('rb-ln-avisos').addEventListener('change', cambioLinea);
     $('rb-ln-reset').addEventListener('click', () => { S.linea = lineaNormaliza(null); pintarLinea(); guardar(); });
-    $('rb-ln-iniciar').addEventListener('click', iniciarLinea);
 
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto
     $('rb-bat-quim').value = S.bateria.quimica;
     $('rb-bat-cap').value = S.bateria.capacidad;
+    $('rb-bat-carga-ma').value = S.bateria.cargador;
+    $('rb-bat-carga-ma').addEventListener('change', e => {
+        S.bateria.cargador = clamp(Math.round(Number(e.target.value) || 500), 100, 3000);
+        e.target.value = S.bateria.cargador;
+        guardar();
+        if (S.ultimoVolt !== null) mostrarBateria(S.ultimoVolt);
+    });
     $('rb-bat-quim').addEventListener('change', e => {
         S.bateria.quimica = e.target.value in CURVAS_BATERIA ? e.target.value : 'nimh';
         S.bateria.capacidad = CAPACIDAD_DEFECTO[S.bateria.quimica];

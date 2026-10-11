@@ -482,7 +482,7 @@ for (const c of R.CANCIONES) {
 
 // 21) Seguidor de líneas: ajustes saneados y órdenes para el robot (todavía desactivado)
 {
-    assert.strictEqual(R.SEGUIDOR_ACTIVO, false, 'el seguidor sigue desactivado por pedido del usuario');
+    assert.strictEqual(R.SEGUIDOR_ACTIVO, true, 'el seguidor está activo: es la función «Seguir la línea»');
     const d = R.lineaNormaliza(null);
     assert.deepStrictEqual(d, R.lineaNormaliza(R.LINEA_DEFECTO));
     // valores raros se acotan o vuelven al de fábrica
@@ -505,7 +505,10 @@ for (const c of R.CANCIONES) {
 
     // firmware: el modo 6 existe pero va apagado (el binario subido no cambia) y acepta las mismas claves
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(/#define SEGUIDOR_LINEA 0\b/.test(ino), 'SEGUIDOR_LINEA debe quedar en 0 hasta activarlo');
+    assert(/#define SEGUIDOR_LINEA 1\b/.test(ino), 'el firmware lleva el seguidor (modo 6)');
+    // sin MeAuriga.h: esa librería enlaza Wire, Servo, IR y encoders y el programa no cabe en 16 KB con el seguidor
+    assert(!/#include\s*<Me\w+\.h>/.test(ino), 'el firmware no debe incluir la librería Makeblock');
+    assert(/void ledsMuestra\(\)/.test(ino) && /PORTL/.test(ino), 'driver propio del anillo de LEDs');
     assert(/strcmp\(cmd, "LINEA"\)/.test(ino) && /void seguirLinea\(\)/.test(ino));
     for (const clave of o.map(l => l.split(' ')[1])) assert(ino.includes(`"${clave}"`), 'el firmware no entiende LINEA ' + clave);
 }
@@ -537,7 +540,7 @@ for (const c of R.CANCIONES) {
     for (const f of R.FUNCIONES) {
         assert(f.v.length && f.v.every(v => ids.includes(v)), f.id + ': modelo desconocido');
         assert(f.nombre && f.desc, f.id);
-        if (f.modo) assert([1, 2].includes(f.modo), f.id + ': modos 1 (esquivar) y 2 (seguir) del robot');
+        if (f.modo) assert([1, 2, 6].includes(f.modo), f.id + ': modos 1 (esquivar), 2 (seguir) y 6 (línea) del robot');
         else {
             assert(R.pasosDeFuncion(f.pasos).length > 0, f.id + ': sin pasos');
             // todo el texto de pasos es "MOV número[°]": nada se pierde en silencio
@@ -579,6 +582,23 @@ for (const c of R.CANCIONES) {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/case 1: esquivar\(\);/.test(ino) && /case 2: seguir\(\);/.test(ino), 'modos 1 y 2 del robot');
     assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_MAX/.test(ino));
+}
+
+// 24) Línea dentro de Funciones y tiempo de carga de las pilas
+{
+    const f = R.FUNCIONES.find(x => x.id === 'linea');
+    assert(f && f.modo === 6 && f.linea && f.v.includes('tanque') && f.v.includes('raptor'), 'Seguir la línea es una función (modo 6)');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!html.includes('data-section="robot-linea"'), 'ya no hay sección Línea aparte');
+    assert(html.includes('id="rb-ln-panel"') && html.indexOf('id="rb-ln-panel"') > html.indexOf('id="sec-robot-funciones"')
+        && html.indexOf('id="rb-ln-panel"') < html.indexOf('id="sec-robot-luces"'), 'los ajustes de la línea viven en Funciones');
+    // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
+    assert.strictEqual(R.tiempoCarga({ pct: 50, capacidadMah: 2000, corrienteMa: 500, quimica: 'nimh' }), 168);
+    assert.strictEqual(R.tiempoCarga({ pct: 100, capacidadMah: 2000, corrienteMa: 500 }), 0);
+    assert.strictEqual(R.tiempoCarga({ pct: 0, capacidadMah: 2000, corrienteMa: 1000 }), 168);
+    assert.strictEqual(R.tiempoCarga({ pct: 50, quimica: 'alcalina' }), null, 'las alcalinas no se recargan');
+    assert.strictEqual(R.tiempoCarga({ pct: null }), null);
+    assert.strictEqual(R.tiempoCarga({ pct: 50, corrienteMa: 0 }), null);
 }
 
 console.log('robot.test.js: todo bien');
