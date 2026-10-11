@@ -59,14 +59,15 @@ function leerNotas(texto) {
 }
 
 // Movimientos: [rueda izquierda, rueda derecha] en múltiplos de la velocidad (positivo = adelante)
-const MOVIMIENTOS = { AD: [1, 1], AT: [-1, -1], GI: [-1, 1], GD: [1, -1], PA: [0, 0] };
+// CI / CD: avanzar en curva (la rueda de ese lado va al 40 %); sirven para círculos y eses.
+const MOVIMIENTOS = { AD: [1, 1], AT: [-1, -1], GI: [-1, 1], GD: [1, -1], PA: [0, 0], CI: [0.4, 1], CD: [1, 0.4] };
 
 // "AD/2 GI/4 PA/4": adelante, atrás, gira izquierda, gira derecha, parar. Misma duración que las notas.
 function leerBaile(texto) {
     const pasos = [], errores = [];
     let denom = 4, punto = false;
     for (const tok of palabras(texto)) {
-        const m = /^(AD|AT|GI|GD|PA)(?:\/(\d+)(\.?))?$/i.exec(tok);
+        const m = /^(AD|AT|GI|GD|PA|CI|CD)(?:\/(\d+)(\.?))?$/i.exec(tok);
         if (!m) { errores.push(tok); continue; }
         if (m[2] !== undefined) {
             const d = Number(m[2]);
@@ -82,8 +83,9 @@ function leerBaile(texto) {
 
 // Junta canción y baile en una sola lista de órdenes en orden de tiempo.
 //   luz(i, hz) -> texto de 72 hex (los 12 LEDs) o null; se manda al empezar cada nota.
+//   continuo: no termina con S (parar), para que una repetición siga de corrido sin frenar entre vueltas.
 // Devuelve { cmds: [{ l, ms, ex }], ms }. ex = orden de LEDs (va sola, sin nada detrás hasta su OK).
-function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null }) {
+function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, continuo = false }) {
     const beatMs = 60000 / clamp(Number(bpm) || 120, 30, 300);
     const v = clamp(Math.round(Number(vel) || 0), 0, VEL_MAX);
     const R = Math.round;
@@ -136,14 +138,14 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null }) 
         if (d && d.mov !== movPrev) {
             movPrev = d.mov;
             const [l, r] = MOVIMIENTOS[d.mov];
-            cmds.push({ l: `M ${l * v} ${r * v}`, ms: 0 });
+            cmds.push({ l: `M ${R(l * v)} ${R(r * v)}`, ms: 0 });
         }
         for (let resta = b - a; resta > 0; resta -= MAX_ORDEN_MS) {
             const ms = Math.min(resta, MAX_ORDEN_MS);
             cmds.push(s && s.hz > 0 ? { l: `T ${s.hz} ${ms}`, ms } : { l: `W ${ms}`, ms });
         }
     }
-    if (baile.length) cmds.push({ l: 'S', ms: 0 });
+    if (baile.length && !continuo) cmds.push({ l: 'S', ms: 0 });
     return { cmds, ms: total };
 }
 
@@ -322,6 +324,53 @@ const BAILES = [
     { id: 'cucaracha', nombre: 'Cucaracha', texto: 'AD/4 PA/4 AT/4 PA/4 GI/2 GD/2' },
     { id: 'quieto', nombre: 'Solo luces (sin moverse)', texto: '' },
 ];
+
+// ---------- Funciones por modelo ----------
+// Los tres modelos del kit mBot Ranger llevan la misma placa (Me Auriga con giroscopio, luz y sonido, y
+// los módulos de ultrasonido y de línea), así que se programan igual; cambia lo que luce en cada uno.
+// pasos: "movimiento segundos", o "GI 90°" con grados (se calibra con giro90, lo que tarda en girar 90°).
+// modo: la hace el propio robot con su sensor ultrasónico (modos 1 y 2 de su programa, sin la página).
+const VARIANTES = [
+    { id: 'tanque', nombre: 'Land Raider (tanque)', nota: 'Orugas: tiene mucha fuerza y gira sobre su propio eje, pero es lento.' },
+    { id: 'raptor', nombre: 'Dashing Raptor (carro de carreras)', nota: 'Tres ruedas: es el más rápido; luce más en curvas abiertas que girando en su sitio.' },
+    { id: 'pajaro', nombre: 'Nervous Bird (autoequilibrado)', nota: 'Se mantiene en pie con el giroscopio de la placa. El programa que hoy lleva el robot no incluye ese equilibrio: aquí solo hay movimientos suaves, para probarlos con el robot sujeto o con la velocidad baja.' },
+];
+
+const FUNCIONES = [
+    { id: 'avanzar', v: ['tanque', 'raptor', 'pajaro'], nombre: 'Seguir avanzando', desc: 'Avanza en línea recta sin parar hasta que pulses Paro.', pasos: 'AD 4' },
+    { id: 'esquivar', v: ['tanque', 'raptor'], nombre: 'Esquivar obstáculos', desc: 'Avanza solo; si algo está a menos de 20 cm, retrocede y gira hacia un lado al azar. Usa su sensor ultrasónico.', modo: 1 },
+    { id: 'mano', v: ['tanque', 'raptor'], nombre: 'Seguir mi mano', desc: 'Se acerca si tu mano está entre 12 y 40 cm, retrocede si la pones a menos de 8 cm y se queda quieto si no hay nada.', modo: 2 },
+    { id: 'cuadrado', v: ['tanque', 'raptor'], nombre: 'Patrulla cuadrada', desc: 'Avanza, gira 90° y repite: recorre un cuadrado una y otra vez.', pasos: 'AD 1.5 GD 90°' },
+    { id: 'idavuelta', v: ['tanque'], nombre: 'Ida y vuelta', desc: 'Avanza 2 s, para, retrocede 2 s y vuelve a empezar, como un guardia en su pasillo.', pasos: 'AD 2 PA 0.5 AT 2 PA 0.5' },
+    { id: 'vigilante', v: ['tanque'], nombre: 'Vigilante', desc: 'Sin moverse del sitio, barre a un lado y al otro con pausas, como mirando que todo esté bien.', pasos: 'GI 45° PA 1 GD 90° PA 1 GI 45° PA 1' },
+    { id: 'trompo', v: ['tanque'], nombre: 'Trompo', desc: 'Gira sobre su propio eje, 3 s para cada lado, sin parar.', pasos: 'GI 3 GD 3' },
+    { id: 'zigzag', v: ['tanque', 'raptor'], nombre: 'Zigzag', desc: 'Avanza haciendo eses, una curva a la izquierda y otra a la derecha.', pasos: 'CI 1 CD 1' },
+    { id: 'arrancon', v: ['raptor'], nombre: 'Arrancón y vuelta', desc: 'Acelera en recta, da la vuelta en U, regresa y vuelve a dar la vuelta.', pasos: 'AD 2 PA 0.5 GD 180° AD 2 PA 0.5 GI 180°' },
+    { id: 'circulos', v: ['raptor'], nombre: 'Círculos', desc: 'Da vueltas en círculo hacia la izquierda. Si no cierra bien, ajusta la velocidad.', pasos: 'CI 8' },
+    { id: 'ocho', v: ['raptor'], nombre: 'Ocho', desc: 'Un círculo a la izquierda y otro a la derecha, dibujando un ocho.', pasos: 'CI 5 CD 5' },
+    { id: 'slalom', v: ['raptor'], nombre: 'Slalom', desc: 'Curvas cortas alternadas con un tramo recto, como esquivando conos.', pasos: 'CI 0.6 CD 1.2 CI 0.6' },
+    { id: 'derrape', v: ['raptor'], nombre: 'Derrape', desc: 'Avanza un momento y da un giro completo en su sitio, a toda velocidad.', pasos: 'AD 1 GI 360° PA 0.5' },
+    { id: 'picoteo', v: ['pajaro'], nombre: 'Pajarito nervioso', desc: 'Pasitos cortos hacia delante y hacia atrás, como si picoteara.', pasos: 'AD 0.15 AT 0.15 AD 0.15 AT 0.15 AD 0.15 AT 0.15 PA 1.2' },
+    { id: 'paso', v: ['pajaro'], nombre: 'Paso de pájaro', desc: 'Da un pasito, se queda quieto un rato y vuelve a dar otro.', pasos: 'AD 0.8 PA 1.5' },
+    { id: 'mirada', v: ['pajaro'], nombre: 'Mirar a los lados', desc: 'Gira un poco a un lado, luego al otro y regresa al centro.', pasos: 'GI 20° PA 0.8 GD 40° PA 0.8 GI 20° PA 1.2' },
+];
+
+// Pasos de una función ya en tiempos del bpm dado (para que compilar() los pueda mezclar con una canción)
+// y repetidos hasta cubrir al menos minS segundos, así la página no tiene que reiniciarlos a cada rato.
+function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30) {
+    const base = [];
+    for (const m of String(texto).matchAll(/\b(AD|AT|GI|GD|PA|CI|CD)\s+(\d+(?:\.\d+)?)(°?)/g)) {
+        const n = Number(m[2]);
+        base.push({ mov: m[1], s: m[3] ? n / 90 * giro90 / 1000 : n });
+    }
+    const ciclo = base.reduce((a, p) => a + p.s, 0);
+    if (!(ciclo > 0)) return [];
+    const veces = Math.min(200, Math.max(1, Math.ceil(minS / ciclo)));
+    const porSegundo = bpm / 60;
+    const pasos = [];
+    for (let i = 0; i < veces; i++) for (const p of base) pasos.push({ mov: p.mov, beats: p.s * porSegundo });
+    return pasos;
+}
 
 const EFECTOS = [
     ['fijo', 'Colores fijos'], ['arcoiris', 'Arcoíris giratorio'], ['respirar', 'Respirar'],
@@ -776,7 +825,7 @@ function lineaAOrdenes(cfg) {
 
 const lib = {
     BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
-    PGM_MAX,
+    PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
@@ -808,6 +857,11 @@ const S = {
     enShow: false,            // el robot está haciendo su show guardado: no hay que mandarle nada
     arranca: false,           // "que empiece solo al encenderlo"
     rec: '',                // última grabación del teclado (texto de notas)
+    variante: 'tanque', funcion: '',                 // modelo del robot y función elegida ('' = ninguna)
+    funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
+    corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
+    autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
+    salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
     linea: Object.assign({}, LINEA_DEFECTO),                   // seguidor de líneas (todavía desactivado)
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
@@ -818,8 +872,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90 } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90 }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -849,6 +903,14 @@ function cargar() {
         S.bpm = c.bpm;
     }
     if (S.pasos === null || S.pasos === undefined) S.pasos = (BAILES.find(b => b.id === S.baile) || BAILES[0]).texto;
+    if (!VARIANTES.some(v => v.id === S.variante)) S.variante = VARIANTES[0].id;
+    const f = FUNCIONES.find(x => x.id === S.funcion);
+    if (!f || !f.v.includes(S.variante)) S.funcion = '';
+    if (S.funcion) { S.baile = 'quieto'; S.pasos = ''; }    // con una función puesta no hay baile
+    S.funLuces = S.funLuces !== false;
+    S.funMusica = S.funMusica === true;
+    S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
+    S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
 }
 
 function mensaje(texto, tipo) {
@@ -870,7 +932,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
     if ($('rb-ln-iniciar')) $('rb-ln-iniciar').disabled = !SEGUIDOR_ACTIVO || est !== 'listo';
     if (est === 'sinprograma') {
         $('rb-instalar').open = true;
@@ -913,6 +975,7 @@ function alLinea(l) {
         S.vioArranque = true;   // el programa viejo (tanquecito): no habla con la página
     } else if (l === 'ABORTED') {
         S.cola.abortado();
+        if (S.salirModo) { S.salirModo = false; crudo('MODE 4\n'); }   // "!" para y ya, pero esquivar/seguir seguirían: se le quita el modo
     } else if (/^SHOW fin/.test(l)) {
         if (S.enShow) mensaje('El show guardado terminó.', 'ok');
         S.enShow = false;
@@ -944,7 +1007,7 @@ function mostrarBateria(v) {
     }
     const b = S.bateria;
     const pct = porcentajeBateria(v, b.quimica);
-    const uso = S.enShow ? 'motores' : S.actuando ? (S.actuando.conBaile ? 'motores' : 'musica') : 'reposo';
+    const uso = S.enShow || S.autonomo ? 'motores' : S.actuando ? (S.actuando.conBaile ? 'motores' : 'musica') : 'reposo';
     const t = tiempoRestante({ pct, capacidadMah: b.capacidad, historial: b.hist, uso, quimica: b.quimica });
     const nivel = pct <= 10 ? 'critica' : pct <= 20 ? 'baja' : 'ok';
     el.dataset.nivel = nivel;
@@ -1107,6 +1170,12 @@ function escucharAqui() {
 
 function coloresBase() { return S.leds.map(hexARgb); }
 
+// La línea FX que toca ahora: las luces de la pantalla, o apagadas si una función en marcha las desactivó.
+function lineaLuces() {
+    if (S.corriendoFuncion && !S.funLuces) return fxLinea('fijo', 0, coloresBase(), 100);
+    return fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx);
+}
+
 // Devuelve { cmds, ms } con la canción y/o el baile que haya en pantalla
 function armar(conCancion, conBaile) {
     const n = leerNotas(S.notas), b = leerBaile(S.pasos);
@@ -1127,6 +1196,8 @@ function actuar(conCancion, conBaile) {
     if (S.estado !== 'listo') return mensaje('Conecta el robot primero.', 'err');
     const { cmds, ms } = armar(conCancion, conBaile);
     if (!ms) return mensaje('No hay nada que tocar: la canción y el baile están vacíos.', 'err');
+    S.corriendoFuncion = false;
+    S.autonomo = 0;
     S.actuando = { conCancion, conBaile };
     S.ultimaActividad = Date.now();
     S.inicio = performance.now();
@@ -1141,6 +1212,110 @@ function actuar(conCancion, conBaile) {
         mensaje('Listo.', 'ok');
     });
     mensaje(conBaile ? 'Bailando…' : 'Cantando…');
+}
+
+// ---------- Funciones por modelo ----------
+// Una función es un comportamiento que corre hasta pulsar Paro. Las de movimiento las arma la página
+// (pasos repetidos, con la canción encima si la casilla de música está marcada); esquivar y seguir la
+// mano las hace el propio robot con su sensor (modos 1 y 2), y entonces la música suena en la página
+// porque el robot no puede mirar el sensor mientras toca una nota.
+
+function funcionActual() {
+    return FUNCIONES.find(f => f.id === S.funcion && f.v.includes(S.variante)) || null;
+}
+
+function armarFuncion(f) {
+    const n = leerNotas(S.notas);
+    mostrarErrores(n.errores, leerBaile(S.pasos).errores);
+    return compilar({
+        notas: S.funMusica ? n.notas : [],
+        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm),
+        bpm: S.bpm, vel: S.vel, continuo: true,
+    });
+}
+
+// seguido: una vuelta más de lo mismo; no repite el MODE 4 ni las luces para que no se note el empalme.
+function lanzarFuncion(f, seguido) {
+    const { cmds, ms } = armarFuncion(f);
+    if (!ms) { S.corriendoFuncion = false; return mensaje('Esa función no tiene pasos.', 'err'); }
+    S.actuando = { fn: true, conBaile: true };
+    S.corriendoFuncion = true;
+    S.ultimaActividad = Date.now();
+    S.inicio = performance.now();
+    S.total = ms;
+    const previo = seguido ? [] : ['MODE 4', { l: lineaLuces(), ex: true }, 'VOL ' + S.vol];
+    S.cola.enviar(previo.concat(cmds), () => {
+        if (S.actuando && S.actuando.fn) lanzarFuncion(f, true);
+    });
+}
+
+// reinicio: lo llama esperarYTocar() tras un cambio en vivo; no hay que parar nada antes.
+function iniciarFuncion(reinicio) {
+    const f = funcionActual();
+    if (!f) return mensaje('Elige una función primero.', 'err');
+    if (S.estado !== 'listo') return mensaje('Conecta el robot primero.', 'err');
+    if (!reinicio && (S.actuando || S.enShow || S.corriendoFuncion)) {   // primero se corta lo que esté haciendo
+        paro();
+        return esperarYTocar({ fn: true });
+    }
+    S.guardarEn = 0;                       // unas luces apagadas por la función no se guardan en el robot
+    if (f.modo) {
+        S.actuando = false;
+        S.corriendoFuncion = true;
+        S.autonomo = f.modo;
+        S.ultimaActividad = Date.now();
+        S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+        if (S.funMusica) escucharAqui();
+        return mensaje(`${f.nombre}: lo hace el robot solo con su sensor. Pulsa Paro para detenerlo.`, 'ok');
+    }
+    S.autonomo = 0;
+    lanzarFuncion(f, false);
+    mensaje(`${f.nombre}: en marcha. Pulsa Paro para detenerlo.`, 'ok');
+}
+
+// Poner una función quita el baile (los dos mueven las ruedas): queda en "Solo luces" y sin pasos.
+function elegirFuncion(id) {
+    if (S.corriendoFuncion) paro();
+    const habiaBaile = S.baile !== 'quieto' || S.pasos.trim() !== '';
+    S.funcion = id;
+    if (id) {
+        S.baile = 'quieto';
+        S.pasos = '';
+    }
+    guardar();
+    pintarTodo();
+    const f = funcionActual();
+    if (f) mensaje(`Función «${f.nombre}» puesta${habiaBaile ? ' y se quitó el baile que tenías' : ''}. Pulsa Iniciar.`, 'ok');
+}
+
+// Elegir o escribir un baile quita la función: no pueden ir juntos.
+function quitarFuncion() {
+    if (!S.funcion) return;
+    if (S.corriendoFuncion) paro();
+    S.funcion = '';
+    pintarFunciones();
+    mensaje('Se quitó la función: el baile y la función no van juntos.');
+}
+
+function pintarFunciones() {
+    const v = VARIANTES.find(x => x.id === S.variante) || VARIANTES[0];
+    const f = funcionActual();
+    $('rb-fn-var').value = v.id;
+    $('rb-fn-nota').textContent = v.nota;
+    const lista = [{ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' }]
+        .concat(FUNCIONES.filter(x => x.v.includes(v.id)));
+    $('rb-fn-lista').innerHTML = lista.map(x =>
+        `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${x.id === S.funcion ? ' checked' : ''}>`
+        + `<span><b>${x.nombre}</b><small>${x.desc}${x.modo ? ' <em>La hace el robot solo.</em>' : ''}</small></span></label>`).join('');
+    $('rb-fn-luces').checked = S.funLuces;
+    $('rb-fn-musica').checked = S.funMusica;
+    $('rb-fn-giro').value = S.giro90;
+    $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
+    $('rb-fn-vel').value = S.vel;
+    $('rb-fn-vel-v').textContent = S.vel;
+    $('rb-fn-vel').disabled = $('rb-fn-giro').disabled = !!(f && f.modo);   // esas usan su propia velocidad
+    const op = $('rb-cancion').selectedOptions[0];
+    $('rb-fn-cancion').textContent = op ? op.textContent : '';
 }
 
 // ---------- Show guardado en el robot ----------
@@ -1175,6 +1350,8 @@ function guardarShow() {
 function probarShow() {
     if (S.estado !== 'listo') return pgmInfo('Conecta el robot primero.', 'err');
     S.actuando = false;
+    S.corriendoFuncion = false;
+    S.autonomo = 0;
     S.enShow = true;
     S.ultimaActividad = Date.now();
     S.cola.enviar([{ l: 'MODE 5', ex: true }]);
@@ -1191,6 +1368,11 @@ function paro() {
     S.ultimaActividad = Date.now();
     S.actuando = false;
     S.enShow = false;
+    if (S.corriendoFuncion) {
+        S.corriendoFuncion = false;
+        S.sucio = true;                                  // las luces vuelven a ser las de la pantalla
+        if (S.autonomo) { S.autonomo = 0; S.salirModo = true; }
+    }
     detenerAudio();
     S.cola.abortar();
     progreso(0);
@@ -1221,7 +1403,8 @@ function cambio(tipo) {
 
 function esperarYTocar(a) {
     if (S.cola.ocupado()) return setTimeout(() => esperarYTocar(a), 40);
-    actuar(a.conCancion, a.conBaile);
+    if (a.fn) iniciarFuncion(true);
+    else actuar(a.conCancion, a.conBaile);
 }
 
 // Cada 100 ms: avance de la barra, aviso si el robot dejó de contestar y, cuando cambian las luces,
@@ -1245,9 +1428,9 @@ function tickLeds() {
     if (S.estado !== 'listo' || !S.vivo || S.actuando || S.enShow || !visible || S.cola.ocupado()) return;
     if (S.sucio) {
         S.sucio = false;
-        S.guardarEn = Date.now() + 2500;
-        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true }, 'VOL ' + S.vol]);
-    } else if (S.guardarEn && Date.now() >= S.guardarEn) {
+        S.guardarEn = S.corriendoFuncion ? 0 : Date.now() + 2500;   // las luces apagadas por una función no se guardan
+        S.cola.enviar([{ l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+    } else if (S.guardarEn && !S.corriendoFuncion && Date.now() >= S.guardarEn) {
         S.guardarEn = 0;
         S.cola.enviar([{ l: 'SAVE', ex: true }]);
         mensaje('Luces guardadas en el robot: siguen igual aunque lo desconectes.', 'ok');
@@ -1299,6 +1482,7 @@ function pintarTodo() {
     $('rb-cancion').value = S.cancion;
     $('rb-baile').value = S.baile;
     $('rb-borrar').disabled = !S.cancion.startsWith('g:');
+    pintarFunciones();
     pintarAnillo();
     mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
 }
@@ -1724,7 +1908,8 @@ function iniciarLinea() {
 // ---------- Barra fija: parar y reproducir lo que haya en la sección que se ve ----------
 
 const QUE_REPRODUCE = {
-    'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-luces': 'las luces',
+    'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-funciones': 'la función elegida',
+    'robot-luces': 'las luces',
     'robot-linea': 'el seguidor de líneas (desactivado)', 'robot-show': 'el show guardado', 'robot-instalar': 'nada en esta sección',
 };
 
@@ -1745,6 +1930,7 @@ function reproducirGeneral() {
     const listo = S.estado === 'listo';
     if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
     if (sec === 'robot-baile') return listo ? actuar(true, true) : escucharAqui();
+    if (sec === 'robot-funciones') return iniciarFuncion();
     if (sec === 'robot-show') return probarShow();
     if (sec === 'robot-linea') return iniciarLinea();
     if (sec === 'robot-luces') {
@@ -1770,7 +1956,7 @@ function iniciarLineaYBateria() {
     });
     $('rb-barra-paro').addEventListener('click', pararTodo);
     $('rb-barra-play').addEventListener('click', reproducirGeneral);
-    document.addEventListener('seccion-admin', pintarBarra);
+    document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); });
     pintarBarra();
     for (const id of ['rb-ln-puerto', 'rb-ln-color', 'rb-ln-perdida', 'rb-ln-cruce', 'rb-ln-buscar', 'rb-ln-obst', 'rb-ln-dur']) {
         $(id).addEventListener('change', cambioLinea);
@@ -1813,6 +1999,7 @@ function iniciar() {
     pintarCanciones();
     opciones($('rb-baile'), BAILES, 'Mi baile');
     $('rb-efecto').innerHTML = EFECTOS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
+    $('rb-fn-var').innerHTML = VARIANTES.map(v => `<option value="${v.id}">${v.nombre}</option>`).join('');
     $('rb-paleta').innerHTML = PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-label="Pintar todos de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join('');
     pintarTodo();
     ponEstado('desconectado');
@@ -1874,6 +2061,7 @@ function iniciar() {
     });
 
     $('rb-baile').addEventListener('change', e => {
+        quitarFuncion();
         S.baile = e.target.value;
         const b = BAILES.find(x => x.id === S.baile);
         if (b) S.pasos = b.texto;
@@ -1881,17 +2069,41 @@ function iniciar() {
         cambio('baile');
     });
     $('rb-pasos').addEventListener('input', e => {
+        quitarFuncion();
         S.pasos = e.target.value;
         S.baile = 'propia';
         $('rb-baile').value = 'propia';
         mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
         cambio('baile');
     });
-    $('rb-vel').addEventListener('input', e => {
+    const ponVel = e => {                  // una sola velocidad para el baile y para las funciones
         S.vel = Number(e.target.value);
-        $('rb-vel-v').textContent = S.vel;
+        for (const id of ['rb-vel', 'rb-fn-vel']) $(id).value = S.vel;
+        for (const id of ['rb-vel-v', 'rb-fn-vel-v']) $(id).textContent = S.vel;
         cambio('baile');
+    };
+    $('rb-vel').addEventListener('input', ponVel);
+    $('rb-fn-vel').addEventListener('input', ponVel);
+
+    // Funciones por modelo
+    $('rb-fn-var').addEventListener('change', e => {
+        if (S.corriendoFuncion) paro();
+        S.variante = e.target.value;
+        if (!funcionActual()) S.funcion = '';
+        guardar();
+        pintarFunciones();
     });
+    $('rb-fn-lista').addEventListener('change', e => {
+        if (e.target.name === 'rb-fn') elegirFuncion(e.target.value);
+    });
+    $('rb-fn-luces').addEventListener('change', e => { S.funLuces = e.target.checked; cambio('led'); });
+    $('rb-fn-musica').addEventListener('change', e => { S.funMusica = e.target.checked; cambio('funcion'); });
+    $('rb-fn-giro').addEventListener('input', e => {
+        S.giro90 = Number(e.target.value);
+        $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
+        cambio('funcion');
+    });
+    $('rb-fn-iniciar').addEventListener('click', () => iniciarFuncion());
 
     $('rb-anillo').addEventListener('click', e => {
         const b = e.target.closest('.rb-led');
@@ -1937,7 +2149,7 @@ function iniciar() {
     } else {
         mensaje('Para controlar el robot abre esta página en Chrome o Edge desde una computadora.', 'err');
     }
-    window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo('!'); });
+    window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);

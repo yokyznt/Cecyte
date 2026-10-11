@@ -267,6 +267,9 @@
                         <button type="button" role="tab" id="tab-robot-baile" data-section-tab="robot-baile" aria-controls="sec-robot-baile" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Baile</span>
                         </button>
+                        <button type="button" role="tab" id="tab-robot-funciones" data-section-tab="robot-funciones" aria-controls="sec-robot-funciones" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Funciones</span>
+                        </button>
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
                         </button>
@@ -793,7 +796,7 @@
                                         <label class="field__label" for="rb-pasos">Pasos</label>
                                         <textarea id="rb-pasos" class="textarea" rows="3" spellcheck="false"></textarea>
                                         <p id="rb-err-baile" class="msg msg--err" role="status"></p>
-                                        <p class="hint">AD adelante, AT atrás, GI gira a la izquierda, GD gira a la derecha, PA parar. Duran como las notas (/2 son dos tiempos). Si el baile es más corto que la canción, se repite.</p>
+                                        <p class="hint">AD adelante, AT atrás, GI gira a la izquierda, GD gira a la derecha, CI y CD avanzan en curva, PA parar. Duran como las notas (/2 son dos tiempos). Si el baile es más corto que la canción, se repite.</p>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-vel">Velocidad de las ruedas: <span id="rb-vel-v"></span></label>
@@ -805,6 +808,45 @@
                                     </div>
                                     <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
 
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Funciones por modelo -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-funciones" data-section="robot-funciones" role="tabpanel" aria-label="Funciones del robot" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Funciones por modelo</h4>
+                                    <div class="stack">
+                                        <div class="field">
+                                            <label class="field__label" for="rb-fn-var">Modelo del mBot Ranger</label>
+                                            <select id="rb-fn-var" class="select"></select>
+                                            <p id="rb-fn-nota" class="hint"></p>
+                                        </div>
+                                        <fieldset class="rb-fn-grupo">
+                                            <legend class="field__label">Función</legend>
+                                            <div id="rb-fn-lista" class="rb-fn-lista"></div>
+                                        </fieldset>
+                                        <p class="hint">Al poner una función se quita el baile (los dos mueven las ruedas). Corre hasta pulsar Paro.</p>
+                                        <div class="btn-row">
+                                            <label class="rb-check"><input type="checkbox" id="rb-fn-luces"><span>Con luces</span></label>
+                                            <label class="rb-check"><input type="checkbox" id="rb-fn-musica"><span>Con música: <b id="rb-fn-cancion"></b></span></label>
+                                        </div>
+                                        <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Música: suena en el robot, o en esta página si la función la hace el robot solo con su sensor.</p>
+                                        <div class="field">
+                                            <label class="field__label" for="rb-fn-vel">Velocidad de las ruedas: <span id="rb-fn-vel-v"></span></label>
+                                            <input type="range" id="rb-fn-vel" min="40" max="180" step="5">
+                                        </div>
+                                        <div class="field">
+                                            <label class="field__label" for="rb-fn-giro">Lo que tarda en girar 90°: <span id="rb-fn-giro-v"></span></label>
+                                            <input type="range" id="rb-fn-giro" min="200" max="1500" step="10">
+                                            <p class="hint">Ajústalo si el cuadrado le queda abierto o cerrado: depende del piso y de la velocidad.</p>
+                                        </div>
+                                        <div class="btn-row">
+                                            <button type="button" id="rb-fn-iniciar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Iniciar la función</button>
+                                        </div>
+                                        <p class="hint">Esquivar obstáculos y Seguir mi mano las hace el robot solo con su sensor: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
                                     </div>
                                 </div>
                             </div>
