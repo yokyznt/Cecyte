@@ -1762,6 +1762,12 @@ function pararTodo() {
 }
 
 function iniciarLineaYBateria() {
+    // la conexión vive solo en Instalar: el estado de la cabecera lleva allá
+    const irAConectar = () => { if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar'); };
+    $('rb-badge').addEventListener('click', irAConectar);
+    $('rb-badge').addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irAConectar(); }
+    });
     $('rb-barra-paro').addEventListener('click', pararTodo);
     $('rb-barra-play').addEventListener('click', reproducirGeneral);
     document.addEventListener('seccion-admin', pintarBarra);
