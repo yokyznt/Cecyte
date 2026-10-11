@@ -949,8 +949,11 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-leds > .stack { max-width: 440px; }
 .rb-color { width: 100%; max-width: 220px; height: 44px; padding: 3px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; }
 .rb-paleta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.rb-sw { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); cursor: pointer; transition: scale 120ms var(--ease-out); }
-.rb-sw:hover { scale: 1.08; }
+.rb-sw { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; min-height: 44px; padding: 4px 2px; border: 0; background: transparent; cursor: pointer; }
+.rb-sw__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); transition: scale 120ms var(--ease-out); }
+.rb-sw__name { font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
+.rb-sw:hover .rb-sw__dot { scale: 1.1; }
+.rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
 
 .rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
 .rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }

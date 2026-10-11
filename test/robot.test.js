@@ -172,6 +172,32 @@ for (const c of R.CANCIONES) {
     assert.deepStrictEqual(R.hexARgb('#ff8000'), [255, 128, 0]);
 }
 
+// 16b) Colores rápidos: los primarios, el blanco y el negro en su valor exacto, y todos llegan tal cual al LED
+{
+    const por = Object.fromEntries(R.PALETA.map(([c, n]) => [n, c]));
+    assert.strictEqual(por.Rojo, '#ff0000');
+    assert.strictEqual(por.Verde, '#00ff00');
+    assert.strictEqual(por.Azul, '#0000ff');
+    assert.strictEqual(por.Blanco, '#ffffff');
+    assert.strictEqual(por.Apagado, '#000000');
+    assert.strictEqual(por.Amarillo, '#ffff00');
+    assert.strictEqual(por.Cian, '#00ffff');
+    assert(R.PALETA.every(([c]) => /^#[0-9a-f]{6}$/.test(c)), 'formato #rrggbb');
+    assert(R.PALETA.every(([c]) => R.hexARgb(c).every(v => [0, 128, 255].includes(v))), 'cada canal vale 0, 128 o 255');
+    assert.strictEqual(R.COLOR_INICIAL, '#00ff00');
+    // a brillo 100 el LED recibe exactamente el color; a otro brillo solo se escala, sin mezclar canales
+    for (const [c] of R.PALETA) {
+        const rgb = R.hexARgb(c);
+        const hex = R.marcoHex(Array.from({ length: 12 }, () => rgb), 100).slice(0, 6);
+        assert.strictEqual('#' + hex, c);
+    }
+    assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ff0000')), 40).slice(0, 6), '660000');
+    assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ffffff')), 40).slice(0, 6), '666666');
+    // el arcoíris también usa primarios puros
+    assert.deepStrictEqual(R.hsv(1 / 3, 1, 1).map(Math.round), [0, 255, 0]);
+    assert.deepStrictEqual(R.hsv(2 / 3, 1, 1).map(Math.round), [0, 0, 255]);
+}
+
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)
 {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');

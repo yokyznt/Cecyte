@@ -300,8 +300,16 @@ const EFECTOS = [
     ['persecucion', 'Persecución'], ['musica', 'Cambia con cada nota'],
 ];
 
+// Colores rápidos: cada canal vale 0, 128 o 255 para que el LED muestre justo ese color.
+// El brillo se aplica después, al mandarlo, y no los mezcla.
+const PALETA = [
+    ['#ff0000', 'Rojo'], ['#ff8000', 'Naranja'], ['#ffff00', 'Amarillo'], ['#00ff00', 'Verde'],
+    ['#00ffff', 'Cian'], ['#0000ff', 'Azul'], ['#8000ff', 'Morado'], ['#ffffff', 'Blanco'], ['#000000', 'Apagado'],
+];
+const COLOR_INICIAL = '#00ff00';
+
 const lib = {
-    BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS,
+    BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, efecto, marcoHex,
 };
@@ -322,7 +330,7 @@ const S = {
     puerto: null, escritor: null, lector: null, vioArranque: false,
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
-    leds: Array.from({ length: LEDS }, () => '#00a850'),
+    leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
     brillo: 40, efecto: 'fijo', vivo: true, repetir: false,
     cancion: 'estrellita', notas: '', bpm: 110, baile: 'vaiven', pasos: null, vel: 110,
 };
@@ -339,7 +347,7 @@ function cargar() {
         const g = JSON.parse(localStorage.getItem(LLAVE) || 'null');
         if (g && typeof g === 'object') Object.assign(S, g);
     } catch (e) { /* datos viejos o dañados: se usan los de fábrica */ }
-    if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => '#00a850');
+    if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
     if (!S.notas) {
         const c = CANCIONES.find(x => x.id === S.cancion) || CANCIONES[0];
         S.notas = c.texto;
@@ -663,9 +671,7 @@ function iniciar() {
     opciones($('rb-cancion'), CANCIONES, 'Mi canción');
     opciones($('rb-baile'), BAILES, 'Mi baile');
     $('rb-efecto').innerHTML = EFECTOS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
-    const paleta = [['#ff2a2a', 'Rojo'], ['#ff7a00', 'Naranja'], ['#ffd400', 'Amarillo'], ['#00c040', 'Verde'],
-                    ['#00c8d0', 'Cian'], ['#2060ff', 'Azul'], ['#a030ff', 'Morado'], ['#ffffff', 'Blanco'], ['#000000', 'Apagado']];
-    $('rb-paleta').innerHTML = paleta.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" style="--c:${c}" aria-label="Pintar todos de ${n}" title="${n}"></button>`).join('');
+    $('rb-paleta').innerHTML = PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-label="Pintar todos de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join('');
     pintarTodo();
     ponEstado('desconectado');
 
