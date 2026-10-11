@@ -535,10 +535,18 @@
                                         <select id="rb-cancion" class="select"></select>
                                     </div>
                                     <div class="field">
+                                        <label class="field__label" for="rb-nombre">Guardar lo que hay en pantalla con el nombre</label>
+                                        <div class="inline-form">
+                                            <input type="text" id="rb-nombre" class="input" maxlength="40" placeholder="Ej. Ritmo de mi canción">
+                                            <button type="button" id="rb-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
+                                            <button type="button" id="rb-borrar" class="btn btn--secondary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Borrar</button>
+                                        </div>
+                                    </div>
+                                    <div class="field">
                                         <label class="field__label" for="rb-notas">Notas</label>
                                         <textarea id="rb-notas" class="textarea" rows="6" spellcheck="false"></textarea>
                                         <p id="rb-err-notas" class="msg msg--err" role="status"></p>
-                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). Lo que sigue a // es un comentario.</p>
+                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). También puedes poner milisegundos: A5:120 suena 120 ms y R:300 calla 300 ms. Lo que sigue a // es un comentario.</p>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
@@ -549,6 +557,44 @@
                                         <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
                                         <button type="button" id="rb-tocar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Cantar en el robot</button>
                                     </div>
+
+                                    <details class="rb-audio">
+                                        <summary>Hacer un ritmo con un audio o un MIDI</summary>
+                                        <div class="stack">
+                                            <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Se detectan los golpes y se vuelven notas del robot; el archivo no sale de tu navegador. Después puedes editarlo, escucharlo y guardarlo con un nombre.</p>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-audio">Archivo</label>
+                                                <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" class="input">
+                                            </div>
+                                            <div class="grid-2">
+                                                <div class="field"><label class="field__label" for="rb-aud-ini">Empezar en (segundos)</label>
+                                                    <input type="number" id="rb-aud-ini" class="input" min="0" step="0.5" value="0"></div>
+                                                <div class="field"><label class="field__label" for="rb-aud-dur">Duración (máximo 60 s)</label>
+                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="20"></div>
+                                            </div>
+                                            <div class="grid-2">
+                                                <div class="field"><label class="field__label" for="rb-aud-modo">Cómo convertir</label>
+                                                    <select id="rb-aud-modo" class="select">
+                                                        <option value="golpes">Un toque por cada golpe (recomendado)</option>
+                                                        <option value="sostenido">Seguir el volumen</option>
+                                                    </select></div>
+                                                <div class="field"><label class="field__label" for="rb-aud-tono">Tonos del robot</label>
+                                                    <select id="rb-aud-tono" class="select">
+                                                        <option value="alterna">Alterna 4 tonos (las luces cambian de color)</option>
+                                                        <option value="agudo">Un solo tono agudo</option>
+                                                        <option value="grave">Un solo tono grave</option>
+                                                    </select></div>
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-aud-sens">Sensibilidad: <span id="rb-aud-sens-v">50</span></label>
+                                                <input type="range" id="rb-aud-sens" min="0" max="100" value="50">
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir en ritmo</button>
+                                            </div>
+                                            <p id="rb-aud-info" class="msg" role="status"></p>
+                                        </div>
+                                    </details>
                                 </div>
 
                                 <!-- Baile -->
@@ -602,6 +648,7 @@
                                                 <label class="field__label" for="rb-efecto">Efecto</label>
                                                 <select id="rb-efecto" class="select"></select>
                                             </div>
+                                            <p class="hint">Las luces se guardan en el robot: siguen igual (y en movimiento) aunque lo desconectes del USB, y vuelven solas al encenderlo.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -612,7 +659,7 @@
                                     <ol>
                                         <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
                                         <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
-                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página.</li>
+                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página. Si ya tenías una versión anterior, vuelve a subirlo para que las luces corran solas y se queden guardadas.</li>
                                         <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
                                     </ol>
                                 </details>
