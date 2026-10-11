@@ -510,4 +510,23 @@ for (const c of R.CANCIONES) {
     for (const clave of o.map(l => l.split(' ')[1])) assert(ino.includes(`"${clave}"`), 'el firmware no entiende LINEA ' + clave);
 }
 
+// 22) Volumen del robot: el ancho del pulso sigue asin(v/100)/pi (amplitud lineal), no una curva cuadrática
+{
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    const m = /ANCHO_VOL\[21\] = \{([^}]*)\}/.exec(ino);
+    assert(m, 'tabla ANCHO_VOL');
+    const tabla = m[1].split(',').map(Number);
+    assert.strictEqual(tabla.length, 21);
+    assert.strictEqual(tabla[0], 0, 'volumen 0 = sin pulso');
+    assert.strictEqual(tabla[20], 500, 'volumen 100 = 50 %, lo más fuerte');
+    tabla.forEach((d, i) => {
+        const esperado = Math.round(Math.asin(i * 5 / 100) / Math.PI * 1000);
+        assert(Math.abs(d - esperado) <= 1, `volumen ${i * 5}: ${d} y debería ser ${esperado}`);
+        if (i) assert(d > tabla[i - 1], 'la tabla sube siempre');
+    });
+    // a media escala hay que oír claramente más que con la curva cuadrática de antes (125 milésimas)
+    assert(tabla[10] >= 160, 'volumen 50 = ' + tabla[10]);
+    assert(/anchoPermil\(\)/.test(ino) && !/volumen \* volumen/.test(ino), 'tono usa la tabla');
+}
+
 console.log('robot.test.js: todo bien');

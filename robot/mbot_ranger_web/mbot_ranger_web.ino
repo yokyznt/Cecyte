@@ -340,14 +340,23 @@ void espera(unsigned long ms) {
 // cada cuadro, ya no entrecorta el sonido (antes la onda se hacía a mano y se cortaba en cada cuadro).
 //   frecuencia = F_CPU / (prescaler * (1 + ICR5))
 // El volumen es el ancho del pulso: 50 % de la onda (volumen 100) es lo más fuerte, y al bajarlo el
-// pulso se hace más angosto y suena más bajito (con curva cuadrática, para afinar los volúmenes bajos).
+// pulso se hace más angosto y suena más bajito. La amplitud de la onda es sin(pi * ancho), así que para
+// que el volumen suba parejo (amplitud lineal) el ancho sigue asin(volumen / 100) / pi. Está en
+// milésimas del periodo, de 5 en 5 de volumen; entre medias se interpola.
+const uint16_t ANCHO_VOL[21] = { 0, 16, 32, 48, 64, 80, 97, 114, 131, 149, 167, 185, 205, 225, 247, 270, 295, 323, 356, 399, 500 };
+uint16_t anchoPermil() {
+  uint8_t i = volumen / 5, r = volumen % 5;
+  if (i >= 20) return ANCHO_VOL[20];
+  return ANCHO_VOL[i] + (uint32_t)(ANCHO_VOL[i + 1] - ANCHO_VOL[i]) * r / 5;
+}
+
 void tono(int hz, int ms) {
   if (volumen == 0) { espera(ms); return; }
   unsigned long ciclos = 16000000UL / (unsigned long)hz;    // con prescaler 1
   uint8_t cs = 1;
   if (ciclos > 65536UL) { cs = 2; ciclos /= 8; }            // graves: prescaler 8
   uint16_t tope = (uint16_t)(ciclos - 1);
-  uint32_t ancho = (uint32_t)tope * volumen * volumen / 20000UL;
+  uint32_t ancho = (uint32_t)tope * anchoPermil() / 1000UL;
   if (ancho < 1) ancho = 1;
   pinMode(PIN_BUZZER, OUTPUT);
   TCCR5A = _BV(COM5B1) | _BV(WGM51);

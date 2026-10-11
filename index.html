@@ -643,6 +643,7 @@
                                     <span class="rb-bateria__linea"><b id="rb-bat-pct" class="rb-bateria__pct">--</b> <span id="rb-bat-v" class="rb-bateria__v"></span></span>
                                     <span class="rb-bateria__barra" role="progressbar" aria-label="Carga de la batería" aria-valuemin="0" aria-valuemax="100"><span id="rb-bat-fill" class="rb-bateria__relleno"></span></span>
                                     <span id="rb-bat-tiempo" class="rb-bateria__tiempo"></span>
+                                    <span id="rb-bat-aviso" class="rb-bateria__aviso" hidden></span>
                                 </div>
                                 <span id="rb-badge" class="badge badge--idle"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
                             </div>
@@ -655,24 +656,8 @@
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
                                 <p class="hint rb-full"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
-                                <details class="rb-full rb-ajustes">
-                                    <summary>Ajustes de la batería</summary>
-                                    <div class="stack">
-                                        <div class="grid-2">
-                                            <div class="field"><label class="field__label" for="rb-bat-quim">Tipo de pilas</label>
-                                                <select id="rb-bat-quim" class="select">
-                                                    <option value="nimh">Recargables NiMH</option>
-                                                    <option value="alcalina">Alcalinas desechables</option>
-                                                    <option value="mixta">No sé / mezcladas</option>
-                                                </select></div>
-                                            <div class="field"><label class="field__label" for="rb-bat-cap">Capacidad de cada pila (mAh)</label>
-                                                <input type="number" id="rb-bat-cap" class="input" min="500" max="10000" step="100"></div>
-                                        </div>
-                                        <p class="hint">El porcentaje sale del voltaje de las 6 pilas en reposo (con los motores andando el voltaje cae y no cuenta). La duración se estima con lo que está haciendo el robot y, cuando ya hay datos de unos 10 minutos, con lo que de verdad se ha ido gastando.</p>
-                                        <div class="btn-row"><button type="button" id="rb-bat-borrar" class="btn btn--secondary btn--sm">Borrar el historial de consumo</button></div>
-                                    </div>
-                                </details>
-                                <p id="rb-diag" class="hint rb-full" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
+                                
+                                
                                 <p id="rb-msg" class="msg" role="status"></p>
                                 <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
 
@@ -720,39 +705,6 @@
                                     </div>
                                 </div>
                                 <div class="rb-card">
-                                    <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
-                                    <div class="stack">
-                                            <p class="hint">Toca las teclas de abajo o las de tu computadora: <b>Z X C V B N M</b> (con <b>S D G H J</b> para las negras) son una octava y <b>Q W E R T Y U</b> (con <b>2 3 5 6 7</b>) la siguiente. Pulsa <b>Grabar</b> y las notas se van registrando solas, con su duración y sus silencios.</p>
-                                            <div id="rb-piano" class="rb-piano" role="group" aria-label="Teclado de notas"></div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-tec-oct-menos" class="btn btn--secondary btn--sm">Octava −</button>
-                                                <span id="rb-tec-oct" class="rb-oct" aria-live="polite"></span>
-                                                <button type="button" id="rb-tec-oct-mas" class="btn btn--secondary btn--sm">Octava +</button>
-                                            </div>
-                                            <div class="btn-row">
-                                                <label class="rb-check"><input type="checkbox" id="rb-tec-aqui" checked><span>Que suene aquí</span></label>
-                                                <label class="rb-check"><input type="checkbox" id="rb-tec-robot" checked><span>Que suene en el robot</span></label>
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-rec-boton" class="btn btn--primary btn--sm">● Grabar</button>
-                                                <button type="button" id="rb-rec-limpiar" class="btn btn--secondary btn--sm">Borrar grabación</button>
-                                            </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-rec-texto">Notas grabadas (se llenan mientras tocas)</label>
-                                                <textarea id="rb-rec-texto" class="textarea" rows="3" readonly spellcheck="false"></textarea>
-                                            </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-rec-nombre">Guardar la grabación con el nombre</label>
-                                                <div class="inline-form">
-                                                    <input type="text" id="rb-rec-nombre" class="input" maxlength="40" placeholder="Ej. Mi melodía">
-                                                    <button type="button" id="rb-rec-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
-                                                    <button type="button" id="rb-rec-usar" class="btn btn--secondary btn--sm">Usar como la canción</button>
-                                                </div>
-                                            </div>
-                                            <p id="rb-rec-info" class="msg" role="status"></p>
-                                        </div>
-                                </div>
-                                <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Melodía o ritmo de un audio o un MIDI</h4>
                                     <div class="stack">
                                             <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Puede sacar <b>la melodía</b> (la voz si la canción la tiene, o el instrumento principal si es solo instrumental) o solo <b>el ritmo</b>. El archivo no sale de tu navegador. Después puedes editarlo, escucharlo y guardarlo con un nombre.</p>
@@ -804,6 +756,39 @@
                                                 <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir</button>
                                             </div>
                                             <p id="rb-aud-info" class="msg" role="status"></p>
+                                        </div>
+                                </div>
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
+                                    <div class="stack">
+                                            <p class="hint">Toca las teclas de abajo o las de tu computadora: <b>Z X C V B N M</b> (con <b>S D G H J</b> para las negras) son una octava y <b>Q W E R T Y U</b> (con <b>2 3 5 6 7</b>) la siguiente. Pulsa <b>Grabar</b> y las notas se van registrando solas, con su duración y sus silencios.</p>
+                                            <div id="rb-piano" class="rb-piano" role="group" aria-label="Teclado de notas"></div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-tec-oct-menos" class="btn btn--secondary btn--sm">Octava −</button>
+                                                <span id="rb-tec-oct" class="rb-oct" aria-live="polite"></span>
+                                                <button type="button" id="rb-tec-oct-mas" class="btn btn--secondary btn--sm">Octava +</button>
+                                            </div>
+                                            <div class="btn-row">
+                                                <label class="rb-check"><input type="checkbox" id="rb-tec-aqui" checked><span>Que suene aquí</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-tec-robot" checked><span>Que suene en el robot</span></label>
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-rec-boton" class="btn btn--primary btn--sm">● Grabar</button>
+                                                <button type="button" id="rb-rec-limpiar" class="btn btn--secondary btn--sm">Borrar grabación</button>
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-rec-texto">Notas grabadas (se llenan mientras tocas)</label>
+                                                <textarea id="rb-rec-texto" class="textarea" rows="3" readonly spellcheck="false"></textarea>
+                                            </div>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-rec-nombre">Guardar la grabación con el nombre</label>
+                                                <div class="inline-form">
+                                                    <input type="text" id="rb-rec-nombre" class="input" maxlength="40" placeholder="Ej. Mi melodía">
+                                                    <button type="button" id="rb-rec-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
+                                                    <button type="button" id="rb-rec-usar" class="btn btn--secondary btn--sm">Usar como la canción</button>
+                                                </div>
+                                            </div>
+                                            <p id="rb-rec-info" class="msg" role="status"></p>
                                         </div>
                                 </div>
                             </div>
@@ -980,8 +965,37 @@
                                     </ol>
                                 </details>
                                 </div>
+
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Batería y diagnóstico</h4>
+                                    <details class="rb-ajustes" open>
+                                    <summary>Ajustes de la batería</summary>
+                                    <div class="stack">
+                                        <div class="grid-2">
+                                            <div class="field"><label class="field__label" for="rb-bat-quim">Tipo de pilas</label>
+                                                <select id="rb-bat-quim" class="select">
+                                                    <option value="nimh">Recargables NiMH</option>
+                                                    <option value="alcalina">Alcalinas desechables</option>
+                                                    <option value="mixta">No sé / mezcladas</option>
+                                                </select></div>
+                                            <div class="field"><label class="field__label" for="rb-bat-cap">Capacidad de cada pila (mAh)</label>
+                                                <input type="number" id="rb-bat-cap" class="input" min="500" max="10000" step="100"></div>
+                                        </div>
+                                        <p class="hint">El porcentaje sale del voltaje de las 6 pilas en reposo (con los motores andando el voltaje cae y no cuenta). La duración se estima con lo que está haciendo el robot y, cuando ya hay datos de unos 10 minutos, con lo que de verdad se ha ido gastando.</p>
+                                        <div class="btn-row"><button type="button" id="rb-bat-borrar" class="btn btn--secondary btn--sm">Borrar el historial de consumo</button></div>
+                                    </div>
+                                </details>
+                                    <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
+                                </div>
                             </div>
                         </section>
+
+                        <!-- Barra fija del apartado Robot: parar y reproducir lo de la sección -->
+                        <div class="rb-barra" role="toolbar" aria-label="Controles generales del robot">
+                            <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar todo</button>
+                            <button type="button" id="rb-barra-play" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Reproducir</button>
+                            <span class="rb-barra__que">Reproduce: <b id="rb-barra-que">la canción</b></span>
+                        </div>
                     </div>
                 </div>
 
