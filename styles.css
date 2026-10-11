@@ -955,6 +955,9 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-sw:hover .rb-sw__dot { scale: 1.1; }
 .rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
 
+.rb-audio { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
+.rb-audio summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.rb-audio[open] > .stack { padding-bottom: 12px; }
 .rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
 .rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .rb-instalar ol { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }

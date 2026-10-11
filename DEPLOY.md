@@ -141,8 +141,14 @@ con el IDE de Arduino (placa "Arduino Mega or Mega 2560", librería Makeblock). 
 sketch del tanquecito con los modos del botón más el modo 4, el de la página.
 Después, al abrir la pestaña con el robot enchufado, se conecta solo.
 
-- **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`).
-- **Luces:** los 12 LEDs del anillo, brillo y efectos; se aplican al instante.
+- **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`). También
+  acepta milisegundos (`A5:120 R:300`).
+- **Audio a ritmo:** se sube un MP3/WAV/OGG o un MIDI, se detectan los golpes (la misma
+  detección que usa el ritmo del timbre) y quedan como notas editables. Los ritmos y las
+  canciones se guardan con nombre en el navegador.
+- **Luces:** los 12 LEDs del anillo, brillo y efectos; se aplican al instante. El efecto
+  corre solo dentro del robot (no se traba mientras suena) y se guarda en su EEPROM: sigue
+  igual al desconectarlo del USB y vuelve solo al encenderlo.
 - **Seguridad:** el botón **Paro** corta nota y motores al momento, y si la página
   deja de mandar órdenes los motores se paran solos a los 3 segundos.
 - **Afinar:** si las notas salen bajas o altas, ajusta `AJUSTE_US` en el `.ino`.

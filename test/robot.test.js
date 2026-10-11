@@ -166,10 +166,82 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.marcoHex(blanco, 0), '000000'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 50).slice(0, 6), '808080');
     assert.deepStrictEqual(R.hsv(0, 1, 1).map(Math.round), [255, 0, 0]);
-    const a = R.efecto('musica', 0, blanco, 440), b = R.efecto('musica', 0, blanco, 880);
-    assert.deepStrictEqual(a[0].map(Math.round), b[0].map(Math.round));
-    assert.strictEqual(R.efecto('arcoiris', 0, blanco).length, 12);
     assert.deepStrictEqual(R.hexARgb('#ff8000'), [255, 128, 0]);
+    // FX: modo, brillo y los 12 colores base SIN brillo (lo aplica el robot)
+    const azul = Array.from({ length: 12 }, () => [0, 0, 255]);
+    assert.strictEqual(R.fxLinea('arcoiris', 40, azul), 'FX 1 40 ' + '0000ff'.repeat(12));
+    assert(R.fxLinea('fijo', 100, azul).startsWith('FX 0 100 '));
+    assert(R.fxLinea('musica', 250, azul).startsWith('FX 4 100 '), 'el brillo se limita a 100');
+    assert(R.fxLinea('raro', 5, azul).startsWith('FX 0 5 '), 'efecto desconocido = fijo');
+    assert.strictEqual(R.fxLinea('persecucion', 50, azul).length, 'FX 3 50 '.length + 72);
+}
+
+// 16c) Duración en milisegundos y texto de ritmos
+{
+    const { notas, errores } = R.leerNotas('A5:120 R:300 C5 E5:5 G5:90000 D5/4');
+    assert.deepStrictEqual(errores, ['E5:5', 'G5:90000']);
+    assert.deepStrictEqual(notas.map(n => n.ms), [120, 300, 300, undefined]);   // C5 hereda los 300 ms
+    assert.strictEqual(notas[3].beats, 1);
+    // en milisegundos la velocidad (bpm) no cuenta
+    const a = R.compilar({ notas: R.leerNotas('A5:200 R:100').notas, bpm: 60 });
+    const b = R.compilar({ notas: R.leerNotas('A5:200 R:100').notas, bpm: 240 });
+    assert.deepStrictEqual(a.cmds.map(c => c.l), b.cmds.map(c => c.l));
+    assert.strictEqual(a.ms, 300);
+    // intervalos -> texto: pausas, tonos que alternan y duración mínima
+    const txt = R.ritmoATexto([[0, 100], [250, 350], [600, 605]]);
+    assert.strictEqual(txt, 'C5:100 R:150 E5:100 R:250 G5:10');
+    assert.deepStrictEqual(R.leerNotas(txt).errores, []);
+    assert.strictEqual(R.ritmoATexto([[200, 300]], R.TONOS_RITMO.agudo), 'R:200 A5:100');
+    // un audio larguísimo nunca pasa del máximo de notas
+    const muchos = Array.from({ length: 1000 }, (_, i) => [i * 100, i * 100 + 50]);
+    assert.deepStrictEqual(R.leerNotas(R.ritmoATexto(muchos)).errores, []);
+}
+
+// 16d) Audio -> ritmo del robot con la detección de golpes de timbre.js (8 golpes sintéticos cada 500 ms)
+{
+    const T = require('../timbre.js');
+    const sr = 8000, x = new Float32Array(sr * 4);
+    for (let c = 0; c < 8; c++) for (let i = 0; i < 240; i++) x[c * 4000 + 800 + i] = Math.sin(i * 0.9) * Math.exp(-i / 60);
+    const { intervalos } = T.audioARitmo(x, sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
+    assert.strictEqual(intervalos.length, 8);
+    const { notas, errores } = R.leerNotas(R.ritmoATexto(intervalos));
+    assert.deepStrictEqual(errores, []);
+    assert.strictEqual(notas.filter(n => n.hz > 0).length, 8);
+    const total = notas.reduce((s, n) => s + n.ms, 0);
+    assert(Math.abs(total - intervalos[7][1]) <= 60, 'dura lo mismo que el audio: ' + total);
+    const { cmds, ms } = R.compilar({ notas });
+    assert.strictEqual(cmds.reduce((s, c) => s + c.ms, 0), ms);
+}
+
+// 16f) Cola: una orden de luces que llega rota (ERR) se reintenta UNA vez; las de tiempo (T, W, M) no
+{
+    const enviadas = [];
+    const cola = R.crearCola(l => enviadas.push(l), () => {});
+    cola.enviar([{ l: 'SAVE', ex: true }]);
+    assert.strictEqual(cola.ack(true), true, 'primer ERR: reintenta');
+    assert.deepStrictEqual(enviadas, ['SAVE', 'SAVE']);
+    assert.strictEqual(cola.ack(true), false, 'segundo ERR: ya no');
+    assert.strictEqual(cola.ocupado(), false);
+    enviadas.length = 0;
+    cola.enviar([{ l: 'T 440 100' }, { l: 'M 100 100' }]);
+    assert.strictEqual(cola.ack(true), false);
+    assert.strictEqual(cola.ack(true), false);
+    assert.deepStrictEqual(enviadas, ['T 440 100', 'M 100 100']);
+    enviadas.length = 0;
+    cola.enviar([{ l: 'FX 1 40 ' + 'ff0000'.repeat(12), ex: true }]);
+    assert.strictEqual(cola.ack(true), true);
+    assert.strictEqual(cola.ack(false), false, 'si el reintento sale bien, ya está');
+    assert.strictEqual(enviadas.length, 2);
+}
+
+// 16e) Cola: "sin novedad" solo cuenta mientras hay algo esperando respuesta
+{
+    const cola = R.crearCola(() => {}, () => {});
+    assert.strictEqual(cola.sinNovedad(), 0);
+    cola.enviar([{ l: 'T 440 100' }]);
+    assert(cola.sinNovedad() >= 0 && cola.sinNovedad() < 1000);
+    cola.ack();
+    assert.strictEqual(cola.sinNovedad(), 0);
 }
 
 // 16b) Colores rápidos: los primarios, el blanco y el negro en su valor exacto, y todos llegan tal cual al LED
@@ -201,9 +273,13 @@ for (const c of R.CANCIONES) {
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)
 {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    for (const cmd of ['PING', 'T', 'W', 'M', 'S', 'L', 'LS', 'MODE']) {
+    for (const cmd of ['PING', 'T', 'W', 'M', 'S', 'L', 'LS', 'FX', 'SAVE', 'MODE']) {
         assert(ino.includes(`strcmp(cmd, "${cmd}")`), `el firmware no entiende ${cmd}`);
     }
+    // los modos de efecto de la página coinciden con los que dibuja el firmware (0 a 4)
+    assert.deepStrictEqual(Object.values(R.MODOS_FX).sort(), [0, 1, 2, 3, 4]);
+    assert(/m < 0 \|\| m > 4/.test(ino), 'el firmware acepta FX 0 a 4');
+    assert(ino.includes('EEPROM.update'), 'SAVE guarda en la EEPROM');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');

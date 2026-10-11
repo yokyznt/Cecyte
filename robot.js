@@ -35,20 +35,24 @@ function palabras(texto) {
     return String(texto || '').replace(/\/\/.*$/gm, ' ').replace(/[|,;]/g, ' ').split(/\s+/).filter(Boolean);
 }
 
-// "C4/8", "F#3/4.", "R/2": la duración se repite hasta que pongas otra. /4 = un tiempo, /2 = dos.
+// "C4/8", "F#3/4.", "R/2", "A5:120": la duración se repite hasta que pongas otra.
+// /4 = un tiempo, /2 = dos, /8 = medio; ":120" = 120 milisegundos (así salen los ritmos de un audio).
 function leerNotas(texto) {
     const notas = [], errores = [];
-    let denom = 4, punto = false;
+    let dur = { beats: 1 };
     for (const tok of palabras(texto)) {
-        const m = /^(?:([A-Ga-g])([#b]?)(\d)|[Rr])(?:\/(\d+)(\.?))?$/.exec(tok);
+        const m = /^(?:([A-Ga-g])([#b]?)(\d)|[Rr])(?:\/(\d+)(\.?)|:(\d+))?$/.exec(tok);
         if (!m) { errores.push(tok); continue; }
         if (m[4] !== undefined) {
             const d = Number(m[4]);
             if (!DENOMINADORES.includes(d)) { errores.push(tok); continue; }
-            denom = d;
-            punto = m[5] === '.';
+            dur = { beats: (4 / d) * (m[5] === '.' ? 1.5 : 1) };
+        } else if (m[6] !== undefined) {
+            const ms = Number(m[6]);
+            if (ms < 10 || ms > 60000) { errores.push(tok); continue; }
+            dur = { ms };
         }
-        notas.push({ nombre: tok, hz: m[1] ? frecuencia(m[1], m[2], Number(m[3])) : 0, beats: (4 / denom) * (punto ? 1.5 : 1) });
+        notas.push({ nombre: tok, hz: m[1] ? frecuencia(m[1], m[2], Number(m[3])) : 0, ...dur });
         if (notas.length >= MAX_NOTAS) { errores.push('…'); break; }
     }
     return { notas, errores };
@@ -89,7 +93,7 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null }) 
     const son = [];
     let t = 0;
     notas.forEach((n, i) => {
-        const dur = n.beats * beatMs;
+        const dur = n.ms !== undefined ? n.ms : n.beats * beatMs;
         const suena = n.hz > 0 ? (dur >= 100 ? dur * ARTICULACION : dur) : 0;
         if (n.hz > 0) son.push({ a: R(t), b: R(t + suena), hz: clamp(n.hz, 40, 8000), i });
         const ini = R(t + suena), fin = R(t + dur);
@@ -149,7 +153,7 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null }) 
 // dibuja el anillo no oye el USB. "!" (abortar) corta todo y se espera su "ABORTED".
 
 function crearCola(escribir, crudo) {
-    let pend = [], vuelo = [], abortando = false, alFinal = null, timerAborto = null;
+    let pend = [], vuelo = [], abortando = false, alFinal = null, timerAborto = null, ultimoMov = Date.now();
 
     function bombear() {
         if (abortando) return;
@@ -159,7 +163,7 @@ function crearCola(escribir, crudo) {
             if (vuelo.length && (c.ex || vuelo[vuelo.length - 1].ex)) break;
             if (vuelo.length >= VENTANA_ORDENES || (vuelo.length && bytes + n > VENTANA_BYTES)) break;
             pend.shift();
-            vuelo.push({ n, ex: !!c.ex });
+            vuelo.push({ n, ex: !!c.ex, c });
             escribir(c.l);
         }
         if (!pend.length && !vuelo.length && alFinal) {
@@ -179,9 +183,21 @@ function crearCola(escribir, crudo) {
         enviar(cmds, fin) {
             pend = pend.concat(cmds.map(c => (typeof c === 'string' ? { l: c } : c)));
             if (fin) alFinal = fin;
+            if (!vuelo.length) ultimoMov = Date.now();
             bombear();
         },
-        ack() { if (!abortando && vuelo.length) { vuelo.shift(); bombear(); } },
+        // err = el robot contestó ERR. Una orden de luces o de ajuste que llegó rota se reintenta una
+        // vez (el USB puede perder un byte mientras el robot dibuja el anillo); las que llevan
+        // tiempo (T, W, M) no, porque repetirlas descuadraría la canción. Devuelve true si reintentó.
+        ack(err) {
+            if (abortando || !vuelo.length) return false;
+            ultimoMov = Date.now();
+            const e = vuelo.shift();
+            const reintentar = !!err && !e.c.reint && /^(FX|SAVE|MODE|LS|L|S)( |$)/.test(e.c.l);
+            if (reintentar) pend.unshift(Object.assign({}, e.c, { reint: 1 }));
+            bombear();
+            return reintentar;
+        },
         abortar() {
             pend = []; vuelo = []; alFinal = null;
             if (abortando) return;
@@ -192,6 +208,8 @@ function crearCola(escribir, crudo) {
         },
         abortado() { soltar(); },
         ocupado() { return abortando || pend.length > 0 || vuelo.length > 0; },
+        // ms desde la última orden confirmada; sirve para detectar que el robot dejó de contestar
+        sinNovedad() { return vuelo.length > 0 && !abortando ? Date.now() - ultimoMov : 0; },
         reiniciar() { soltar(); },
     };
 }
@@ -225,37 +243,20 @@ function hexARgb(hex) {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-// base: 12 colores [r,g,b]; t en ms; hz solo para "musica". Devuelve 12 colores [r,g,b].
-function efecto(nombre, t, base, hz) {
-    switch (nombre) {
-        case 'arcoiris':
-            return base.map((_, i) => hsv((i / LEDS + t / 4000) % 1, 1, 1));
-        case 'respirar': {
-            const k = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(2 * Math.PI * t / 2400));
-            return base.map(c => c.map(x => x * k));
-        }
-        case 'persecucion': {
-            const cabeza = Math.floor(t / 90) % LEDS;
-            return base.map((c, i) => {
-                const d = (cabeza - i + LEDS) % LEDS;
-                const k = d < 5 ? 1 - d * 0.2 : 0.04;
-                return c.map(x => x * k);
-            });
-        }
-        case 'musica': {
-            if (!hz) return base;
-            const tono = ((Math.log2(hz / 261.63) % 1) + 1) % 1;   // la misma nota da el mismo color en cualquier octava
-            return base.map(() => hsv(tono, 1, 1));
-        }
-        default:
-            return base;
-    }
-}
-
 // 12 colores [r,g,b] -> "RRGGBB" x 12 con el brillo (0 a 100) aplicado
 function marcoHex(colores, brillo) {
     const k = clamp(brillo, 0, 100) / 100;
     return colores.slice(0, LEDS).map(c => c.map(x => clamp(Math.round(x * k), 0, 255).toString(16).padStart(2, '0')).join('')).join('');
+}
+
+// Los efectos corren solos en el robot (también mientras suena una nota), así las luces siguen
+// su flujo y no hay que mandarle cuadros uno por uno. Modo FX = número que entiende el firmware.
+const MODOS_FX = { fijo: 0, arcoiris: 1, respirar: 2, persecucion: 3, musica: 4 };
+
+// Orden FX: los 12 colores base van sin brillo y el robot aplica el brillo (0 a 100).
+function fxLinea(nombre, brillo, colores) {
+    const m = MODOS_FX[nombre] !== undefined ? MODOS_FX[nombre] : 0;
+    return `FX ${m} ${Math.round(clamp(Number(brillo) || 0, 0, 100))} ${marcoHex(colores, 100)}`;
 }
 
 // ---------- Biblioteca ----------
@@ -308,10 +309,33 @@ const PALETA = [
 ];
 const COLOR_INICIAL = '#00ff00';
 
+// Tonos con los que suenan los golpes de un ritmo. "Alterna" cambia de tono en cada golpe, y así
+// el efecto de luces "por nota" también cambia de color.
+const TONOS_RITMO = {
+    alterna: ['C5', 'E5', 'G5', 'C6'],
+    agudo: ['A5'],
+    grave: ['A4'],
+};
+
+// [[inicio, fin], ...] en ms -> texto de notas con duración en milisegundos: "C5:120 R:300 E5:90"
+function ritmoATexto(intervalos, tonos = TONOS_RITMO.alterna) {
+    const out = [];
+    let t = 0, k = 0;
+    for (const [s, e] of intervalos) {
+        if (out.length >= MAX_NOTAS - 2) break;
+        const pausa = Math.round(s - t);
+        if (pausa >= 10) out.push('R:' + Math.min(pausa, 60000));
+        const dur = Math.min(60000, Math.max(10, Math.round(e - s)));
+        out.push(`${tonos[k++ % tonos.length]}:${dur}`);
+        t = Math.max(t, s) + dur;
+    }
+    return out.join(' ');
+}
+
 const lib = {
-    BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL,
+    BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
-    hsv, hexARgb, efecto, marcoHex,
+    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lib;
@@ -333,12 +357,16 @@ const S = {
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
     brillo: 40, efecto: 'fijo', vivo: true, repetir: false,
     cancion: 'estrellita', notas: '', bpm: 110, baile: 'vaiven', pasos: null, vel: 110,
+    guardadas: [],            // canciones y ritmos guardados: { id, nombre, texto, bpm }
+    guardarEn: 0,             // cuándo mandar SAVE al robot (ms), 0 = nada pendiente
 };
+const MAX_GUARDADAS = 40;
+let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel }));
+        const { leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -348,6 +376,10 @@ function cargar() {
         if (g && typeof g === 'object') Object.assign(S, g);
     } catch (e) { /* datos viejos o dañados: se usan los de fábrica */ }
     if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
+    S.guardadas = (Array.isArray(S.guardadas) ? S.guardadas : [])
+        .filter(g => g && typeof g.id === 'string' && typeof g.nombre === 'string' && typeof g.texto === 'string')
+        .slice(0, MAX_GUARDADAS);
+    if (S.cancion.startsWith('g:') && !S.guardadas.some(g => 'g:' + g.id === S.cancion)) S.cancion = 'propia';
     if (!S.notas) {
         const c = CANCIONES.find(x => x.id === S.cancion) || CANCIONES[0];
         S.notas = c.texto;
@@ -388,8 +420,9 @@ const escribirLinea = l => crudo(l + '\n');
 
 function alLinea(l) {
     if (/^(OK|ERR)\b/.test(l)) {
-        if (/^ERR/.test(l)) mensaje('El robot no entendió una orden (' + l + ').', 'err');
-        S.cola.ack();
+        const err = /^ERR/.test(l);
+        const reintento = S.cola.ack(err);
+        if (err && !reintento) mensaje('El robot no entendió una orden (' + l + ').', 'err');
     } else if (/^PONG mbot-web/.test(l) || /mBot Ranger web .*listo/.test(l)) {
         if (S.estado === 'conectando') alListo();
     } else if (/mBot Ranger listo/.test(l)) {
@@ -538,13 +571,10 @@ function coloresBase() { return S.leds.map(hexARgb); }
 function armar(conCancion, conBaile) {
     const n = leerNotas(S.notas), b = leerBaile(S.pasos);
     mostrarErrores(n.errores, b.errores);
-    const base = coloresBase();
-    const luz = (i, hz) => marcoHex(efecto(S.efecto, (i || 0) * 150, base, hz), S.brillo);
     return compilar({
         notas: conCancion ? n.notas : [],
         pasos: conBaile ? b.pasos : [],
         bpm: S.bpm, vel: S.vel,
-        luz: S.efecto === 'fijo' ? null : luz,
     });
 }
 
@@ -560,11 +590,13 @@ function actuar(conCancion, conBaile) {
     S.actuando = { conCancion, conBaile };
     S.inicio = performance.now();
     S.total = ms;
-    S.cola.enviar(['MODE 4'].concat(cmds), () => {
+    // El efecto de luces va primero y corre solo en el robot mientras suena todo lo demás.
+    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true };
+    S.guardarEn = Date.now() + 2500;
+    S.cola.enviar(['MODE 4', fx].concat(cmds), () => {
         if (S.actuando && S.repetir) return actuar(conCancion, conBaile);
         S.actuando = false;
         progreso(0);
-        S.sucio = true;
         mensaje('Listo.', 'ok');
     });
     mensaje(conBaile ? 'Bailando…' : 'Cantando…');
@@ -605,16 +637,26 @@ function esperarYTocar(a) {
     actuar(a.conCancion, a.conBaile);
 }
 
-// Anillo de LEDs y efectos: cada 100 ms, si el robot está libre
+// Cada 100 ms: avance de la barra, aviso si el robot dejó de contestar y, cuando cambian las luces,
+// una sola orden FX (el robot anima el efecto él solo) y luego SAVE para que se quede guardado.
 function tickLeds() {
     const visible = !$('sec-robot').hidden && !document.hidden;
     if (S.actuando || S.audio) progreso((performance.now() - S.inicio) / S.total);
+    if (S.estado === 'listo' && S.cola.sinNovedad() > 6000) {
+        paro();
+        mensaje('El robot dejó de contestar. Si no reacciona, pulsa Desconectar y vuelve a conectar.', 'err');
+        return;
+    }
     if (S.estado !== 'listo' || !S.vivo || S.actuando || !visible || S.cola.ocupado()) return;
-    const animado = S.efecto !== 'fijo' && S.efecto !== 'musica';
-    if (!animado && !S.sucio) return;
-    S.sucio = false;
-    const colores = efecto(animado ? S.efecto : 'fijo', performance.now(), coloresBase());
-    S.cola.enviar([{ l: 'LS ' + marcoHex(colores, S.brillo), ex: true }]);
+    if (S.sucio) {
+        S.sucio = false;
+        S.guardarEn = Date.now() + 2500;
+        S.cola.enviar([{ l: fxLinea(S.efecto, S.brillo, coloresBase()), ex: true }]);
+    } else if (S.guardarEn && Date.now() >= S.guardarEn) {
+        S.guardarEn = 0;
+        S.cola.enviar([{ l: 'SAVE', ex: true }]);
+        mensaje('Luces guardadas en el robot: siguen igual aunque lo desconectes.', 'ok');
+    }
 }
 
 // ---------- Pantalla ----------
@@ -656,6 +698,7 @@ function pintarTodo() {
     $('rb-repetir').checked = S.repetir;
     $('rb-cancion').value = S.cancion;
     $('rb-baile').value = S.baile;
+    $('rb-borrar').disabled = !S.cancion.startsWith('g:');
     pintarAnillo();
     mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
 }
@@ -664,11 +707,140 @@ function opciones(sel, lista, propia) {
     sel.innerHTML = lista.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('') + `<option value="propia">${propia}</option>`;
 }
 
+const escHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Canciones de fábrica, luego las que guardaste (canciones o ritmos de un audio) y "sin guardar"
+function pintarCanciones() {
+    const base = CANCIONES.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+    const mias = S.guardadas.map(x => `<option value="g:${escHtml(x.id)}">${escHtml(x.nombre)}</option>`).join('');
+    $('rb-cancion').innerHTML = base + (mias ? `<optgroup label="Mis canciones y ritmos">${mias}</optgroup>` : '')
+        + '<option value="propia">Sin guardar (lo que hay en pantalla)</option>';
+    $('rb-cancion').value = S.cancion;
+}
+
+// ---------- Audio o MIDI -> ritmo ----------
+// Reutiliza la detección de golpes de timbre.js (la misma del ritmo del timbre) y deja el
+// resultado como texto de notas con milisegundos, para poder editarlo, escucharlo y guardarlo.
+
+function infoAudio(texto, tipo) {
+    const el = $('rb-aud-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+async function leerArchivoMusica(f) {
+    const buf = await f.arrayBuffer();
+    if (/\.midi?$/i.test(f.name)) {
+        const notas = parseMidi(new Uint8Array(buf));
+        if (!notas.length) throw new Error('el MIDI no trae notas');
+        return { tipo: 'midi', notas, dur: notas[notas.length - 1].e / 1000 };
+    }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    try {
+        const buffer = await ctx.decodeAudioData(buf);
+        return { tipo: 'audio', buffer, dur: buffer.duration };
+    } finally {
+        ctx.close();
+    }
+}
+
+// Pedazo [ini, ini + dur] segundos, mezclado a mono
+function monoVentana(buffer, ini, dur) {
+    const sr = buffer.sampleRate;
+    const a = Math.floor(ini * sr);
+    const n = Math.max(1, Math.min(Math.floor(dur * sr), buffer.length - a));
+    const x = new Float32Array(n);
+    const canales = buffer.numberOfChannels;
+    for (let c = 0; c < canales; c++) {
+        const d = buffer.getChannelData(c);
+        for (let i = 0; i < n; i++) x[i] += d[a + i] / canales;
+    }
+    return { x, sr };
+}
+
+// Tempo aproximado a partir del tiempo típico entre golpes, para que el baile (que va en tiempos) acompañe
+function estimarBpm(intervalos) {
+    const d = [];
+    for (let i = 1; i < intervalos.length; i++) d.push(intervalos[i][0] - intervalos[i - 1][0]);
+    d.sort((p, q) => p - q);
+    const med = d[Math.floor(d.length / 2)];
+    if (!med || med < 40) return null;
+    let bpm = 60000 / med;
+    while (bpm > 200) bpm /= 2;
+    while (bpm < 70) bpm *= 2;
+    return Math.round(bpm);
+}
+
+function convertirAudio() {
+    if (!musicaCargada) return infoAudio('Primero elige un archivo de audio o un MIDI.', 'err');
+    const ini = clamp(Number($('rb-aud-ini').value) || 0, 0, Math.max(0, musicaCargada.dur - 1));
+    const dur = clamp(Number($('rb-aud-dur').value) || 20, 1, 60);
+    const op = { modo: $('rb-aud-modo').value, sens: Number($('rb-aud-sens').value), golpe: 120, sep: 120 };
+    let intervalos;
+    if (musicaCargada.tipo === 'midi') {
+        const desde = ini * 1000, hasta = (ini + dur) * 1000;
+        const notas = musicaCargada.notas
+            .filter(n => n.e > desde && n.s < hasta)
+            .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde }));
+        intervalos = midiARitmo(notas, op).intervalos;
+    } else {
+        const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
+        intervalos = audioARitmo(x, sr, op).intervalos;
+    }
+    const texto = ritmoATexto(intervalos, TONOS_RITMO[$('rb-aud-tono').value] || TONOS_RITMO.alterna);
+    if (!texto) return infoAudio('No encontré golpes en ese pedazo. Sube la sensibilidad o elige otra parte.', 'err');
+    const n = leerNotas(texto).notas;
+    const total = n.reduce((s, x) => s + x.ms, 0);
+    const bpm = estimarBpm(intervalos);
+    S.notas = texto;
+    S.cancion = 'propia';
+    if (bpm) S.bpm = bpm;
+    $('rb-nombre').value = '';
+    pintarCanciones();
+    pintarTodo();
+    cambio('cancion');
+    infoAudio(`Listo: ${intervalos.length} golpes en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}. Escúchalo aquí o guárdalo con un nombre.`, 'ok');
+}
+
+function guardarCancion() {
+    const texto = S.notas.trim();
+    if (!leerNotas(texto).notas.length) return mensaje('No hay notas que guardar.', 'err');
+    const nombre = ($('rb-nombre').value.trim() || ('Ritmo ' + (S.guardadas.length + 1))).slice(0, 40);
+    let g = S.guardadas.find(x => x.nombre.toLowerCase() === nombre.toLowerCase());
+    if (g) {
+        g.texto = texto;
+        g.bpm = S.bpm;
+    } else {
+        if (S.guardadas.length >= MAX_GUARDADAS) return mensaje('Ya tienes ' + MAX_GUARDADAS + ' guardados; borra alguno primero.', 'err');
+        g = { id: Date.now().toString(36), nombre, texto, bpm: S.bpm };
+        S.guardadas.push(g);
+    }
+    S.cancion = 'g:' + g.id;
+    $('rb-nombre').value = g.nombre;
+    pintarCanciones();
+    pintarTodo();
+    guardar();
+    mensaje(`Guardado «${g.nombre}». Sale en la lista de canciones.`, 'ok');
+}
+
+function borrarCancion() {
+    const g = S.guardadas.find(x => 'g:' + x.id === S.cancion);
+    if (!g || !window.confirm(`¿Borrar «${g.nombre}»?`)) return;
+    S.guardadas = S.guardadas.filter(x => x !== g);
+    S.cancion = 'propia';
+    $('rb-nombre').value = '';
+    pintarCanciones();
+    pintarTodo();
+    guardar();
+    mensaje('Borrado.');
+}
+
 function iniciar() {
     if (!$('sec-robot')) return;
     cargar();
     S.cola = crearCola(escribirLinea, crudo);
-    opciones($('rb-cancion'), CANCIONES, 'Mi canción');
+    pintarCanciones();
     opciones($('rb-baile'), BAILES, 'Mi baile');
     $('rb-efecto').innerHTML = EFECTOS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
     $('rb-paleta').innerHTML = PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-label="Pintar todos de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join('');
@@ -688,8 +860,9 @@ function iniciar() {
 
     $('rb-cancion').addEventListener('change', e => {
         S.cancion = e.target.value;
-        const c = CANCIONES.find(x => x.id === S.cancion);
+        const c = CANCIONES.find(x => x.id === S.cancion) || S.guardadas.find(x => 'g:' + x.id === S.cancion);
         if (c) { S.notas = c.texto; S.bpm = c.bpm; }
+        $('rb-nombre').value = S.cancion.startsWith('g:') ? c.nombre : '';
         pintarTodo();
         cambio('cancion');
     });
@@ -697,9 +870,28 @@ function iniciar() {
         S.notas = e.target.value;
         S.cancion = 'propia';
         $('rb-cancion').value = 'propia';
+        $('rb-borrar').disabled = true;
         mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
         cambio('cancion');
     });
+    $('rb-guardar').addEventListener('click', guardarCancion);
+    $('rb-borrar').addEventListener('click', borrarCancion);
+
+    $('rb-audio').addEventListener('change', async e => {
+        const f = e.target.files[0];
+        musicaCargada = null;
+        if (!f) return infoAudio('');
+        infoAudio('Leyendo el archivo…');
+        try {
+            musicaCargada = await leerArchivoMusica(f);
+            $('rb-aud-ini').value = 0;
+            infoAudio(`${f.name}: dura ${musicaCargada.dur.toFixed(1)} s. Elige desde dónde y pulsa Convertir en ritmo.`);
+        } catch (err) {
+            infoAudio('No pude leer ese archivo (' + (err && err.message ? err.message : 'formato no válido') + ').', 'err');
+        }
+    });
+    $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
+    $('rb-aud-convertir').addEventListener('click', convertirAudio);
     $('rb-bpm').addEventListener('input', e => {
         S.bpm = Number(e.target.value);
         $('rb-bpm-v').textContent = S.bpm + ' tiempos por minuto';
