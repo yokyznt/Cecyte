@@ -21,7 +21,10 @@
                      m = 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota;
                      b = brillo 0..100; los 12 colores base van en hex como en LS
     SAVE             guarda el último FX en la EEPROM: al encender, el robot lo vuelve a poner
-    MODE n           cambia de modo (0..4)
+    PCLR             empieza a guardar un show nuevo (borra el anterior)
+    PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
+    PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
+    MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
                      frena los motores y borra lo pendiente. Responde ABORTED.
   Avisos sueltos: "BTN n" (se cambió de modo con el botón) y "WDT" (los motores se pararon
@@ -49,7 +52,16 @@ const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int AJUSTE_US = 4;             // lo que tarda un digitalWrite; si las notas salen bajas, súbelo
 const int MODO_WEB = 4;
+const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
 const unsigned long SIN_ORDENES_MS = 3000;
+
+// Show guardado: cabecera de 4 bytes en la EEPROM y luego las órdenes, una detrás de otra:
+//   1 hz(2) ms(2) = nota   2 ms(2) = espera   3 izq/2 der/2 = motores   4 = parar
+const int PGM_DIR = 100;
+const int PGM_MAX = 2800;
+const uint8_t PGM_MAGICO = 0xB5;
+int pgmFin = 0;                      // bytes que lleva la subida en curso
+unsigned long showT0 = 0;            // el show espera a esta hora (para dejarlo en el piso)
 
 int modo = 0;
 bool moviendo = false;
@@ -179,7 +191,7 @@ void tono(int hz, int ms) {
   unsigned long fin = micros() + (unsigned long)ms * 1000UL;
   unsigned long ultimoDrenaje = micros();
   pinMode(PIN_BUZZER, OUTPUT);
-  while (!abortar && (long)(fin - micros()) > 0) {
+  while (!abortar && !(modo == MODO_SHOW && colaN > 0) && (long)(fin - micros()) > 0) {
     digitalWrite(PIN_BUZZER, HIGH);
     delayMicroseconds(medio);
     digitalWrite(PIN_BUZZER, LOW);
@@ -194,7 +206,7 @@ void tono(int hz, int ms) {
 
 void espera(unsigned long ms) {
   unsigned long fin = millis() + ms;
-  while (!abortar && (long)(fin - millis()) > 0) {
+  while (!abortar && !(modo == MODO_SHOW && colaN > 0) && (long)(fin - millis()) > 0) {
     drenar();
     fxPaso();
   }
@@ -315,6 +327,71 @@ void fxRestaurar() {
   Serial.println(m);
 }
 
+// ---------- Show guardado: canta y baila solo, sin la página ----------
+bool pgmValido()      { return EEPROM.read(PGM_DIR) == PGM_MAGICO && pgmLargo() > 0; }
+uint8_t pgmBanderas() { return EEPROM.read(PGM_DIR + 1); }
+int pgmLargo()        { return EEPROM.read(PGM_DIR + 2) | (EEPROM.read(PGM_DIR + 3) << 8); }
+
+bool pgmPon(uint8_t b) {                     // un byte más de la subida
+  if (pgmFin >= PGM_MAX) return false;
+  EEPROM.update(PGM_DIR + 4 + pgmFin++, b);
+  drenar();                                  // cada escritura tarda ~3 ms: que el USB no se llene
+  return true;
+}
+
+// La página (o el botón de la placa) cortan el show: llegan bytes por USB, un "!" o se pulsa el botón.
+bool showCortar() {
+  drenar();
+  if (abortar || colaN > 0) return true;
+  if (botonPresionado()) {
+    ultimoBoton = millis();
+    modo = 0;
+    aplicaModo();
+    Serial.print(F("BTN "));
+    Serial.println(modo);
+    return true;
+  }
+  return false;
+}
+
+void correShow() {
+  if (!pgmValido()) { modo = 0; return; }
+  const int largo = pgmLargo();
+  const bool repite = pgmBanderas() & 2;
+  Serial.println(F("SHOW inicio"));
+  do {
+    int p = 0;
+    while (p < largo && modo == MODO_SHOW) {
+      uint8_t op = EEPROM.read(PGM_DIR + 4 + p++);
+      if (op == 1 && p + 4 <= largo) {
+        int hz = EEPROM.read(PGM_DIR + 4 + p) | (EEPROM.read(PGM_DIR + 4 + p + 1) << 8);
+        int ms = EEPROM.read(PGM_DIR + 4 + p + 2) | (EEPROM.read(PGM_DIR + 4 + p + 3) << 8);
+        p += 4;
+        tono(constrain(hz, 40, 8000), constrain(ms, 1, 5000));
+      } else if (op == 2 && p + 2 <= largo) {
+        int ms = EEPROM.read(PGM_DIR + 4 + p) | (EEPROM.read(PGM_DIR + 4 + p + 1) << 8);
+        p += 2;
+        espera(constrain(ms, 0, 5000));
+      } else if (op == 3 && p + 2 <= largo) {
+        int izq = (int8_t)EEPROM.read(PGM_DIR + 4 + p) * 2;
+        int der = (int8_t)EEPROM.read(PGM_DIR + 4 + p + 1) * 2;
+        p += 2;
+        motores(constrain(izq, -VEL_MAX, VEL_MAX), constrain(der, -VEL_MAX, VEL_MAX));
+      } else if (op == 4) {
+        parar();
+      } else {
+        break;                               // dato raro: se termina el show
+      }
+      fxPaso();
+      if (showCortar()) break;
+    }
+    parar();
+  } while (repite && modo == MODO_SHOW && !abortar && colaN == 0);
+  parar();
+  if (modo == MODO_SHOW) modo = 0;           // las luces siguen: no se llama a aplicaModo()
+  Serial.println(F("SHOW fin"));
+}
+
 // ---------- Órdenes ----------
 void ok()  { Serial.println(F("OK")); }
 void err(const __FlashStringHelper *motivo) { Serial.print(F("ERR ")); Serial.println(motivo); }
@@ -377,10 +454,41 @@ void ejecuta(char *s) {
   } else if (!strcmp(cmd, "SAVE")) {
     fxGuardar();
     ok();
+  } else if (!strcmp(cmd, "PCLR")) {
+    EEPROM.update(PGM_DIR, 0);                 // el show queda inválido hasta que PEND lo cierre
+    pgmFin = 0;
+    ok();
+  } else if (!strcmp(cmd, "PADD") && a) {
+    bool bien = false;
+    if (!strcmp(a, "T") && b && c) {
+      int hz = constrain(atoi(b), 40, 8000), ms = constrain(atoi(c), 1, 5000);
+      bien = pgmPon(1) && pgmPon(hz & 0xFF) && pgmPon(hz >> 8) && pgmPon(ms & 0xFF) && pgmPon(ms >> 8);
+    } else if (!strcmp(a, "W") && b) {
+      int ms = constrain(atoi(b), 0, 5000);
+      bien = pgmPon(2) && pgmPon(ms & 0xFF) && pgmPon(ms >> 8);
+    } else if (!strcmp(a, "M") && b && c) {
+      int izq = constrain(atoi(b), -VEL_MAX, VEL_MAX) / 2, der = constrain(atoi(c), -VEL_MAX, VEL_MAX) / 2;
+      bien = pgmPon(3) && pgmPon((uint8_t)(int8_t)izq) && pgmPon((uint8_t)(int8_t)der);
+    } else if (!strcmp(a, "S")) {
+      bien = pgmPon(4);
+    }
+    if (bien) ok(); else err(F("show"));
+  } else if (!strcmp(cmd, "PEND")) {
+    int banderas = a ? atoi(a) : 0;
+    EEPROM.update(PGM_DIR + 1, banderas);
+    EEPROM.update(PGM_DIR + 2, pgmFin & 0xFF);
+    EEPROM.update(PGM_DIR + 3, pgmFin >> 8);
+    EEPROM.update(PGM_DIR, pgmFin > 0 ? PGM_MAGICO : 0);   // al final: así nunca queda un show a medias
+    ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
-    if (n < 0 || n > MODO_WEB) { err(F("modo")); }
-    else { modo = n; aplicaModo(); ok(); }
+    if (n < 0 || n > MODO_SHOW) { err(F("modo")); }
+    else {
+      modo = n;
+      aplicaModo();
+      if (n == MODO_SHOW) showT0 = millis() + 300;
+      ok();
+    }
   } else {
     err(F("comando"));
   }
@@ -437,6 +545,10 @@ void setup() {
   aplicaModo();
   buzzer.tone(800, 100);
   fxRestaurar();                       // si hay luces guardadas, vuelven solas
+  if (pgmValido() && (pgmBanderas() & 1)) {   // show guardado que arranca solo, a los 2,5 s
+    modo = MODO_SHOW;
+    showT0 = millis() + 2500;
+  }
   Serial.println(F("mBot Ranger web v1 listo"));
 }
 
@@ -444,10 +556,12 @@ void loop() {
   atiendeUSB();
   fxPaso();
 
-  // Cambio de modo con el botón (con antirrebote). De 3 o de 4 vuelve a 0.
+  // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
+  // De 3 sin show, de 4 (página) y de 5 vuelve a 0.
   if (botonPresionado() && millis() - ultimoBoton > 400) {
     ultimoBoton = millis();
-    modo = (modo >= MODO_WEB - 1) ? 0 : modo + 1;
+    if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
+    else modo = (modo >= 3) ? 0 : modo + 1;
     aplicaModo();
     Serial.print(F("BTN "));
     Serial.println(modo);
@@ -457,6 +571,7 @@ void loop() {
     case 1: esquivar();    break;
     case 2: seguir();      break;
     case 3: testMotores(); break;
+    case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
     default: break;
   }
 

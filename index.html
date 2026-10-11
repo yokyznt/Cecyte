@@ -619,6 +619,21 @@
                                         <label class="rb-check"><input type="checkbox" id="rb-repetir"><span>Repetir hasta pulsar Paro</span></label>
                                     </div>
                                     <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
+
+                                    <details class="rb-audio">
+                                        <summary>Que lo haga solo, sin la página (desconectado)</summary>
+                                        <div class="stack">
+                                            <p class="hint">Guarda en el robot la canción y el baile que tengas en pantalla, más las luces. Después lo hace sin USB ni computadora: se elige con el botón de la placa (después del modo rojo, con las luces del efecto) o, si lo marcas, arranca solo 2,5 s después de encenderlo. El botón de la placa lo corta.</p>
+                                            <label class="rb-check"><input type="checkbox" id="rb-auto"><span>Que empiece solo al encenderlo</span></label>
+                                            <p class="hint">Se repite sin parar si marcas "Repetir hasta pulsar Paro" de arriba. Caben unos 2800 bytes (más o menos 350 notas).</p>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-pgm-guardar" class="btn btn--primary btn--sm" disabled>Guardar el show en el robot</button>
+                                                <button type="button" id="rb-pgm-probar" class="btn btn--secondary btn--sm" disabled>Probar el show guardado</button>
+                                                <button type="button" id="rb-pgm-borrar" class="btn btn--secondary btn--sm" disabled>Borrar el show del robot</button>
+                                            </div>
+                                            <p id="rb-pgm-info" class="msg" role="status"></p>
+                                        </div>
+                                    </details>
                                 </div>
 
                                 <hr class="divider">
