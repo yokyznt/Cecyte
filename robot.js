@@ -12,7 +12,7 @@
 const BAUDIOS = 115200;
 const VEL_MAX = 180;          // lo mismo que VEL_MAX del firmware
 const ARTICULACION = 0.9;     // cuánto de cada nota suena; el resto es el silencio entre notas
-const MAX_NOTAS = 400;
+const MAX_NOTAS = 600;
 const LEDS = 12;
 const MAX_ORDEN_MS = 4000;    // el firmware corta cada T y W a 5000 ms; se parten antes
 const VENTANA_BYTES = 120;    // lo que puede haber en camino sin OK (el firmware guarda 256)
@@ -332,6 +332,217 @@ function ritmoATexto(intervalos, tonos = TONOS_RITMO.alterna) {
     return out.join(' ');
 }
 
+// ---------- Melodía de un audio o de un MIDI ----------
+// El buzzer toca una nota a la vez, así que de una canción se queda la línea principal (la voz o el
+// instrumento que más se oye): el pico dominante del espectro entre fMin y fMax en cada instante.
+// Luego se suaviza, se ajusta a la tonalidad (se quitan las notas desafinadas) y se sube al registro
+// donde el buzzer suena mejor.
+
+const NOMBRES_NOTA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOMBRES_TONICA = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+const nombreMidi = m => NOMBRES_NOTA[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+const ESCALA_MAYOR = [0, 2, 4, 5, 7, 9, 11];
+const MIDI_OBJETIVO = 79;         // La mediana de la melodía cae cerca de Sol5 (784 Hz), donde el buzzer se oye bien
+
+function fftEnSitio(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+        let bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) { const a = re[i]; re[i] = re[j]; re[j] = a; const b = im[i]; im[i] = im[j]; im[j] = b; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+        const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), medio = len >> 1;
+        for (let i = 0; i < n; i += len) {
+            let cr = 1, ci = 0;
+            for (let j = 0; j < medio; j++) {
+                const ur = re[i + j], ui = im[i + j];
+                const xr = re[i + j + medio], xi = im[i + j + medio];
+                const vr = xr * cr - xi * ci, vi = xr * ci + xi * cr;
+                re[i + j] = ur + vr; im[i + j] = ui + vi;
+                re[i + j + medio] = ur - vr; im[i + j + medio] = ui - vi;
+                const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+            }
+        }
+    }
+}
+
+// midi: un valor por cuadro (NaN = silencio) -> texto de notas con milisegundos. Es el último paso
+// de la melodía, y lo comparten el audio y el MIDI.
+function melodiaATexto(midi, hopMs, op) {
+    const o = Object.assign({ minNotaMs: 90, tonalidad: true, subir: true }, op);
+    const n = midi.length;
+    const q = Array.from(midi, v => (Number.isNaN(v) ? NaN : Math.round(v)));
+
+    // tonalidad: la escala mayor que más cuadros cubre (Do mayor = La menor, etc.)
+    const cuentas = new Array(12).fill(0);
+    q.forEach(m => { if (!Number.isNaN(m)) cuentas[((m % 12) + 12) % 12]++; });
+    let tonica = 0, mejor = -1;
+    for (let t = 0; t < 12; t++) {
+        const cubre = ESCALA_MAYOR.reduce((s, g) => s + cuentas[(t + g) % 12], 0);
+        if (cubre > mejor) { mejor = cubre; tonica = t; }
+    }
+    const enEscala = new Set(ESCALA_MAYOR.map(g => (tonica + g) % 12));
+    if (o.tonalidad) {
+        for (let f = 0; f < n; f++) {
+            const m = q[f];
+            if (Number.isNaN(m) || enEscala.has(((m % 12) + 12) % 12)) continue;
+            const abajo = enEscala.has((((m - 1) % 12) + 12) % 12), arriba = enEscala.has((((m + 1) % 12) + 12) % 12);
+            // si las dos vecinas valen, se queda con la que más suena en la canción
+            q[f] = abajo && arriba
+                ? (cuentas[(((m - 1) % 12) + 12) % 12] >= cuentas[(((m + 1) % 12) + 12) % 12] ? m - 1 : m + 1)
+                : abajo ? m - 1 : arriba ? m + 1 : m;
+        }
+    }
+
+    // cuadros iguales seguidos -> tramos
+    let tramos = [];
+    for (let f = 0; f < n; f++) {
+        const t = tramos[tramos.length - 1];
+        if (t && ((Number.isNaN(t.m) && Number.isNaN(q[f])) || t.m === q[f])) t.n++;
+        else tramos.push({ m: q[f], n: 1 });
+    }
+    // quita notas demasiado cortas (se funden con la vecina más cercana) y huecos mínimos
+    const minF = Math.max(1, Math.round(o.minNotaMs / hopMs));
+    const huecoF = Math.max(1, Math.round(50 / hopMs));
+    for (let pasada = 0; pasada < 3; pasada++) {
+        for (let i = 0; i < tramos.length; i++) {
+            const r = tramos[i];
+            if (!Number.isNaN(r.m) && r.n < minF) {
+                const vec = [tramos[i - 1], tramos[i + 1]].filter(t => t && !Number.isNaN(t.m));
+                r.m = vec.length ? vec.sort((a, b) => Math.abs(a.m - r.m) - Math.abs(b.m - r.m))[0].m : NaN;
+            } else if (Number.isNaN(r.m) && r.n < huecoF && i > 0 && i < tramos.length - 1) {
+                r.m = tramos[i - 1].m;
+            }
+        }
+        tramos = tramos.reduce((out, r) => {
+            const t = out[out.length - 1];
+            if (t && ((Number.isNaN(t.m) && Number.isNaN(r.m)) || t.m === r.m)) t.n += r.n; else out.push({ m: r.m, n: r.n });
+            return out;
+        }, []);
+    }
+
+    // continuidad de octava: el detector confunde una nota con su octava. Un salto de 10 o más
+    // semitonos respecto a la nota anterior casi siempre es eso, así que pasa a la octava más cercana
+    // a la anterior; los saltos normales (hasta una sexta) no se tocan. Las iguales que quedan
+    // seguidas se juntan
+    let previa = NaN;
+    for (const t of tramos) {
+        if (Number.isNaN(t.m)) continue;
+        if (!Number.isNaN(previa) && Math.abs(t.m - previa) >= 10) {
+            let mejorM = t.m;
+            for (const d of [-24, -12, 12, 24]) if (Math.abs(t.m + d - previa) < Math.abs(mejorM - previa)) mejorM = t.m + d;
+            t.m = mejorM;
+        }
+        previa = t.m;
+    }
+    tramos = tramos.reduce((out, r) => {
+        const t = out[out.length - 1];
+        if (t && !Number.isNaN(t.m) && t.m === r.m) t.n += r.n; else out.push({ m: r.m, n: r.n });
+        return out;
+    }, []);
+
+    // al registro del buzzer: octavas enteras, así cada nota conserva su nombre
+    const sonadas = tramos.filter(t => !Number.isNaN(t.m)).map(t => t.m).sort((a, b) => a - b);
+    let desplazo = 0;
+    if (o.subir && sonadas.length) {
+        const med = sonadas[sonadas.length >> 1];
+        desplazo = 12 * Math.round((MIDI_OBJETIVO - med) / 12);
+    }
+    const ajusta = m => { let v = m + desplazo; while (v < 55) v += 12; while (v > 100) v -= 12; return v; };
+
+    const fichas = [];
+    let notas = 0, ms = 0, truncado = false;
+    for (const t of tramos) {
+        if (fichas.length >= MAX_NOTAS - 2) { truncado = true; break; }
+        const dur = clamp(Math.round(t.n * hopMs), 10, 60000);
+        if (Number.isNaN(t.m)) { if (fichas.length) fichas.push('R:' + dur); }
+        else { fichas.push(`${nombreMidi(ajusta(t.m))}:${dur}`); notas++; }
+        ms += dur;
+    }
+    while (fichas.length && fichas[fichas.length - 1].startsWith('R:')) fichas.pop();
+    const inicios = [];
+    let t0 = 0;
+    for (const t of tramos) { if (!Number.isNaN(t.m)) inicios.push([t0, t0 + t.n * hopMs]); t0 += t.n * hopMs; }
+    return {
+        texto: fichas.join(' '), notas, ms, truncado, intervalos: inicios,
+        tonalidad: `${NOMBRES_TONICA[tonica]} mayor (o ${NOMBRES_TONICA[(tonica + 9) % 12]} menor)`,
+    };
+}
+
+// x: muestras mono en [-1, 1]; sr: su frecuencia de muestreo.
+// op: fMin y fMax (Hz) del registro a seguir, sens (0 a 100), minNotaMs, tonalidad, subir.
+function melodiaDeAudio(x, sr, op = {}) {
+    const o = Object.assign({ fMin: 200, fMax: 1000, sens: 50 }, op);
+    const k = Math.max(1, Math.round(sr / 16000)), sr2 = sr / k;
+    const n2 = Math.floor(x.length / k);
+    const y = new Float32Array(n2);
+    for (let i = 0; i < n2; i++) { let s = 0; for (let j = 0; j < k; j++) s += x[i * k + j]; y[i] = s / k; }
+
+    const N = 2048, hop = 512;
+    const frames = Math.floor((n2 - N) / hop);
+    if (frames < 4) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    const hopMs = hop / sr2 * 1000;
+    const kLo = Math.max(2, Math.floor(o.fMin * N / sr2)), kHi = Math.min(N / 2 - 2, Math.ceil(o.fMax * N / sr2));
+    const umbral = 9 - 0.06 * clamp(Number(o.sens) || 0, 0, 100);   // más sensibilidad = acepta picos menos marcados
+    const ventana = new Float32Array(N);
+    for (let i = 0; i < N; i++) ventana[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
+
+    const energia = new Float32Array(frames);
+    let maxE = 0;
+    for (let f = 0; f < frames; f++) {
+        let s = 0;
+        for (let i = 0; i < N; i += 4) { const v = y[f * hop + i]; s += v * v; }
+        energia[f] = Math.sqrt(s / (N / 4));
+        if (energia[f] > maxE) maxE = energia[f];
+    }
+
+    const re = new Float32Array(N), im = new Float32Array(N), mag = new Float32Array(N / 2);
+    const midi = new Float32Array(frames).fill(NaN);
+    for (let f = 0; f < frames; f++) {
+        if (energia[f] < 0.03 * maxE) continue;
+        for (let i = 0; i < N; i++) { re[i] = y[f * hop + i] * ventana[i]; im[i] = 0; }
+        fftEnSitio(re, im);
+        let mejor = -1, pico = 0, media = 0;
+        for (let b = kLo - 1; b <= kHi + 1; b++) mag[b] = Math.hypot(re[b], im[b]);
+        for (let b = kLo; b <= kHi; b++) {
+            media += mag[b];
+            if (mag[b] > pico && mag[b] >= mag[b - 1] && mag[b] >= mag[b + 1]) { pico = mag[b]; mejor = b; }
+        }
+        media /= (kHi - kLo + 1);
+        if (mejor < 0 || pico / (media + 1e-9) < umbral) continue;
+        const a = mag[mejor - 1], c = mag[mejor + 1], den = a + c - 2 * pico;
+        const d = den !== 0 ? 0.5 * (a - c) / den : 0;
+        midi[f] = 69 + 12 * Math.log2(((mejor + d) * sr2 / N) / 440);
+    }
+
+    // mediana móvil de 5 cuadros sobre los que tienen tono
+    const liso = new Float32Array(frames).fill(NaN);
+    for (let f = 0; f < frames; f++) {
+        if (Number.isNaN(midi[f])) continue;
+        const v = [];
+        for (let j = Math.max(0, f - 2); j <= Math.min(frames - 1, f + 2); j++) if (!Number.isNaN(midi[j])) v.push(midi[j]);
+        v.sort((p, q) => p - q);
+        liso[f] = v[v.length >> 1];
+    }
+    return melodiaATexto(liso, hopMs, o);
+}
+
+// notas: [{ s, e, p }] en ms y p = número MIDI. Si suenan varias a la vez, se queda la más aguda.
+function melodiaDeMidi(notas, op = {}) {
+    const hopMs = 20;
+    const fin = notas.reduce((m, n) => Math.max(m, n.e), 0);
+    const n = Math.ceil(fin / hopMs);
+    const midi = new Float32Array(n).fill(NaN);
+    for (const t of notas) {
+        for (let f = Math.floor(t.s / hopMs); f < Math.min(n, Math.ceil(t.e / hopMs)); f++) {
+            if (Number.isNaN(midi[f]) || t.p > midi[f]) midi[f] = t.p;
+        }
+    }
+    return melodiaATexto(midi, hopMs, Object.assign({ minNotaMs: 40, tonalidad: false }, op));
+}
+
 // Show guardado en el robot: la canción y el baile compilados, para que los haga solo, sin la página.
 // Espacio en su EEPROM: nota 5 bytes, espera 3, motores 3, parar 1 (igual que PGM_MAX del firmware).
 const PGM_MAX = 2800;
@@ -354,6 +565,7 @@ const lib = {
     PGM_MAX,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
+    melodiaDeAudio, melodiaDeMidi, nombreMidi,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lib;
@@ -443,6 +655,19 @@ function alLinea(l) {
         const err = /^ERR/.test(l);
         const reintento = S.cola.ack(err);
         if (err && !reintento) mensaje('El robot no entendió una orden (' + l + ').', 'err');
+    } else if (/^INFO /.test(l)) {
+        // "INFO BOOT=2 BTN=0 RUN=3 MIN=5.4 BAT=7.42" al encender: lo que el robot anotó solo desde que
+        // se borró el aviso. BOOT cuenta cada arranque, y conectarlo por USB también reinicia la placa
+        const kv = {};
+        for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
+        mostrarBateria(kv.BAT);
+        const cosas = [];
+        if (kv.BOOT > 1) cosas.push(`${kv.BOOT} arranques (conectarlo por USB cuenta uno; si lo probaste solo, los demás fueron reinicios)`);
+        if (kv.BTN) cosas.push(`${kv.BTN} cambio(s) de modo con el botón`);
+        if (kv.RUN) cosas.push(`${kv.RUN} pasada(s) del show`);
+        if (kv.MIN) cosas.push(`voltaje más bajo con las ruedas andando: ${kv.MIN.toFixed(1)} V`);
+        $('rb-diag-txt').textContent = cosas.length ? 'Desde la última vez que lo borraste: ' + cosas.join(', ') + '.' : '';
+        $('rb-diag').hidden = !cosas.length;
     } else if (/^PONG mbot-web/.test(l) || /mBot Ranger web .*listo/.test(l)) {
         if (S.estado === 'conectando') alListo();
     } else if (/mBot Ranger listo/.test(l)) {
@@ -458,6 +683,17 @@ function alLinea(l) {
     } else if (/^BTN \d/.test(l)) {
         mensaje('Se cambió de modo con el botón del robot. Pulsa Tocar o Bailar para que vuelva a obedecer a la página.');
     }
+}
+
+// Voltaje de la batería junto al estado; por debajo de 6,5 V se avisa (con motores y luces a la vez
+// la placa se puede reiniciar)
+function mostrarBateria(v) {
+    const el = $('rb-bat');
+    if (!el || !(v > 0)) return;
+    const baja = v < 6.5;
+    el.hidden = false;
+    el.textContent = `Batería ${v.toFixed(1)} V${baja ? ' (baja)' : ''}`;
+    el.className = 'badge badge--' + (baja ? 'off' : 'idle');
 }
 
 function alListo() {
@@ -920,6 +1156,7 @@ function iniciar() {
     $('rb-conectar').addEventListener('click', () => conectar(false));
     $('rb-todos').addEventListener('click', () => conectar(true));
     $('rb-paro').addEventListener('click', paro);
+    $('rb-diag-borrar').addEventListener('click', () => { S.cola.enviar(['DIAG0']); $('rb-diag').hidden = true; });
     $('rb-tocar').addEventListener('click', () => actuar(true, false));
     $('rb-bailar').addEventListener('click', () => actuar(true, true));
     $('rb-escuchar').addEventListener('click', escucharAqui);

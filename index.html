@@ -513,6 +513,7 @@
                         <section class="panel admin-sec" id="sec-robot" data-section="robot" role="tabpanel" aria-labelledby="robot-heading" hidden>
                             <div class="panel__head">
                                 <h3 id="robot-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Robot mBot Ranger</h3>
+                                <span id="rb-bat" class="badge badge--idle" hidden></span>
                                 <span id="rb-badge" class="badge badge--idle"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
                             </div>
                             <div class="panel__body">
@@ -524,6 +525,7 @@
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
                                 <p class="hint rb-full"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
+                                <p id="rb-diag" class="hint rb-full" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
                                 <p id="rb-msg" class="msg" role="status"></p>
                                 <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
 

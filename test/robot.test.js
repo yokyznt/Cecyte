@@ -304,9 +304,61 @@ for (const c of R.CANCIONES) {
     // el botón de la placa no debe poder echar a andar los motores por ruido o por quedar "pegado"
     assert(ino.includes('botonFlanco()') && !/if \(botonPresionado\(\) &&/.test(ino), 'el botón usa botonFlanco');
     assert(/v > 500/.test(ino) && /v < 60/.test(ino) && />= 60/.test(ino), 'el botón es estricto: alto claro, bajo sostenido 60 ms');
+    // las ruedas suben en rampa SIN bloquear (si no, cada orden M le quita hasta 70 ms a la música),
+    // y parar es inmediato; la rampa avanza en drenar(), que corre en toda espera y todo tono
+    assert(!/void motores[^]*?delay\(/.test(ino.split('void adelante')[0]), 'motores() no debe bloquear con delay');
+    assert(/void drenar\(\)[^]*?rampa\(\)/.test(ino), 'la rampa avanza dentro de drenar()');
+    assert(/void parar\(\) \{[^}]*setMotorPwm\(0\)/.test(ino), 'parar corta de golpe');
+    assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
+    // diagnóstico que la página lee al conectar
+    for (const clave of ['BTN=', 'RUN=', 'MIN=', 'BAT=']) assert(ino.includes(`F(" ${clave}")`), `INFO sin ${clave}`);
+    assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
+    assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
+    // el bootloader de esta placa borra MCUSR antes de arrancar el sketch: leerlo no sirve
+    assert(!/\bMCUSR\b/.test(ino.replace(/\/\/.*$/gm, '')), 'el firmware no debe fiarse de MCUSR');
+    // un falso pulso del botón (ruido de motores) no corta el show: debe seguir bajo un rato
+    assert(/botonFlanco\(\) && botonSostenido\(\)/.test(ino), 'el botón exige una pulsación sostenida');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
+}
+
+// 18) Melodía de un audio: se recuperan las notas, un salto normal no se "corrige" y un salto de
+//     octava de más (error típico del detector) sí
+{
+    const sr = 16000;
+    const tono = lista => {                                    // lista de [midi, segundos]
+        const x = new Float32Array(Math.round(sr * lista.reduce((s, n) => s + n[1], 0)));
+        let i = 0;
+        for (const [m, seg] of lista) {
+            const f = 440 * Math.pow(2, (m - 69) / 12);
+            for (let k = 0; k < sr * seg; k++, i++) x[i] = 0.5 * Math.sin(2 * Math.PI * f * k / sr);
+        }
+        return x;
+    };
+    const nombres = r => r.texto.split(' ').map(t => t.split(':')[0]);
+    const op = { fMin: 200, fMax: 1500, tonalidad: false, subir: false };
+
+    // subida con un salto legítimo Sol5 -> Do6: no lo baja una octava
+    const r1 = R.melodiaDeAudio(tono([[72, 0.25], [76, 0.25], [79, 0.25], [84, 0.25], [79, 0.25], [76, 0.25]]), sr, op);
+    assert.deepStrictEqual(nombres(r1), ['C5', 'E5', 'G5', 'C6', 'G5', 'E5'], r1.texto);
+    assert.strictEqual(r1.notas, 6);
+
+    // un Sol6 suelto entre notas graves (confusión de octava) vuelve a su octava
+    const r2 = R.melodiaDeAudio(tono([[72, 0.25], [76, 0.25], [91, 0.25], [76, 0.25], [72, 0.25]]), sr, { ...op, fMax: 2000 });
+    assert.deepStrictEqual(nombres(r2), ['C5', 'E5', 'G5', 'E5', 'C5'], r2.texto);
+
+    // con "subir al registro" las notas conservan su nombre y la mediana cae cerca de Sol5
+    const grave = R.melodiaDeAudio(tono([[48, 0.3], [52, 0.3], [55, 0.3], [52, 0.3]]), sr, { fMin: 80, fMax: 400, tonalidad: false });
+    assert.deepStrictEqual(nombres(grave).map(n => n.replace(/\d/, '')), ['C', 'E', 'G', 'E'], grave.texto);
+    assert(nombres(grave).every(n => /[5-6]$/.test(n)), grave.texto);
+
+    // un MIDI se convierte igual, y a la vez suena la más aguda
+    const m = R.melodiaDeMidi([{ s: 0, e: 200, p: 60 }, { s: 0, e: 200, p: 48 }, { s: 200, e: 400, p: 64 }], { subir: false });
+    assert.deepStrictEqual(nombres(m), ['C4', 'E4'], m.texto);
+
+    // y la ficha resultante es una canción que la página sabe tocar
+    assert(R.leerNotas(r1.texto).notas.length === 6);
 }
 
 console.log('robot.test.js: todo bien');

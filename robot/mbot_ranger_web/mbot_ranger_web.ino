@@ -25,6 +25,8 @@
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
     PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
     MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página)
+    BAT              responde "BAT 7.42" (voltaje de la batería)
+    DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
                      frena los motores y borra lo pendiente. Responde ABORTED.
   Avisos sueltos: "BTN n" (se cambió de modo con el botón) y "WDT" (los motores se pararon
@@ -92,17 +94,55 @@ void isrDer(void) {
 }
 
 // ---------- Movimiento ----------
-// izq y der: positivo = esa rueda va hacia adelante
+// Voltaje de la batería (A4 mide un tercio, como en el firmware de fábrica)
+float bateria() { return analogRead(A4) / 1024.0 * 15.0; }
+
+// Diagnóstico que sobrevive a un reinicio (EEPROM, 0xFF = vacío; la página lo muestra al conectar).
+// El bootloader de esta placa borra MCUSR antes de arrancar el sketch, así que no se puede saber por
+// qué se reinició; en su lugar se cuenta: BOOT = arranques (conectar por USB cuenta uno), BTN = veces
+// que el botón cambió de modo, RUN = pasadas del show, MIN = voltaje más bajo con las ruedas andando (x10).
+const int EE_BOOT = 2980, EE_BTN = 2981, EE_RUN = 2982, EE_MIN = 2983;
+uint8_t cuentaEE(int dir) { uint8_t v = EEPROM.read(dir); return v == 0xFF ? 0 : v; }
+void sumaEE(int dir) { uint8_t v = cuentaEE(dir); if (v < 254) EEPROM.update(dir, v + 1); }
+void notaBateria() {
+  uint8_t d = (uint8_t)constrain(bateria() * 10.0, 0, 254);
+  uint8_t m = EEPROM.read(EE_MIN);
+  if (m == 0xFF || d < m) EEPROM.update(EE_MIN, d);
+}
+
+// izq y der: positivo = esa rueda va hacia adelante.
+// Las ruedas suben en rampa (30 de PWM cada 12 ms): pedirle de golpe toda la corriente a la batería
+// hunde el voltaje y la placa se puede reiniciar. Parar, en cambio, es inmediato.
+// motores() solo fija el objetivo; la rampa avanza dentro de drenar(), que corre en toda espera y en
+// todo tono, así no se frena la música.
+int izqAct = 0, derAct = 0, izqObj = 0, derObj = 0;
+unsigned long rampaT = 0, bateriaT = 0;
+void rampa() {
+  unsigned long t = millis();
+  if (moviendo && t - bateriaT > 50) { bateriaT = t; notaBateria(); }
+  if ((izqAct == izqObj && derAct == derObj) || t - rampaT < 12) return;
+  rampaT = t;
+  izqAct += constrain(izqObj - izqAct, -30, 30);
+  derAct += constrain(derObj - derAct, -30, 30);
+  motorIzq.setMotorPwm(-izqAct);
+  motorDer.setMotorPwm(derAct);
+}
 void motores(int izq, int der) {
-  motorIzq.setMotorPwm(-izq);
-  motorDer.setMotorPwm(der);
+  izqObj = izq;
+  derObj = der;
   moviendo = (izq != 0 || der != 0);
+  rampa();
 }
 void adelante(int v)   { motores(v, v); }
 void atras(int v)      { motores(-v, -v); }
 void giraIzq(int v)    { motores(-v, v); }
 void giraDer(int v)    { motores(v, -v); }
-void parar()           { motores(0, 0); }
+void parar() {
+  izqAct = derAct = izqObj = derObj = 0;
+  motorIzq.setMotorPwm(0);
+  motorDer.setMotorPwm(0);
+  moviendo = false;
+}
 
 // ---------- LEDs ----------
 void color(int r, int g, int b) {
@@ -129,11 +169,11 @@ void esquivar() {
     adelante(VEL);
   } else {
     parar();
-    delay(100);
+    espera(100);
     atras(VEL);
-    delay(400);
+    espera(400);
     if (random(2) == 0) giraIzq(VEL); else giraDer(VEL);
-    delay(random(350, 700));
+    espera(random(350, 700));
     parar();
   }
 }
@@ -147,12 +187,12 @@ void seguir() {
 
 void testMotores() {
   // Cada motor por separado, para ver cuál no responde
-  motores(150, 0);  delay(800); parar(); delay(400);
-  motores(0, 150);  delay(800); parar(); delay(400);
-  adelante(150);    delay(800); parar(); delay(400);
-  atras(150);       delay(800); parar(); delay(400);
-  giraIzq(150);     delay(600); parar(); delay(400);
-  giraDer(150);     delay(600); parar();
+  motores(150, 0);  espera(800); parar(); espera(400);
+  motores(0, 150);  espera(800); parar(); espera(400);
+  adelante(150);    espera(800); parar(); espera(400);
+  atras(150);       espera(800); parar(); espera(400);
+  giraIzq(150);     espera(600); parar(); espera(400);
+  giraDer(150);     espera(600); parar();
   modo = 0;         // al terminar vuelve a reposo
   aplicaModo();
 }
@@ -187,6 +227,17 @@ bool botonFlanco() {
   return pulso;
 }
 
+// Una pulsación de verdad sigue baja un rato; el ruido de los motores o un cable flojo, no. Tras el
+// flanco se exige que siga baja 150 ms seguidos (atendiendo el USB mientras tanto).
+bool botonSostenido() {
+  unsigned long t0 = millis();
+  while (millis() - t0 < 150) {
+    if (analogRead(A7) >= 60) return false;
+    drenar();
+  }
+  return true;
+}
+
 // ---------- USB: cola de bytes ----------
 // Todo lo que llega se guarda aquí, también mientras suena una nota, y un "!" corta todo.
 const int RING = 256;
@@ -206,6 +257,7 @@ void drenar() {
       colaN++;
     }
   }
+  if (!abortar) rampa();                     // drenar() corre en toda espera: de aquí avanza la rampa
 }
 
 // ---------- Sonido y esperas (revisan el USB y el paro mientras pasan) ----------
@@ -310,7 +362,8 @@ void fxDibuja() {
         if (fxHayNota) hsvFx(fxMatiz, r, g, b);
         break;
     }
-    uint32_t esc = (uint32_t)k * fxBrillo;                 // k 0..255 por brillo 0..100
+    // con las ruedas andando el anillo baja a la mitad: así le queda más corriente a los motores
+    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo / 2 : fxBrillo);   // k 0..255 por brillo 0..100
     leds.setColorAt(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
   }
   leds.show();
@@ -368,8 +421,9 @@ bool pgmPon(uint8_t b) {                     // un byte más de la subida
 bool showCortar() {
   drenar();
   if (abortar || colaN > 0) return true;
-  if (botonFlanco()) {
+  if (botonFlanco() && botonSostenido()) {
     ultimoBoton = millis();
+    sumaEE(EE_BTN);
     modo = 0;
     aplicaModo();
     Serial.print(F("BTN "));
@@ -386,6 +440,7 @@ void correShow() {
   Serial.println(F("SHOW inicio"));
   do {
     int p = 0;
+    sumaEE(EE_RUN);
     while (p < largo && modo == MODO_SHOW) {
       uint8_t op = EEPROM.read(PGM_DIR + 4 + p++);
       if (op == 1 && p + 4 <= largo) {
@@ -478,6 +533,12 @@ void ejecuta(char *s) {
     }
   } else if (!strcmp(cmd, "SAVE")) {
     fxGuardar();
+    ok();
+  } else if (!strcmp(cmd, "BAT")) {
+    Serial.print(F("BAT "));
+    Serial.println(bateria(), 2);
+  } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
+    for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
     ok();
   } else if (!strcmp(cmd, "PCLR")) {
     EEPROM.update(PGM_DIR, 0);                 // el show queda inválido hasta que PEND lo cierre
@@ -574,6 +635,18 @@ void setup() {
     modo = MODO_SHOW;
     showT0 = millis() + 2500;
   }
+  sumaEE(EE_BOOT);
+  uint8_t minimo = EEPROM.read(EE_MIN);
+  Serial.print(F("INFO BOOT="));
+  Serial.print(cuentaEE(EE_BOOT));
+  Serial.print(F(" BTN="));
+  Serial.print(cuentaEE(EE_BTN));
+  Serial.print(F(" RUN="));
+  Serial.print(cuentaEE(EE_RUN));
+  Serial.print(F(" MIN="));
+  Serial.print(minimo == 0xFF ? 0.0 : minimo / 10.0, 1);
+  Serial.print(F(" BAT="));
+  Serial.println(bateria(), 2);
   Serial.println(F("mBot Ranger web v1 listo"));
 }
 
@@ -583,8 +656,9 @@ void loop() {
 
   // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
   // De 3 sin show, de 4 (página) y de 5 vuelve a 0.
-  if (botonFlanco() && millis() - ultimoBoton > 300) {
+  if (botonFlanco() && botonSostenido() && millis() - ultimoBoton > 300) {
     ultimoBoton = millis();
+    sumaEE(EE_BTN);
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
     else modo = (modo >= 3) ? 0 : modo + 1;
     aplicaModo();
