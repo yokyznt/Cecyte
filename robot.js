@@ -1675,7 +1675,7 @@ function pintarTeclado() {
     const n = BLANCAS.length;
     const blancas = BLANCAS.map(s => `<button type="button" class="rb-tecla" data-s="${s}" aria-label="${notaDeSemitono(s).nombre}"><span>${letras[s] || ''}</span></button>`).join('');
     const negras = Object.entries(NEGRAS).map(([s, izq]) =>
-        `<button type="button" class="rb-tecla rb-tecla--negra" data-s="${s}" style="left: calc(${(izq + 1) * 100 / n}% - 2.2%)" aria-label="${notaDeSemitono(Number(s)).nombre}"><span>${letras[s] || ''}</span></button>`).join('');
+        `<button type="button" class="rb-tecla rb-tecla--negra" data-s="${s}" style="left: ${(izq + 1) * 100 / n}%" aria-label="${notaDeSemitono(Number(s)).nombre}"><span>${letras[s] || ''}</span></button>`).join('');
     $('rb-piano').innerHTML = blancas + negras;
     $('rb-tec-oct').textContent = `Octava ${T.octava}: de ${notaDeSemitono(0).nombre} a ${notaDeSemitono(24).nombre}`;
 }
