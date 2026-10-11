@@ -1059,3 +1059,13 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-barra .btn { min-height: 48px; }
 .rb-barra__que { font-size: var(--fs-sm); color: var(--ink-2); }
 .rb-barra__que b { color: var(--black); }
+
+/* El estado de la cabecera lleva a Instalar, donde está la conexión */
+.rb-badge-conectar { cursor: pointer; }
+.rb-badge-conectar:hover { background: var(--green-100); }
+.rb-badge-conectar:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; }
+
+/* Avance y mensajes dentro de la barra fija */
+.rb-barra .rb-prog { flex: 1 1 160px; min-width: 120px; width: auto; }
+.rb-barra .msg { flex: 1 1 100%; margin: 0; }
+.rb-barra .msg:empty { display: none; }

@@ -645,23 +645,8 @@
                                     <span id="rb-bat-tiempo" class="rb-bateria__tiempo"></span>
                                     <span id="rb-bat-aviso" class="rb-bateria__aviso" hidden></span>
                                 </div>
-                                <span id="rb-badge" class="badge badge--idle"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
+                                <span id="rb-badge" class="badge badge--idle rb-badge-conectar" role="button" tabindex="0" title="Ir a Instalar para conectar el robot"><span class="dot"></span> <span id="rb-badge-text">Sin conectar</span></span>
                             </div>
-                            <div class="panel__body">
-                                <p class="hint rb-full">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
-
-                                <div class="btn-row rb-full">
-                                    <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
-                                    <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
-                                    <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
-                                </div>
-                                <p class="hint rb-full"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
-                                
-                                
-                                <p id="rb-msg" class="msg" role="status"></p>
-                                <progress id="rb-prog" class="rb-prog rb-full" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
-
-                                </div>
                         </section>
 
                         <!-- Música: canción, teclado y melodía de un audio -->
@@ -955,6 +940,17 @@
                         <section class="panel admin-sec rb-panel" id="sec-robot-instalar" data-section="robot-instalar" role="tabpanel" aria-label="Instalar el programa en el robot" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Conexión</h4>
+                                    <p class="hint">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
+                                    <div class="btn-row">
+                                    <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
+                                    <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
+                                    <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
+                                </div>
+                                    <p class="hint"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
+                                </div>
+
+                                <div class="rb-card rb-card--ancho">
                                     <details id="rb-instalar" class="rb-instalar" open>
                                     <summary>Instalar el programa en el robot (una sola vez)</summary>
                                     <ol>
@@ -995,6 +991,8 @@
                             <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar todo</button>
                             <button type="button" id="rb-barra-play" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Reproducir</button>
                             <span class="rb-barra__que">Reproduce: <b id="rb-barra-que">la canción</b></span>
+                            <progress id="rb-prog" class="rb-prog" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
+                            <p id="rb-msg" class="msg" role="status"></p>
                         </div>
                     </div>
                 </div>
