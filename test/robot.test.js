@@ -432,4 +432,82 @@ for (const c of R.CANCIONES) {
     assert(!/digitalWrite\(PIN_BUZZER, HIGH\)/.test(ino), 'el tono ya no se hace a mano');
 }
 
+// 20) Batería: porcentaje por tipo de pilas, y cuánto va a durar
+{
+    // NiMH: 6 celdas; 8,52 V (1,42 por celda) = llena, 7,5 V ≈ 45 %, 6 V = vacía
+    assert.strictEqual(R.porcentajeBateria(8.6, 'nimh'), 100);
+    assert.strictEqual(R.porcentajeBateria(8.52, 'nimh'), 100);
+    assert.strictEqual(R.porcentajeBateria(8.4, 'nimh'), 97);
+    assert.strictEqual(R.porcentajeBateria(7.5, 'nimh'), 45);
+    assert.strictEqual(R.porcentajeBateria(6.0, 'nimh'), 0);
+    assert.strictEqual(R.porcentajeBateria(5.0, 'nimh'), 0);
+    // la misma lectura vale distinto en alcalinas (7,5 V ya es casi la mitad baja)
+    assert(R.porcentajeBateria(7.5, 'alcalina') < R.porcentajeBateria(7.5, 'nimh'));
+    assert.strictEqual(R.porcentajeBateria(9.6, 'alcalina'), 100);
+    assert.strictEqual(R.porcentajeBateria(0, 'nimh'), null, 'sin lectura no hay porcentaje');
+    // las curvas bajan siempre al bajar el voltaje (sin saltos hacia arriba)
+    for (const q of Object.keys(R.CURVAS_BATERIA)) {
+        let antes = 101;
+        for (let v = 9.8; v >= 5.5; v -= 0.05) {
+            const p = R.porcentajeBateria(v, q);
+            assert(p <= antes, `${q} sube en ${v.toFixed(2)} V`);
+            antes = p;
+        }
+    }
+
+    // estimado por uso: 2000 mAh al 50 % con margen del 10 % -> 900 mAh
+    const reposo = R.tiempoRestante({ pct: 50, capacidadMah: 2000, uso: 'reposo' });
+    assert.deepStrictEqual(reposo, { minutos: Math.round(900 / 120 * 60), fuente: 'estimado' });
+    const motores = R.tiempoRestante({ pct: 50, capacidadMah: 2000, uso: 'motores' });
+    assert(motores.minutos < reposo.minutos / 4, 'con los motores dura bastante menos');
+    assert.strictEqual(R.tiempoRestante({ pct: null }), null);
+
+    // con historial real: baja 10 % en una hora -> con 50 % quedan unas 5 horas, sin importar el estimado
+    const t0 = 1000000000000;
+    const hist = [];
+    for (let i = 0; i <= 6; i++) hist.push([t0 + i * 600000, 7.6 - i * 0.02]);   // cada 10 min, 0,02 V
+    const pctFin = R.porcentajeBateria(hist[hist.length - 1][1], 'nimh');
+    const real = R.tiempoRestante({ pct: pctFin, capacidadMah: 2000, historial: hist, uso: 'reposo' });
+    assert.strictEqual(real.fuente, 'por tu uso');
+    assert(real.minutos > 0);
+    // con muy pocos datos no se fía del historial
+    assert.strictEqual(R.tiempoRestante({ pct: 50, historial: hist.slice(0, 2) }).fuente, 'estimado');
+
+    assert.strictEqual(R.formatoDuracion(0), 'menos de 1 min');
+    assert.strictEqual(R.formatoDuracion(45), '45 min');
+    assert.strictEqual(R.formatoDuracion(60), '1 h');
+    assert.strictEqual(R.formatoDuracion(200), '3 h 20 min');
+    assert.strictEqual(R.formatoDuracion(5000), 'más de 2 días');
+}
+
+// 21) Seguidor de líneas: ajustes saneados y órdenes para el robot (todavía desactivado)
+{
+    assert.strictEqual(R.SEGUIDOR_ACTIVO, false, 'el seguidor sigue desactivado por pedido del usuario');
+    const d = R.lineaNormaliza(null);
+    assert.deepStrictEqual(d, R.lineaNormaliza(R.LINEA_DEFECTO));
+    // valores raros se acotan o vuelven al de fábrica
+    const raro = R.lineaNormaliza({ puerto: 9, color: 'azul', velocidad: 999, giro: -5, perdida: 'volar', cruce: 'x', obstaculoCm: 5000, duracionS: -1, buscarMs: 99999 });
+    assert.strictEqual(raro.puerto, 6, 'el 9 es el botón de la placa');
+    assert.strictEqual(raro.color, 'negra');
+    assert.strictEqual(raro.velocidad, 150);
+    assert.strictEqual(raro.giro, 10);
+    assert.strictEqual(raro.perdida, 'buscar');
+    assert.strictEqual(raro.cruce, 'recto');
+    assert.strictEqual(raro.obstaculoCm, 200);
+    assert.strictEqual(raro.duracionS, 0);
+    assert.strictEqual(raro.buscarMs, 10000);
+
+    const o = R.lineaAOrdenes({ puerto: 7, color: 'blanca', velocidad: 100, giro: 60, perdida: 'parar', buscarMs: 800, cruce: 'izquierda', obstaculoCm: 15, duracionS: 30, avisos: false });
+    assert.deepStrictEqual(o, [
+        'LINEA puerto 7', 'LINEA color 1', 'LINEA vel 100', 'LINEA giro 60', 'LINEA perdida 0',
+        'LINEA buscar 800', 'LINEA cruce 2', 'LINEA obst 15', 'LINEA dur 30', 'LINEA avisos 0',
+    ]);
+
+    // firmware: el modo 6 existe pero va apagado (el binario subido no cambia) y acepta las mismas claves
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/#define SEGUIDOR_LINEA 0\b/.test(ino), 'SEGUIDOR_LINEA debe quedar en 0 hasta activarlo');
+    assert(/strcmp\(cmd, "LINEA"\)/.test(ino) && /void seguirLinea\(\)/.test(ino));
+    for (const clave of o.map(l => l.split(' ')[1])) assert(ino.includes(`"${clave}"`), 'el firmware no entiende LINEA ' + clave);
+}
+
 console.log('robot.test.js: todo bien');

@@ -669,12 +669,119 @@ function programaParaRobot(cmds) {
     return { lineas, bytes, cabe: bytes <= PGM_MAX };
 }
 
+// ---------- Batería: porcentaje y cuánto va a durar ----------
+// El robot mide el voltaje de sus 6 pilas AA. Cada curva es por celda, [voltios, %] de mayor a menor; el
+// porcentaje del paquete sale de interpolar (voltaje / 6). Con los motores andando el voltaje cae mucho
+// (a ~5,6 V), así que solo se deben usar lecturas en reposo.
+const CELDAS = 6;
+const CURVAS_BATERIA = {
+    nimh: [[1.42, 100], [1.35, 90], [1.30, 75], [1.27, 60], [1.25, 45], [1.23, 30], [1.20, 15], [1.15, 5], [1.00, 0]],
+    alcalina: [[1.60, 100], [1.50, 80], [1.40, 50], [1.30, 25], [1.20, 10], [1.10, 0]],
+    mixta: [[1.50, 100], [1.40, 80], [1.32, 55], [1.26, 35], [1.20, 15], [1.05, 0]],
+};
+const CAPACIDAD_DEFECTO = { nimh: 2000, alcalina: 2200, mixta: 2000 };
+// Corriente aproximada (mA) según lo que hace el robot; el historial real la corrige cuando hay datos.
+const CONSUMO_MA = { reposo: 120, musica: 160, motores: 700 };
+
+function porcentajeBateria(volts, quimica) {
+    const curva = CURVAS_BATERIA[quimica] || CURVAS_BATERIA.nimh;
+    const v = Number(volts) / CELDAS;
+    if (!(v > 0)) return null;
+    if (v >= curva[0][0]) return 100;
+    if (v <= curva[curva.length - 1][0]) return 0;
+    for (let i = 1; i < curva.length; i++) {
+        const [vb, pb] = curva[i], [va, pa] = curva[i - 1];
+        if (v >= vb) return Math.round(pb + (pa - pb) * (v - vb) / (va - vb));
+    }
+    return 0;
+}
+
+// pct 0..100; historial [[ms, volts]] en reposo; uso 'reposo' | 'musica' | 'motores'.
+// Devuelve { minutos, fuente } o null si no hay porcentaje.
+function tiempoRestante({ pct, capacidadMah = 2000, historial = [], uso = 'reposo', quimica = 'nimh' }) {
+    if (pct === null || pct === undefined || !(pct >= 0)) return null;
+    // 1) con lo que de verdad ha bajado (mínimos cuadrados del % contra las horas)
+    const puntos = [];
+    for (const [t, v] of historial) {
+        const p = porcentajeBateria(v, quimica);
+        if (p !== null) puntos.push([t / 3600000, p]);
+    }
+    if (puntos.length >= 4) {
+        const dt = puntos[puntos.length - 1][0] - puntos[0][0];
+        const caida = puntos[0][1] - puntos[puntos.length - 1][1];
+        if (dt >= 10 / 60 && caida >= 3) {
+            const n = puntos.length;
+            const mx = puntos.reduce((s, q) => s + q[0], 0) / n, my = puntos.reduce((s, q) => s + q[1], 0) / n;
+            let sxy = 0, sxx = 0;
+            for (const [x, y] of puntos) { sxy += (x - mx) * (y - my); sxx += (x - mx) * (x - mx); }
+            const pendiente = sxx > 0 ? -sxy / sxx : 0;           // % que se pierde por hora
+            if (pendiente > 0.5) return { minutos: Math.round(pct / pendiente * 60), fuente: 'por tu uso' };
+        }
+    }
+    // 2) estimado por lo que está haciendo (con 10 % de margen: no se aprovecha toda la carga)
+    const restanteMah = capacidadMah * pct / 100 * 0.9;
+    const ma = CONSUMO_MA[uso] || CONSUMO_MA.reposo;
+    return { minutos: Math.round(restanteMah / ma * 60), fuente: 'estimado' };
+}
+
+function formatoDuracion(min) {
+    if (!(min >= 0)) return '';
+    if (min < 1) return 'menos de 1 min';
+    if (min < 60) return min + ' min';
+    if (min >= 48 * 60) return 'más de 2 días';
+    const h = Math.floor(min / 60), m = min % 60;
+    return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+// ---------- Seguidor de líneas (todavía desactivado) ----------
+// Con el módulo Me Line Follower (dos sensores). Puertos con dos pines digitales: 6, 7 y 8; el 9 es el
+// botón de la placa y el 10 lo usa el ultrasonido.
+const SEGUIDOR_ACTIVO = false;
+const LINEA_DEFECTO = { puerto: 6, color: 'negra', velocidad: 80, giro: 50, perdida: 'buscar', buscarMs: 1500, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
+const LINEA_PERDIDA = { parar: 0, buscar: 1, recto: 2 };
+const LINEA_CRUCE = { recto: 0, parar: 1, izquierda: 2, derecha: 3 };
+
+function lineaNormaliza(c) {
+    const o = Object.assign({}, LINEA_DEFECTO, c || {});
+    return {
+        puerto: [6, 7, 8].includes(Number(o.puerto)) ? Number(o.puerto) : LINEA_DEFECTO.puerto,
+        color: o.color === 'blanca' ? 'blanca' : 'negra',
+        velocidad: clamp(Math.round(Number(o.velocidad) || LINEA_DEFECTO.velocidad), 40, 150),
+        giro: clamp(Math.round(Number(o.giro) || LINEA_DEFECTO.giro), 10, 100),
+        perdida: o.perdida in LINEA_PERDIDA ? o.perdida : LINEA_DEFECTO.perdida,
+        buscarMs: clamp(Math.round(Number(o.buscarMs) || 0), 0, 10000),
+        cruce: o.cruce in LINEA_CRUCE ? o.cruce : LINEA_DEFECTO.cruce,
+        obstaculoCm: clamp(Math.round(Number(o.obstaculoCm) || 0), 0, 200),
+        duracionS: clamp(Math.round(Number(o.duracionS) || 0), 0, 3600),
+        avisos: o.avisos !== false,
+    };
+}
+
+// Las órdenes que se le mandan al robot para configurar el seguidor (una por ajuste)
+function lineaAOrdenes(cfg) {
+    const c = lineaNormaliza(cfg);
+    return [
+        'LINEA puerto ' + c.puerto,
+        'LINEA color ' + (c.color === 'blanca' ? 1 : 0),
+        'LINEA vel ' + c.velocidad,
+        'LINEA giro ' + c.giro,
+        'LINEA perdida ' + LINEA_PERDIDA[c.perdida],
+        'LINEA buscar ' + c.buscarMs,
+        'LINEA cruce ' + LINEA_CRUCE[c.cruce],
+        'LINEA obst ' + c.obstaculoCm,
+        'LINEA dur ' + c.duracionS,
+        'LINEA avisos ' + (c.avisos ? 1 : 0),
+    ];
+}
+
 const lib = {
     BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
+    porcentajeBateria, tiempoRestante, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
+    lineaNormaliza, lineaAOrdenes, LINEA_DEFECTO, SEGUIDOR_ACTIVO,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lib;
@@ -701,14 +808,18 @@ const S = {
     enShow: false,            // el robot está haciendo su show guardado: no hay que mandarle nada
     arranca: false,           // "que empiece solo al encenderlo"
     rec: '',                // última grabación del teclado (texto de notas)
+    bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
+    linea: Object.assign({}, LINEA_DEFECTO),                   // seguidor de líneas (todavía desactivado)
+    fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
+    ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
 const MAX_GUARDADAS = 40;
 let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -720,6 +831,13 @@ function cargar() {
     S.velFx = clamp(Number(S.velFx) || 100, 20, 300);
     S.vol = clamp(Number.isFinite(Number(S.vol)) ? Number(S.vol) : 100, 0, 100);
     if (typeof S.rec !== 'string') S.rec = '';
+    const b = S.bateria && typeof S.bateria === 'object' ? S.bateria : {};
+    S.bateria = {
+        quimica: b.quimica in CURVAS_BATERIA ? b.quimica : 'nimh',
+        capacidad: clamp(Math.round(Number(b.capacidad) || CAPACIDAD_DEFECTO.nimh), 500, 10000),
+        hist: (Array.isArray(b.hist) ? b.hist : []).filter(p => Array.isArray(p) && p.length === 2 && p[0] > 0 && p[1] > 0).slice(-200),
+    };
+    S.linea = lineaNormaliza(S.linea);
     if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
     S.guardadas = (Array.isArray(S.guardadas) ? S.guardadas : [])
         .filter(g => g && typeof g.id === 'string' && typeof g.nombre === 'string' && typeof g.texto === 'string')
@@ -753,6 +871,7 @@ function ponEstado(est) {
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-pgm-guardar', 'rb-pgm-probar', 'rb-pgm-borrar']) $(id).disabled = est !== 'listo';
+    if ($('rb-ln-iniciar')) $('rb-ln-iniciar').disabled = !SEGUIDOR_ACTIVO || est !== 'listo';
     if (est === 'sinprograma') {
         $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -771,12 +890,16 @@ function alLinea(l) {
         const err = /^ERR/.test(l);
         const reintento = S.cola.ack(err);
         if (err && !reintento) mensaje('El robot no entendió una orden (' + l + ').', 'err');
+    } else if (/^BAT /.test(l)) {
+        S.cola.ack();                      // BAT contesta con su propia línea, sin OK
+        bateriaLeida(parseFloat(l.slice(4)));
     } else if (/^INFO /.test(l)) {
         // "INFO BOOT=2 BTN=0 RUN=3 MIN=5.4 BAT=7.42" al encender: lo que el robot anotó solo desde que
         // se borró el aviso. BOOT cuenta cada arranque, y conectarlo por USB también reinicia la placa
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
-        mostrarBateria(kv.BAT);
+        S.fwNuevo = true;                  // este programa ya entiende la orden BAT
+        bateriaLeida(kv.BAT);
         const cosas = [];
         if (kv.BOOT > 1) cosas.push(`${kv.BOOT} arranques (conectarlo por USB cuenta uno; si lo probaste solo, los demás fueron reinicios)`);
         if (kv.BTN) cosas.push(`${kv.BTN} cambio(s) de modo con el botón`);
@@ -801,15 +924,53 @@ function alLinea(l) {
     }
 }
 
-// Voltaje de la batería junto al estado; por debajo de 6,5 V se avisa (con motores y luces a la vez
-// la placa se puede reiniciar)
+// Medidor de la cabecera: barra, porcentaje y cuánto va a durar con lo que se está haciendo.
+// Solo con lecturas en reposo (con los motores andando el voltaje cae a ~5,6 V y daría un % falso).
+const NOMBRE_PILAS = { nimh: 'recargables NiMH', alcalina: 'alcalinas', mixta: 'mixtas' };
+
 function mostrarBateria(v) {
     const el = $('rb-bat');
-    if (!el || !(v > 0)) return;
-    const baja = v < 6.5;
+    if (!el || !(v >= 0)) return;
     el.hidden = false;
-    el.textContent = `Batería ${v.toFixed(1)} V${baja ? ' (baja)' : ''}`;
-    el.className = 'badge badge--' + (baja ? 'off' : 'idle');
+    if (v < 1) {                                   // solo USB: la placa no ve las pilas
+        el.dataset.nivel = 'sin';
+        $('rb-bat-pct').textContent = 'Sin pilas';
+        $('rb-bat-v').textContent = 'solo USB';
+        $('rb-bat-fill').style.width = '0%';
+        $('rb-bat-tiempo').textContent = '';
+        el.title = 'El robot no está viendo las pilas: está alimentado solo por el USB, o el interruptor está apagado.';
+        return;
+    }
+    const b = S.bateria;
+    const pct = porcentajeBateria(v, b.quimica);
+    const uso = S.enShow ? 'motores' : S.actuando ? (S.actuando.conBaile ? 'motores' : 'musica') : 'reposo';
+    const t = tiempoRestante({ pct, capacidadMah: b.capacidad, historial: b.hist, uso, quimica: b.quimica });
+    const nivel = pct <= 10 ? 'critica' : pct <= 20 ? 'baja' : 'ok';
+    el.dataset.nivel = nivel;
+    $('rb-bat-pct').textContent = pct + ' %';
+    $('rb-bat-v').textContent = v.toFixed(2) + ' V';
+    $('rb-bat-fill').style.width = pct + '%';
+    el.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(pct));
+    $('rb-bat-tiempo').textContent = t ? `≈ ${formatoDuracion(t.minutos)} de uso (${t.fuente})` : '';
+    el.title = `${v.toFixed(2)} V, pilas ${NOMBRE_PILAS[b.quimica]} de ${b.capacidad} mAh`;
+    if (nivel !== S.ultimoNivel) {
+        S.ultimoNivel = nivel;
+        if (nivel !== 'ok') mensaje(`Batería al ${pct} %: conviene cargar o cambiar las pilas pronto.`, nivel === 'critica' ? 'err' : undefined);
+    }
+}
+
+// Una lectura nueva en reposo: se guarda para estimar el consumo real y se actualiza el medidor
+function bateriaLeida(v) {
+    if (!(v >= 0)) return;
+    if (v < 1) return mostrarBateria(v);
+    const b = S.bateria, ahora = Date.now();
+    if (S.ultimoVolt !== null && v > S.ultimoVolt + 0.4) b.hist = [];     // pilas cargadas o cambiadas: el historial ya no sirve
+    S.ultimoVolt = v;
+    const ult = b.hist[b.hist.length - 1];
+    if (!ult || ahora - ult[0] >= 20000) b.hist.push([ahora, Math.round(v * 100) / 100]);
+    b.hist = b.hist.filter(p => ahora - p[0] < 6 * 3600000).slice(-200);
+    mostrarBateria(v);
+    guardar();
 }
 
 function alListo() {
@@ -965,6 +1126,7 @@ function actuar(conCancion, conBaile) {
     const { cmds, ms } = armar(conCancion, conBaile);
     if (!ms) return mensaje('No hay nada que tocar: la canción y el baile están vacíos.', 'err');
     S.actuando = { conCancion, conBaile };
+    S.ultimaActividad = Date.now();
     S.inicio = performance.now();
     S.total = ms;
     // El efecto de luces va primero y corre solo en el robot mientras suena todo lo demás.
@@ -1012,6 +1174,7 @@ function probarShow() {
     if (S.estado !== 'listo') return pgmInfo('Conecta el robot primero.', 'err');
     S.actuando = false;
     S.enShow = true;
+    S.ultimaActividad = Date.now();
     S.cola.enviar([{ l: 'MODE 5', ex: true }]);
     pgmInfo('El robot hace su show guardado por su cuenta. Pulsa Paro para cortarlo.');
 }
@@ -1023,6 +1186,7 @@ function borrarShow() {
 }
 
 function paro() {
+    S.ultimaActividad = Date.now();
     S.actuando = false;
     S.enShow = false;
     detenerAudio();
@@ -1066,6 +1230,14 @@ function tickLeds() {
     if (S.estado === 'listo' && S.cola.sinNovedad() > 6000) {
         paro();
         mensaje('El robot dejó de contestar. Si no reacciona, pulsa Desconectar y vuelve a conectar.', 'err');
+        return;
+    }
+    // cada 10 s, con el robot quieto y sin nada en la cola, se le pregunta el voltaje (en reposo)
+    const ahora = Date.now();
+    if (S.estado === 'listo' && S.fwNuevo && !S.actuando && !S.enShow && !S.cola.ocupado()
+        && ahora - S.ultimoBat > 10000 && ahora - S.ultimaActividad > 3000) {
+        S.ultimoBat = ahora;
+        S.cola.enviar(['BAT']);
         return;
     }
     if (S.estado !== 'listo' || !S.vivo || S.actuando || S.enShow || !visible || S.cola.ocupado()) return;
@@ -1504,6 +1676,84 @@ function iniciarTeclado() {
     window.addEventListener('blur', soltarTodas);
 }
 
+// ---------- Seguidor de líneas (desactivado) ----------
+
+function pintarLinea() {
+    const c = S.linea;
+    $('rb-ln-puerto').value = String(c.puerto);
+    $('rb-ln-color').value = c.color;
+    $('rb-ln-vel').value = c.velocidad;
+    $('rb-ln-vel-v').textContent = c.velocidad;
+    $('rb-ln-giro').value = c.giro;
+    $('rb-ln-giro-v').textContent = c.giro + ' %';
+    $('rb-ln-perdida').value = c.perdida;
+    $('rb-ln-buscar').value = c.buscarMs;
+    $('rb-ln-buscar-campo').hidden = c.perdida !== 'buscar';
+    $('rb-ln-cruce').value = c.cruce;
+    $('rb-ln-obst').value = c.obstaculoCm;
+    $('rb-ln-dur').value = c.duracionS;
+    $('rb-ln-avisos').checked = c.avisos;
+    $('rb-ln-ordenes').textContent = lineaAOrdenes(c).join('\n');
+    $('rb-ln-iniciar').disabled = !SEGUIDOR_ACTIVO || S.estado !== 'listo';
+    $('rb-ln-aviso').hidden = SEGUIDOR_ACTIVO;
+}
+
+function cambioLinea() {
+    S.linea = lineaNormaliza({
+        puerto: $('rb-ln-puerto').value, color: $('rb-ln-color').value,
+        velocidad: $('rb-ln-vel').value, giro: $('rb-ln-giro').value,
+        perdida: $('rb-ln-perdida').value, buscarMs: $('rb-ln-buscar').value,
+        cruce: $('rb-ln-cruce').value, obstaculoCm: $('rb-ln-obst').value,
+        duracionS: $('rb-ln-dur').value, avisos: $('rb-ln-avisos').checked,
+    });
+    pintarLinea();
+    guardar();
+}
+
+function iniciarLinea() {
+    if (!SEGUIDOR_ACTIVO) return mensaje('El seguidor de líneas todavía está desactivado.', 'err');
+    if (S.estado !== 'listo') return mensaje('Conecta el robot primero.', 'err');
+    S.actuando = false;
+    S.ultimaActividad = Date.now();
+    S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(S.linea), [{ l: 'MODE 6', ex: true }]));
+    mensaje('Siguiendo la línea… pulsa Paro para detenerlo.');
+}
+
+function iniciarLineaYBateria() {
+    for (const id of ['rb-ln-puerto', 'rb-ln-color', 'rb-ln-perdida', 'rb-ln-cruce', 'rb-ln-buscar', 'rb-ln-obst', 'rb-ln-dur']) {
+        $(id).addEventListener('change', cambioLinea);
+    }
+    for (const id of ['rb-ln-vel', 'rb-ln-giro']) $(id).addEventListener('input', cambioLinea);
+    $('rb-ln-avisos').addEventListener('change', cambioLinea);
+    $('rb-ln-reset').addEventListener('click', () => { S.linea = lineaNormaliza(null); pintarLinea(); guardar(); });
+    $('rb-ln-iniciar').addEventListener('click', iniciarLinea);
+
+    // ajustes de las pilas: el porcentaje y la duración se calculan con esto
+    $('rb-bat-quim').value = S.bateria.quimica;
+    $('rb-bat-cap').value = S.bateria.capacidad;
+    $('rb-bat-quim').addEventListener('change', e => {
+        S.bateria.quimica = e.target.value in CURVAS_BATERIA ? e.target.value : 'nimh';
+        S.bateria.capacidad = CAPACIDAD_DEFECTO[S.bateria.quimica];
+        S.bateria.hist = [];
+        $('rb-bat-cap').value = S.bateria.capacidad;
+        S.ultimoNivel = 'ok';
+        guardar();
+        if (S.ultimoVolt !== null) mostrarBateria(S.ultimoVolt);
+    });
+    $('rb-bat-cap').addEventListener('change', e => {
+        S.bateria.capacidad = clamp(Math.round(Number(e.target.value) || CAPACIDAD_DEFECTO[S.bateria.quimica]), 500, 10000);
+        e.target.value = S.bateria.capacidad;
+        guardar();
+        if (S.ultimoVolt !== null) mostrarBateria(S.ultimoVolt);
+    });
+    $('rb-bat-borrar').addEventListener('click', () => {
+        S.bateria.hist = [];
+        guardar();
+        if (S.ultimoVolt !== null) mostrarBateria(S.ultimoVolt);
+    });
+    pintarLinea();
+}
+
 function iniciar() {
     if (!$('sec-robot')) return;
     cargar();
@@ -1623,6 +1873,7 @@ function iniciar() {
         cambio('led');
     });
     iniciarTeclado();
+    iniciarLineaYBateria();
 
     setInterval(tickLeds, 100);
 

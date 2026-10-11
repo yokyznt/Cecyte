@@ -137,8 +137,17 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 
 - **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
 - **Timbre:** Timbre, Ritmo y ESP32.
-- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Luces, Show guardado e Instalar.
-  La conexión, el paro y el progreso están siempre arriba. El volumen del robot está en Música.
+- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Luces, Línea, Show guardado e Instalar.
+  La conexión, el paro, el progreso y la batería están siempre arriba. El volumen del robot está en Música.
+  - **Batería:** barra con el porcentaje, el voltaje y cuánto va a durar. El robot manda su voltaje al
+    conectar (`INFO ... BAT=`) y la página se lo pregunta (`BAT`) cada 10 s cuando está quieto; con los
+    motores andando el voltaje cae (~5,6 V) y esas lecturas no cuentan. El porcentaje sale de una curva por
+    tipo de pilas (recargables NiMH, alcalinas o mixtas, en "Ajustes de la batería") y la duración se estima
+    con lo que hace el robot y, con ~10 minutos de datos, con lo que de verdad se ha gastado.
+  - **Línea (todavía desactivado):** todos los ajustes del seguidor (puerto del módulo Me Line Follower,
+    color, velocidad, corrección, qué hacer al perder la línea o en un cruce, obstáculo, duración y avisos)
+    ya se pueden dejar listos; no se mandan al robot. Para activarlo: `SEGUIDOR_ACTIVO = true` en
+    `robot.js`, `#define SEGUIDOR_LINEA 1` en el `.ino` y volver a subir el firmware (compila: 17,4 KB).
 
 Se puede abrir una sección directo con `#admin-<sección>` (por ejemplo `#admin-robot-luces`;
 `#admin-robot` abre Música). `node test/admin-secciones.test.js` revisa que el HTML y el script coincidan.
