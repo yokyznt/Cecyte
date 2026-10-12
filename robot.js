@@ -874,6 +874,7 @@ const S = {
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
     musicaIds: [],            // temporizadores de la música que la página manda nota a nota en las funciones autónomas
+    pedirLog: false, logEsperado: 0, logLinea: [],   // registro del seguidor de línea (diagnóstico)
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
     linea: Object.assign({}, LINEA_DEFECTO),                   // seguidor de líneas (todavía desactivado)
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
@@ -970,6 +971,13 @@ function alLinea(l) {
         const err = /^ERR/.test(l);
         const reintento = S.cola.ack(err);
         if (err && !reintento) mensaje('El robot no entendió una orden (' + l + ').', 'err');
+    } else if (/^LOG \d+$/.test(l)) {
+        S.logEsperado = Number(l.slice(4));
+        S.logLinea = [];
+        if (!S.logEsperado) mostrarLogLinea();
+    } else if (/^LG \d+ \d+ \d+$/.test(l)) {
+        S.logLinea.push(l.slice(3).split(' ').map(Number));
+        if (S.logLinea.length >= S.logEsperado) mostrarLogLinea();
     } else if (/^BAT /.test(l)) {
         S.cola.ack();                      // BAT contesta con su propia línea, sin OK
         bateriaLeida(parseFloat(l.slice(4)));
@@ -994,6 +1002,7 @@ function alLinea(l) {
         S.vioArranque = true;   // el programa viejo (tanquecito): no habla con la página
     } else if (l === 'ABORTED') {
         S.cola.abortado();
+        if (S.pedirLog) { S.pedirLog = false; setTimeout(() => crudo('LOG' + String.fromCharCode(10)), 150); }   // al parar la línea: su registro
         if (S.salirModo) { S.salirModo = false; crudo('MODE 4\n'); }   // "!" para y ya, pero esquivar/seguir seguirían: se le quita el modo
     } else if (/^SHOW fin/.test(l)) {
         if (S.enShow) mensaje('El show guardado terminó.', 'ok');
@@ -1485,7 +1494,7 @@ function paro() {
     if (S.corriendoFuncion) {
         S.corriendoFuncion = false;
         S.sucio = true;                                  // las luces vuelven a ser las de la pantalla
-        if (S.autonomo) { S.autonomo = 0; S.salirModo = true; }
+        if (S.autonomo) { S.pedirLog = S.autonomo === 6; S.autonomo = 0; S.salirModo = true; }
     }
     detenerAudio();
     S.cola.abortar();
@@ -1977,6 +1986,17 @@ function iniciarTeclado() {
 
 // ---------- Seguidor de líneas (desactivado) ----------
 
+// Registro del seguidor: qué sensores veían la línea (S1 S2) y qué decidió el robot, con el tiempo desde que arrancó
+const ACCIONES_LINEA = ['', 'recto', 'corrige hacia S1', 'corrige hacia S2', 'cruce (ambos)', 'perdida: sigue derecho',
+    'arco buscando hacia S1', 'arco buscando hacia S2', 'parar'];
+function mostrarLogLinea() {
+    const filas = S.logLinea.map(([estado, accion, t]) =>
+        `${(t / 100).toFixed(2).padStart(6)} s   S1=${(estado >> 1) & 1} S2=${estado & 1}   ${ACCIONES_LINEA[accion] || accion}`);
+    $('rb-ln-log').textContent = filas.length
+        ? filas.join(String.fromCharCode(10))
+        : 'El robot no tiene registro: arranca el seguidor y páralo.';
+}
+
 function pintarLinea() {
     const c = S.linea;
     $('rb-ln-puerto').value = String(c.puerto);
@@ -2063,6 +2083,7 @@ function iniciarLineaYBateria() {
     }
     $('rb-ln-giro').addEventListener('input', cambioLinea);
     $('rb-ln-avisos').addEventListener('change', cambioLinea);
+    $('rb-ln-leer').addEventListener('click', () => { if (S.estado === 'listo') crudo('LOG' + String.fromCharCode(10)); });
     $('rb-ln-reset').addEventListener('click', () => { S.linea = lineaNormaliza(null); pintarLinea(); guardar(); });
 
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto

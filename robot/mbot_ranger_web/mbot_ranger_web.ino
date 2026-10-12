@@ -762,9 +762,31 @@ void lineaEstado(uint8_t e) {
   if (lnAvisos && fxModo == 0) { if (e == 0) color(40, 0, 0); else color(0, 40, 0); }   // con un efecto, el efecto manda
 }
 
+// Registro del seguidor (diagnóstico, orden LOG): cada cambio de lo que ven los sensores o de lo que decide el
+// robot. estado = bit1 sensor 1 (S1) y bit0 sensor 2 (S2) viendo la línea; accion: 1 recto, 2 corrige hacia S1,
+// 3 corrige hacia S2, 4 cruce, 5 perdida (derecho), 6 arco hacia S1, 7 arco hacia S2, 8 parar.
+uint8_t lnLog[150];                    // 50 eventos de 3 bytes: estado*16+accion, tiempo (10 ms) alto y bajo
+uint8_t lnLogN = 0;
+uint8_t lnLogUlt = 255;
+unsigned long lnLogT0 = 0;
+
+void lnRegistra(uint8_t estado, uint8_t accion) {
+  const uint8_t k = (estado << 4) | accion;
+  if (k == lnLogUlt || lnLogN >= 50) return;
+  lnLogUlt = k;
+  const unsigned int t = (unsigned int)((millis() - lnLogT0) / 10UL);
+  lnLog[3 * lnLogN] = k;
+  lnLog[3 * lnLogN + 1] = t >> 8;
+  lnLog[3 * lnLogN + 2] = t & 0xFF;
+  lnLogN++;
+}
+
 void seguirLinea() {
   if (lnT0 == 0) {
     lnT0 = millis();
+    lnLogT0 = lnT0;                                    // registro nuevo en cada carrera
+    lnLogN = 0;
+    lnLogUlt = 255;
     pinMode(LN_S1[lnPuerto], INPUT);
     pinMode(LN_S2[lnPuerto], INPUT);
   }
@@ -785,16 +807,19 @@ void seguirLinea() {
     else if (lnCruce == 1) parar();
     else if (lnCruce == 2) motores(-lnVel, lnVel);
     else motores(lnVel, -lnVel);
+    lnRegistra(3, 4);
   } else if (s1) {                                   // la línea está a la izquierda: corrige hacia allí
     lnLado = -1;
     lnPerdidoDesde = 0;
     lineaEstado(1);
     motores(lnVel - 2 * c, lnVel);
+    lnRegistra(2, 2);
   } else if (s2) {
     lnLado = 1;
     lnPerdidoDesde = 0;
     lineaEstado(1);
     motores(lnVel, lnVel - 2 * c);
+    lnRegistra(1, 3);
   } else {                                           // perdida
     if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
     lineaEstado(0);
@@ -805,15 +830,19 @@ void seguirLinea() {
     const unsigned long perdido = millis() - lnPerdidoDesde;
     if (lnPerdida == 0) {
       parar();
+      lnRegistra(0, 8);
     } else if (lnPerdida == 2 || perdido < 150) {
       motores(lnVel, lnVel);
+      lnRegistra(0, 5);
     } else if (perdido - 150 > lnBuscarMs) {
       parar();
+      lnRegistra(0, 8);
     } else {
       unsigned long r = perdido - 150, dur = 250;
       int8_t lado = lnLado;
       while (r >= dur && dur < 2500) { r -= dur; dur += 250; lado = -lado; }
       if (lado > 0) motores(lnVel, lnVel / 5); else motores(lnVel / 5, lnVel);   // arco hacia ese lado
+      lnRegistra(0, lado > 0 ? 7 : 6);
     }
   }
 }
@@ -952,6 +981,17 @@ void ejecuta(char *s) {
     ok();
 #endif
 #if SEGUIDOR_LINEA
+  } else if (!strcmp(cmd, "LOG")) {                   // el registro del seguidor de la última carrera
+    Serial.print(F("LOG "));
+    Serial.println(lnLogN);
+    for (uint8_t q = 0; q < lnLogN; q++) {
+      Serial.print(F("LG "));
+      Serial.print(lnLog[3 * q] >> 4);
+      Serial.print(' ');
+      Serial.print(lnLog[3 * q] & 15);
+      Serial.print(' ');
+      Serial.println(((unsigned int)lnLog[3 * q + 1] << 8) | lnLog[3 * q + 2]);
+    }
   } else if (!strcmp(cmd, "SENS")) {                  // diagnóstico: los dos pines de los puertos 6, 7 y 8 (1 = alto)
     Serial.print(F("SENS"));
     for (uint8_t q = 0; q < 4; q++) {
