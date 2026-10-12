@@ -975,9 +975,6 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-fn b { font-size: var(--fs-sm); }
 .rb-fn small { font-size: var(--fs-cap); color: var(--ink-2); }
 .rb-fn em { font-style: normal; font-weight: 700; color: var(--green-800); }
-.rb-ln-panel { grid-column: 1 / -1; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
-.rb-ln-panel[hidden] { display: none; }
-.rb-ln-panel > .hint, .rb-ln-panel > .btn-row { grid-column: 1 / -1; }
 
 @media print {
     .site-header, .site-footer, .notify, .toasts, .intro .group-pick, .agenda { display: none !important; }
@@ -1060,10 +1057,6 @@ input[type="range"] { width: 100%; accent-color: var(--green-700); min-height: 2
 .rb-bateria[data-nivel="critica"] .rb-bateria__aviso { background: var(--rose-100); color: var(--rose-700); }
 @media (max-width: 560px) { .panel__head .rb-bateria { margin-left: 0; flex-basis: 100%; order: 3; } }
 
-.rb-codigo {
-    margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm);
-    background: var(--green-50); font: 0.8125rem/1.5 ui-monospace, Consolas, monospace; overflow-x: auto;
-}
 .rb-ajustes { width: 100%; max-width: 720px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
 .rb-ajustes summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .rb-ajustes[open] > .stack { padding-bottom: 12px; }

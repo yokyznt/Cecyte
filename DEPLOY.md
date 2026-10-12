@@ -137,7 +137,7 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 
 - **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
 - **Timbre:** Timbre, Ritmo y ESP32.
-- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones (incluye *Seguir la línea*), Luces e Instalar.
+- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones, Luces e Instalar.
   La conexión, el paro, el progreso y la batería están siempre arriba. El volumen del robot está en Música.
   - **Batería:** barra con el porcentaje, el voltaje y cuánto va a durar. El robot manda su voltaje al
     conectar (`INFO ... BAT=`) y la página se lo pregunta (`BAT`) cada 10 s cuando está quieto; con los
@@ -151,11 +151,6 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
     en girar 90°"); *Esquivar* y *Seguir mi mano* usan los modos 1 y 2 que el programa del robot ya trae (`MODE 1`
     / `MODE 2`) y al parar la página manda `!` y `MODE 4`. El Nervous Bird necesita un programa de equilibrio con el
     giroscopio que este firmware no incluye: sus funciones son solo movimientos suaves.
-  - **Seguir la línea:** es una función (Land Raider y Dashing Raptor) con el módulo Me Line Follower en el puerto 6, 7 u 8.
-    Sus ajustes (color de la línea, velocidad, corrección, qué hacer al perderla o en un cruce, obstáculo, duración y
-    avisos) salen en la misma sección y se aplican en vivo con `LINEA clave valor`; arranca con `MODE 6`.
-    El firmware ya no incluye `MeAuriga.h` (enlazaba Wire, Servo, IR y encoders): el anillo de LEDs lo mueve un driver
-    propio y todo ocupa unos 13,4 KB, bajo el tope de 16 KB de esta placa (ver nota del flasheo).
   - **Pilas:** además del tiempo de uso, la barra dice en cuánto tiempo volverían al 100 % con tu cargador
     (corriente en "Ajustes de la batería", 500 mA por defecto; las NiMH necesitan ~140 % de su capacidad).
 
@@ -182,7 +177,7 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   deja de mandar órdenes los motores se paran solos a los 3 segundos.
 - **Baile guardado:** en Baile, "Guardar este baile en el robot" deja el baile con su canción y sus luces y borra
   cualquier función guardada: el robot solo baila, sin la página. **Velocidad:** un solo control (de lo más lento a lo más
-  rápido) en Funciones y Baile sirve para todas las funciones, incluidas esquivar (`SPD`), seguir la mano y la línea.
+  rápido) en Funciones y Baile sirve para todas las funciones, incluidas esquivar (`SPD`) y seguir la mano.
 - **Funciones guardadas:** en Funciones, "Guardar la función en el robot" deja la función (con la canción y las luces
   marcadas) en su EEPROM y la hace sin USB: con el botón de la placa o, si lo marcas, sola 2,5 s después de
   encenderlo. Cada guardado reemplaza al anterior. Úsalo con las baterías puestas y el interruptor encendido.
@@ -209,5 +204,12 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
   nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
   `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
-  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa ~16 KB.
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa ~14 KB.
 - **Pruebas:** `node test/robot.test.js`.
+
+## Pendiente
+
+- **Seguir la línea:** se quitó del robot y de la página (el módulo Me Line Follower en el puerto 9 comparte pin con el
+  botón de la placa y con solo dos sensores no se distingue "centrada" de "perdida"). Se retomará al armar el Dashing
+  Raptor. El historial de git (PR #16, #28 a #31) conserva el código, con el registro `LOG` para afinarlo.
+- El firmware ocupa unos 14 KB de los 16 KB (64 páginas) que admite esta placa; ver la nota del flasheo.

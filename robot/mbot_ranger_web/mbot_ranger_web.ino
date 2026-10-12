@@ -7,7 +7,7 @@
   Modos (botón de la placa):
     0 = Reposo (LEDs azules)         1 = Esquivar obstáculos (verde)
     2 = Seguir objeto con la mano (amarillo)   3 = Test de motores (rojo)
-    4 = Página (la manda la web; el botón vuelve a 0)   6 = Seguir la línea (solo por la página: MODE 6)
+    4 = Página (la manda la web; el botón vuelve a 0)   5 = Baile o función guardados (sin la página)
 
   Órdenes por USB, 115200 baudios, una por línea. Cada una responde OK, ERR ... o PONG:
     PING             -> PONG mbot-web 1
@@ -27,10 +27,10 @@
     PCLR             empieza a guardar un show nuevo (borra el anterior)
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
     PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
-    SPD n            velocidad de esquivar y seguir la mano, 40..230 (la línea usa LINEA vel)
-    MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página; 6 = seguir la línea)
-    FSAVE m [1]      guarda la función m (1 esquivar, 2 seguir la mano, 6 línea, con los ajustes LINEA de ese momento);
-                     con 1 arranca sola 2,5 s después de encender. FCLR la borra
+    SPD n            velocidad de esquivar y seguir la mano, 40..230
+    MODE n           cambia de modo (0..5; 5 = el baile guardado, solo, sin la página)
+    FSAVE m [1]      guarda la función m (1 esquivar, 2 seguir la mano); con 1 arranca sola 2,5 s después de
+                     encender. FCLR la borra
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
@@ -150,14 +150,6 @@ const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
-#define SEGUIDOR_LINEA 1             // 1 = incluye el modo 6 (seguidor de línea, orden LINEA)
-#if SEGUIDOR_LINEA
-const int MODO_MAX = 6;              // 6 = seguir la línea con el módulo Me Line Follower
-unsigned long lnT0 = 0;              // cuándo empezó a seguir la línea (0 = no ha empezado)
-uint8_t lnEstado = 255;              // 0 perdida, 1 en la línea, 2 cruce (para no redibujar las luces sin necesidad)
-#else
-const int MODO_MAX = MODO_SHOW;
-#endif
 const unsigned long SIN_ORDENES_MS = 3000;
 
 // Show guardado: cabecera de 4 bytes en la EEPROM y luego las órdenes, una detrás de otra:
@@ -272,10 +264,6 @@ void aplicaModo() {
   escEstado = 0;
   musP = 0;
   musT = millis() + 1500;               // si la página manda la música, tiene tiempo de adelantarse
-#if SEGUIDOR_LINEA
-  lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
-  lnEstado = 255;
-#endif
   // los colores de los modos del botón mandan sobre el efecto, salvo en esquivar y seguir la mano cuando
   // el usuario guardó sus luces: ahí siguen con su efecto
   const bool conserva = luzPropia && (modo == 1 || modo == 2);
@@ -378,10 +366,6 @@ void testMotores() {
 }
 
 // ---------- Botón de la placa ----------
-bool botonPresionado() {
-  return analogRead(A7) < 100;
-}
-
 // Cuenta solo el instante de pulsar, y solo si el botón se vio suelto al menos una vez desde que
 // enciende. Así un botón que lee "presionado" siempre (placa sin batería, botón atorado) no cambia
 // de modo ni echa a andar los motores solo.
@@ -390,9 +374,7 @@ bool botonPresionado() {
 bool botonLiberado = false;
 bool botonAntes = false;
 unsigned long botonBajoDesde = 0;
-bool botonOcupado();
 bool botonFlanco() {
-  if (botonOcupado()) return false;       // el módulo de línea del puerto 9 usa ese pin
   int v = analogRead(A7);
   unsigned long t = millis();
   if (v > 500) {
@@ -637,10 +619,10 @@ void fxRestaurar() {
   Serial.println(m);
 }
 
-// Música de fondo de las funciones guardadas (esquivar, seguir la mano y línea): toca las notas T y W del show
+// Música de fondo de las funciones guardadas (esquivar y seguir la mano): toca las notas T y W del show
 // guardado con la bandera 4, sin esperarlas, y las repite. La llama drenar(), que corre en toda espera.
 void musicaFondo() {
-  if (!(modo == 1 || modo == 2 || modo == 6) || abortar) return;
+  if (!(modo == 1 || modo == 2) || abortar) return;
   unsigned long t = millis();
   if ((long)(t - musT) < 0) return;                    // sonando o en silencio
   if (!pgmValido() || !(pgmBanderas() & 4)) return;
@@ -732,158 +714,18 @@ void correShow() {
   Serial.println(F("SHOW fin"));
 }
 
-#if SEGUIDOR_LINEA
-// ---------- Seguidor de línea (módulo Me Line Follower: dos sensores digitales) ----------
-// Puertos con dos pines digitales: 6, 7, 8 y 9 (el 10 es el ultrasonido). El 9 comparte el pin A7 con el botón de
-// la placa: con el módulo ahí el botón no se puede usar (la salida del sensor parecería una pulsación).
-const uint8_t LN_S1[4] = { A10, A9, A8, A7 };     // puertos 6, 7, 8 y 9 (el 9 comparte A7 con el botón de la placa)
-const uint8_t LN_S2[4] = { A15, A14, A13, A12 };
-uint8_t lnPuerto = 0, lnColor = 0, lnVel = 130, lnGiro = 50, lnPerdida = 1, lnCruce = 0, lnObst = 0, lnAvisos = 1;
-uint16_t lnBuscarMs = 4000, lnDurS = 0;
-unsigned long lnPerdidoDesde = 0;
-int8_t lnLado = 1;                   // hacia dónde vio la línea por última vez (-1 izquierda, 1 derecha)
-
-void lineaConfig(const char *k, int v) {
-  if (!strcmp(k, "puerto")) lnPuerto = constrain(v, 6, 9) - 6;
-  else if (!strcmp(k, "color")) lnColor = v ? 1 : 0;
-  else if (!strcmp(k, "vel")) lnVel = constrain(v, 40, 150);
-  else if (!strcmp(k, "giro")) lnGiro = constrain(v, 10, 100);
-  else if (!strcmp(k, "perdida")) lnPerdida = constrain(v, 0, 2);
-  else if (!strcmp(k, "buscar")) lnBuscarMs = constrain(v, 0, 10000);
-  else if (!strcmp(k, "cruce")) lnCruce = constrain(v, 0, 3);
-  else if (!strcmp(k, "obst")) lnObst = constrain(v, 0, 200);
-  else if (!strcmp(k, "dur")) lnDurS = constrain(v, 0, 3600);
-  else if (!strcmp(k, "avisos")) lnAvisos = v ? 1 : 0;
-}
-
-void lineaEstado(uint8_t e) {
-  if (e == lnEstado) return;
-  lnEstado = e;
-  if (lnAvisos && fxModo == 0) { if (e == 0) color(40, 0, 0); else color(0, 40, 0); }   // con un efecto, el efecto manda
-}
-
-// Registro del seguidor (diagnóstico, orden LOG): cada cambio de lo que ven los sensores o de lo que decide el
-// robot. estado = bit1 sensor 1 (S1) y bit0 sensor 2 (S2) viendo la línea; accion: 1 recto, 2 corrige hacia S1,
-// 3 corrige hacia S2, 4 cruce, 5 perdida (derecho), 6 arco hacia S1, 7 arco hacia S2, 8 parar.
-uint8_t lnLog[150];                    // 50 eventos de 3 bytes: estado*16+accion, tiempo (10 ms) alto y bajo
-uint8_t lnLogN = 0;
-uint8_t lnLogUlt = 255;
-unsigned long lnLogT0 = 0;
-
-void lnRegistra(uint8_t estado, uint8_t accion) {
-  const uint8_t k = (estado << 4) | accion;
-  if (k == lnLogUlt || lnLogN >= 50) return;
-  lnLogUlt = k;
-  const unsigned int t = (unsigned int)((millis() - lnLogT0) / 10UL);
-  lnLog[3 * lnLogN] = k;
-  lnLog[3 * lnLogN + 1] = t >> 8;
-  lnLog[3 * lnLogN + 2] = t & 0xFF;
-  lnLogN++;
-}
-
-void seguirLinea() {
-  if (lnT0 == 0) {
-    lnT0 = millis();
-    lnLogT0 = lnT0;                                    // registro nuevo en cada carrera
-    lnLogN = 0;
-    lnLogUlt = 255;
-    pinMode(LN_S1[lnPuerto], INPUT);
-    pinMode(LN_S2[lnPuerto], INPUT);
-  }
-  if ((lnDurS && millis() - lnT0 > lnDurS * 1000UL) || (lnObst && distanciaCm() < lnObst)) {
-    parar();
-    modo = 0;
-    aplicaModo();
-    return;
-  }
-  // el módulo da LOW sobre una línea negra; con línea blanca se invierte
-  const bool s1 = (digitalRead(LN_S1[lnPuerto]) == LOW) != (lnColor == 1);
-  const bool s2 = (digitalRead(LN_S2[lnPuerto]) == LOW) != (lnColor == 1);
-  const int c = (int)lnVel * lnGiro / 100;           // cuánto se frena la rueda de adentro (x2)
-  if (s1 && s2) {                                    // cruce
-    lnPerdidoDesde = 0;
-    lineaEstado(2);
-    if (lnCruce == 0) motores(lnVel, lnVel);
-    else if (lnCruce == 1) parar();
-    else if (lnCruce == 2) motores(-lnVel, lnVel);
-    else motores(lnVel, -lnVel);
-    lnRegistra(3, 4);
-  } else if (s1) {                                   // la línea está a la izquierda: corrige hacia allí
-    lnLado = -1;
-    lnPerdidoDesde = 0;
-    lineaEstado(1);
-    motores(lnVel - 2 * c, lnVel);
-    lnRegistra(2, 2);
-  } else if (s2) {
-    lnLado = 1;
-    lnPerdidoDesde = 0;
-    lineaEstado(1);
-    motores(lnVel, lnVel - 2 * c);
-    lnRegistra(1, 3);
-  } else {                                           // perdida
-    if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
-    lineaEstado(0);
-    // Ninguno la ve: en una recta es lo normal (la línea queda ENTRE los sensores) y en una curva fuerte es que
-    // se salió. Como no se puede distinguir, no se gira en el sitio: sigue derecho un instante y luego AVANZA
-    // zigzagueando en arcos cada vez más largos (hacia el último lado, luego al otro...). En una recta el
-    // zigzag es mínimo porque un sensor la toca enseguida y corrige; en una curva la vuelve a encontrar.
-    const unsigned long perdido = millis() - lnPerdidoDesde;
-    if (lnPerdida == 0) {
-      parar();
-      lnRegistra(0, 8);
-    } else if (lnPerdida == 2 || perdido < 150) {
-      motores(lnVel, lnVel);
-      lnRegistra(0, 5);
-    } else if (perdido - 150 > lnBuscarMs) {
-      parar();
-      lnRegistra(0, 8);
-    } else {
-      unsigned long r = perdido - 150, dur = 250;
-      int8_t lado = lnLado;
-      while (r >= dur && dur < 2500) { r -= dur; dur += 250; lado = -lado; }
-      if (lado > 0) motores(lnVel, lnVel / 5); else motores(lnVel / 5, lnVel);   // arco hacia ese lado
-      lnRegistra(0, lado > 0 ? 7 : 6);
-    }
-  }
-}
-#endif
-
-// El puerto 9 comparte el pin A7 con el botón de la placa: con el seguidor de línea ahí, el botón se ignora
-// (el sensor negro se leería como pulsación y cambiaría de modo solo).
-bool botonOcupado() {
-#if SEGUIDOR_LINEA
-  return lnPuerto == 3;
-#else
-  return false;
-#endif
-}
-
-// ---------- Función guardada (esquivar, seguir la mano o seguir la línea) ----------
+// ---------- Función guardada (esquivar o seguir la mano) ----------
 // Al encenderlo (si se marcó) o con el botón de la placa, el robot la hace sin la página.
-// 15 bytes: magia, modo, arranca solo y los ajustes de la línea, que se cargan al encender.
+// 4 bytes en la EEPROM: magia, modo, arranca solo y velocidad.
 const int FN_DIR = 2950;
-const uint8_t FN_MAGICO = 0xC3;
+const uint8_t FN_MAGICO = 0xC4;
 int fnModo = 0;                       // 0 = no hay función guardada
 unsigned long fnEspera = 0;           // si no es 0, arranca a esta hora (para dejarlo en el piso)
 
 void fnGuardar(int m, bool solo) {
   EEPROM.update(FN_DIR + 1, m);
   EEPROM.update(FN_DIR + 2, solo ? 1 : 0);
-#if SEGUIDOR_LINEA
-  EEPROM.update(FN_DIR + 3, lnPuerto);
-  EEPROM.update(FN_DIR + 4, lnColor);
-  EEPROM.update(FN_DIR + 5, lnVel);
-  EEPROM.update(FN_DIR + 6, lnGiro);
-  EEPROM.update(FN_DIR + 7, lnPerdida);
-  EEPROM.update(FN_DIR + 8, lnCruce);
-  EEPROM.update(FN_DIR + 9, lnObst);
-  EEPROM.update(FN_DIR + 10, lnAvisos);
-  EEPROM.update(FN_DIR + 11, lnBuscarMs & 0xFF);
-  EEPROM.update(FN_DIR + 12, lnBuscarMs >> 8);
-  EEPROM.update(FN_DIR + 13, lnDurS & 0xFF);
-  EEPROM.update(FN_DIR + 14, lnDurS >> 8);
-#endif
-  EEPROM.update(FN_DIR + 15, velFn);
+  EEPROM.update(FN_DIR + 3, velFn);
   EEPROM.update(FN_DIR, FN_MAGICO);     // al final: nunca queda a medias
   fnModo = m;
 }
@@ -891,22 +733,10 @@ void fnGuardar(int m, bool solo) {
 void fnCargar() {
   if (EEPROM.read(FN_DIR) != FN_MAGICO) return;
   int m = EEPROM.read(FN_DIR + 1);
-  if (m != 1 && m != 2 && m != 6) return;
-  if (m > MODO_MAX) return;
+  if (m != 1 && m != 2) return;
   fnModo = m;
-  { uint8_t v = EEPROM.read(FN_DIR + 15); if (v >= 40 && v <= 230) velFn = v; }
-#if SEGUIDOR_LINEA
-  lnPuerto = constrain(EEPROM.read(FN_DIR + 3), 0, 3);
-  lnColor = EEPROM.read(FN_DIR + 4) ? 1 : 0;
-  lnVel = constrain(EEPROM.read(FN_DIR + 5), 40, 150);
-  lnGiro = constrain(EEPROM.read(FN_DIR + 6), 10, 100);
-  lnPerdida = constrain(EEPROM.read(FN_DIR + 7), 0, 2);
-  lnCruce = constrain(EEPROM.read(FN_DIR + 8), 0, 3);
-  lnObst = constrain(EEPROM.read(FN_DIR + 9), 0, 200);
-  lnAvisos = EEPROM.read(FN_DIR + 10) ? 1 : 0;
-  lnBuscarMs = constrain(EEPROM.read(FN_DIR + 11) | (EEPROM.read(FN_DIR + 12) << 8), 0, 10000);
-  lnDurS = constrain(EEPROM.read(FN_DIR + 13) | (EEPROM.read(FN_DIR + 14) << 8), 0, 3600);
-#endif
+  const uint8_t v = EEPROM.read(FN_DIR + 3);
+  if (v >= 40 && v <= 230) velFn = v;
 }
 
 // ---------- Órdenes ----------
@@ -931,7 +761,7 @@ void ejecuta(char *s) {
       fxHayNota = true;
       fxSucio = true;
     }
-    if (modo == 1 || modo == 2 || modo == 6) {          // esquivar, seguir y línea: la nota suena sin frenar al robot
+    if (modo == 1 || modo == 2) {                       // esquivar y seguir: la nota suena sin frenar al robot
       if (volumen) { tonoInicia(hz); tonoFin = millis() + ms; }
       musT = millis() + 3000;                          // la página manda la música: la guardada espera
     } else {
@@ -975,34 +805,6 @@ void ejecuta(char *s) {
       fxDibuja();
       ok();
     }
-#if SEGUIDOR_LINEA
-  } else if (!strcmp(cmd, "LINEA") && a && b) {      // LINEA clave valor: ajustes del seguidor (en RAM)
-    lineaConfig(a, atoi(b));
-    ok();
-#endif
-#if SEGUIDOR_LINEA
-  } else if (!strcmp(cmd, "LOG")) {                   // el registro del seguidor de la última carrera
-    Serial.print(F("LOG "));
-    Serial.println(lnLogN);
-    for (uint8_t q = 0; q < lnLogN; q++) {
-      Serial.print(F("LG "));
-      Serial.print(lnLog[3 * q] >> 4);
-      Serial.print(' ');
-      Serial.print(lnLog[3 * q] & 15);
-      Serial.print(' ');
-      Serial.println(((unsigned int)lnLog[3 * q + 1] << 8) | lnLog[3 * q + 2]);
-    }
-  } else if (!strcmp(cmd, "SENS")) {                  // diagnóstico: los dos pines de los puertos 6, 7 y 8 (1 = alto)
-    Serial.print(F("SENS"));
-    for (uint8_t q = 0; q < 4; q++) {
-      pinMode(LN_S1[q], INPUT);
-      pinMode(LN_S2[q], INPUT);
-      Serial.print(' ');
-      Serial.print(digitalRead(LN_S1[q]));
-      Serial.print(digitalRead(LN_S2[q]));
-    }
-    Serial.println();
-#endif
   } else if (!strcmp(cmd, "SPD") && a) {              // SPD n: velocidad de esquivar y seguir la mano (40..230)
     velFn = constrain(atoi(a), 40, 230);
     ok();
@@ -1052,7 +854,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "FSAVE") && a) {           // FSAVE modo [1 = arranca sola al encender]
     int m = atoi(a);
-    if ((m != 1 && m != 2 && m != 6) || m > MODO_MAX) { err(F("modo")); }
+    if (m != 1 && m != 2) { err(F("modo")); }
     else { fnGuardar(m, b && atoi(b) != 0); ok(); }
   } else if (!strcmp(cmd, "FCLR")) {
     EEPROM.update(FN_DIR, 0);
@@ -1060,7 +862,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
-    if (n < 0 || n > MODO_MAX) { err(F("modo")); }
+    if (n < 0 || n > MODO_SHOW) { err(F("modo")); }
     else {
       modo = n;
       aplicaModo();
@@ -1161,7 +963,6 @@ void loop() {
     ultimoBoton = millis();
     sumaEE(EE_BTN);
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
-    else if ((modo == 3 || modo == MODO_SHOW) && fnModo == 6) modo = 6;   // la línea guardada, tras el show
     else modo = (modo >= 3) ? 0 : modo + 1;
     aplicaModo();
     Serial.print(F("BTN "));
@@ -1180,9 +981,6 @@ void loop() {
     case 2: seguir();      break;
     case 3: testMotores(); break;
     case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
-#if SEGUIDOR_LINEA
-    case 6: seguirLinea(); break;
-#endif
     default: break;
   }
 

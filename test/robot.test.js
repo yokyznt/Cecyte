@@ -480,40 +480,6 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.formatoDuracion(5000), 'más de 2 días');
 }
 
-// 21) Seguidor de líneas: ajustes saneados y órdenes para el robot (todavía desactivado)
-{
-    assert.strictEqual(R.SEGUIDOR_ACTIVO, true, 'el seguidor está activo: es la función «Seguir la línea»');
-    const d = R.lineaNormaliza(null);
-    assert.deepStrictEqual(d, R.lineaNormaliza(R.LINEA_DEFECTO));
-    // valores raros se acotan o vuelven al de fábrica
-    const raro = R.lineaNormaliza({ puerto: 12, color: 'azul', velocidad: 999, giro: -5, perdida: 'volar', cruce: 'x', obstaculoCm: 5000, duracionS: -1, buscarMs: 99999 });
-    assert.strictEqual(raro.puerto, R.LINEA_DEFECTO.puerto, 'un puerto que no existe vuelve al de fábrica');
-    assert.strictEqual(R.lineaNormaliza({ puerto: 9 }).puerto, 9, 'el 9 se acepta (comparte pin con el botón)');
-    assert.strictEqual(raro.color, 'negra');
-    assert.strictEqual(raro.velocidad, 150);
-    assert.strictEqual(raro.giro, 10);
-    assert.strictEqual(raro.perdida, 'buscar');
-    assert.strictEqual(raro.cruce, 'recto');
-    assert.strictEqual(raro.obstaculoCm, 200);
-    assert.strictEqual(raro.duracionS, 0);
-    assert.strictEqual(raro.buscarMs, 10000);
-
-    const o = R.lineaAOrdenes({ puerto: 7, color: 'blanca', velocidad: 100, giro: 60, perdida: 'parar', buscarMs: 800, cruce: 'izquierda', obstaculoCm: 15, duracionS: 30, avisos: false });
-    assert.deepStrictEqual(o, [
-        'LINEA puerto 7', 'LINEA color 1', 'LINEA vel 100', 'LINEA giro 60', 'LINEA perdida 0',
-        'LINEA buscar 800', 'LINEA cruce 2', 'LINEA obst 15', 'LINEA dur 30', 'LINEA avisos 0',
-    ]);
-
-    // firmware: el modo 6 existe pero va apagado (el binario subido no cambia) y acepta las mismas claves
-    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(/#define SEGUIDOR_LINEA 1\b/.test(ino), 'el firmware lleva el seguidor (modo 6)');
-    // sin MeAuriga.h: esa librería enlaza Wire, Servo, IR y encoders y el programa no cabe en 16 KB con el seguidor
-    assert(!/#include\s*<Me\w+\.h>/.test(ino), 'el firmware no debe incluir la librería Makeblock');
-    assert(/void ledsMuestra\(\)/.test(ino) && /PORTL/.test(ino), 'driver propio del anillo de LEDs');
-    assert(/strcmp\(cmd, "LINEA"\)/.test(ino) && /void seguirLinea\(\)/.test(ino));
-    for (const clave of o.map(l => l.split(' ')[1])) assert(ino.includes(`"${clave}"`), 'el firmware no entiende LINEA ' + clave);
-}
-
 // 22) Volumen del robot: el ancho del pulso sigue asin(v/100)/pi (amplitud lineal), no una curva cuadrática
 {
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
@@ -541,7 +507,7 @@ for (const c of R.CANCIONES) {
     for (const f of R.FUNCIONES) {
         assert(f.v.length && f.v.every(v => ids.includes(v)), f.id + ': modelo desconocido');
         assert(f.nombre && f.desc, f.id);
-        if (f.modo) assert([1, 2, 6].includes(f.modo), f.id + ': modos 1 (esquivar), 2 (seguir) y 6 (línea) del robot');
+        if (f.modo) assert([1, 2].includes(f.modo), f.id + ': modos 1 (esquivar) y 2 (seguir) del robot');
         else {
             assert(R.pasosDeFuncion(f.pasos).length > 0, f.id + ': sin pasos');
             // todo el texto de pasos es "MOV número[°]": nada se pierde en silencio
@@ -582,17 +548,16 @@ for (const c of R.CANCIONES) {
     // el firmware entiende los modos que usan las funciones autónomas y la página los manda con MODE
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/case 1: esquivar\(\);/.test(ino) && /case 2: seguir\(\);/.test(ino), 'modos 1 y 2 del robot');
-    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_MAX/.test(ino));
+    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_SHOW/.test(ino));
 }
 
-// 24) Línea dentro de Funciones y tiempo de carga de las pilas
+// 24) Sin seguidor de línea (se hará con el Raptor) y tiempo de carga de las pilas
 {
-    const f = R.FUNCIONES.find(x => x.id === 'linea');
-    assert(f && f.modo === 6 && f.linea && f.v.includes('tanque') && f.v.includes('raptor'), 'Seguir la línea es una función (modo 6)');
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    assert(!html.includes('data-section="robot-linea"'), 'ya no hay sección Línea aparte');
-    assert(html.includes('id="rb-ln-panel"') && html.indexOf('id="rb-ln-panel"') > html.indexOf('id="sec-robot-funciones"')
-        && html.indexOf('id="rb-ln-panel"') < html.indexOf('id="sec-robot-luces"'), 'los ajustes de la línea viven en Funciones');
+    assert(!html.includes('rb-ln-'), 'la interfaz ya no lleva el seguidor de línea');
+    assert(!R.FUNCIONES.some(f => f.modo === 6 || f.linea || f.id === 'linea'), 'ninguna función usa el modo 6');
+    const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(!/SEGUIDOR_LINEA|seguirLinea|LINEA/.test(fw), 'el firmware ya no lleva el seguidor');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
     assert.strictEqual(R.tiempoCarga({ pct: 50, capacidadMah: 2000, corrienteMa: 500, quimica: 'nimh' }), 168);
     assert.strictEqual(R.tiempoCarga({ pct: 100, capacidadMah: 2000, corrienteMa: 500 }), 0);
@@ -609,7 +574,7 @@ for (const c of R.CANCIONES) {
     const dir = Number(/const int FN_DIR = (\d+);/.exec(ino)[1]);
     const pgm = Number(/const int PGM_DIR = (\d+);/.exec(ino)[1]) + 4 + Number(/const int PGM_MAX = (\d+);/.exec(ino)[1]);
     const diag = Number(/const int EE_BOOT = (\d+)/.exec(ino)[1]);
-    assert(dir >= pgm && dir + 15 <= diag, 'la función guardada no pisa el show ni los contadores');
+    assert(dir >= pgm && dir + 4 <= diag, 'la función guardada no pisa el show ni los contadores');
     assert(/if \(modo != 0\) fnEspera = 0;/.test(ino), 'si la página toma el control, la función no arranca sola');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');
