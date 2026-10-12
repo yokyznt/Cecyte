@@ -21,6 +21,7 @@
                      m = 0 fijo, 1 arcoíris, 2 respirar, 3 persecución, 4 color por nota;
                      b = brillo 0..100; los 12 colores base van en hex como en LS;
                      v = velocidad del efecto en % (20..300, 100 = normal; opcional)
+    TRIM n           corrección de rumbo -30..30 (+ gira a la derecha); se guarda sola
     VOL v            volumen del zumbador, 0..100 (se guarda con SAVE)
     SAVE             guarda el último FX y el volumen en la EEPROM: al encender, el robot los vuelve a poner
     PCLR             empieza a guardar un show nuevo (borra el anterior)
@@ -115,6 +116,10 @@ const uint8_t MOT_PWM[2] = { 11, 10 };
 const uint8_t MOT_H1[2]  = { 49, 47 };
 const uint8_t MOT_H2[2]  = { 48, 46 };
 int motUltimo[2] = { 1000, 1000 };
+// Corrección de rumbo (orden TRIM, -30..30): dos motores nunca son idénticos y el robot se va de un lado.
+// Positivo = la rueda derecha va a (100 - n) %, así gira hacia la derecha; negativo = la izquierda se frena.
+const int EE_TRIM = 3041;
+int8_t trim = 0;
 void motorPwm(uint8_t m, int pwm) {
   pwm = constrain(pwm, -255, 255);
   if (pwm == motUltimo[m]) return;
@@ -219,8 +224,13 @@ void rampa() {
   // voltaje caía a ~4 V, el regulador de 5 V se hundía y la placa se reiniciaba al segundo de andar
   izqAct += constrain(izqObj - izqAct, -8, 8);
   derAct += constrain(derObj - derAct, -8, 8);
-  motorPwm(0, -izqAct);
-  motorPwm(1, derAct);
+  sacaMotores();
+}
+void sacaMotores() {                       // lleva izqAct/derAct a los motores, con la corrección de rumbo
+  int li = izqAct, ld = derAct;
+  if (trim > 0) ld = ld * (100 - trim) / 100; else li = li * (100 + trim) / 100;
+  motorPwm(0, -li);
+  motorPwm(1, ld);
 }
 void motores(int izq, int der) {
   izqObj = izq;
@@ -501,9 +511,9 @@ void fxDibuja() {
         if (fxHayNota) hsvFx(fxMatiz, r, g, b);
         break;
     }
-    // el anillo es lo que más gasta después de los motores (hasta ~300 mA): en reposo va al 70 % del brillo
-    // elegido y con las ruedas andando a la tercera parte, así le queda corriente a los motores y duran más las pilas
-    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo / 3 : fxBrillo * 7 / 10);   // k 0..255 por brillo 0..100
+    // el anillo es lo que más gasta después de los motores (hasta ~300 mA al 100 %): el 100 % del control
+    // equivale a un 50 % real, y andando baja otro poco; así se ve bien y duran más las pilas
+    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo * 35 / 100 : fxBrillo / 2);   // k 0..255 por brillo 0..100
     ledPon(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
   }
   ledsMuestra();
@@ -808,6 +818,11 @@ void ejecuta(char *s) {
     lineaConfig(a, atoi(b));
     ok();
 #endif
+  } else if (!strcmp(cmd, "TRIM") && a) {            // TRIM n: corrección de rumbo, se guarda sola
+    trim = constrain(atoi(a), -30, 30);
+    EEPROM.update(EE_TRIM, (uint8_t)trim);
+    if (moviendo) sacaMotores();
+    ok();
   } else if (!strcmp(cmd, "VOL") && a) {
     volumen = constrain(atoi(a), 0, 100);
     ok();
@@ -920,6 +935,7 @@ void setup() {
   aplicaModo();
   tono(800, 100);
   fxRestaurar();                       // si hay luces guardadas, vuelven solas
+  { uint8_t t = EEPROM.read(EE_TRIM); trim = (t == 0xFF) ? 0 : constrain((int8_t)t, -30, 30); }
   if (pgmValido() && (pgmBanderas() & 1)) {   // show guardado que arranca solo, a los 2,5 s
     modo = MODO_SHOW;
     showT0 = millis() + 2500;
@@ -938,6 +954,8 @@ void setup() {
   imprimeDec(minimo == 0xFF ? 0 : minimo, 1);
   Serial.print(F(" BAT="));
   imprimeDec(bateriaCv(), 2);
+  Serial.print(F(" TRIM="));
+  Serial.print((int)trim);
   Serial.println();
   Serial.println(F("mBot Ranger web v1 listo"));
 }

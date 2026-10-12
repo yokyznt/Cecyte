@@ -869,6 +869,7 @@ const S = {
     variante: 'tanque', funcion: '',                 // modelo del robot y función elegida ('' = ninguna)
     funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
     funAuto: false,           // la función guardada arranca sola al encender el robot
+    trim: 0,                  // corrección de rumbo del robot (-30..30), la guarda él mismo
     corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
@@ -882,8 +883,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, trim } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, arranca, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, trim }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -921,6 +922,7 @@ function cargar() {
     S.funLuces = S.funLuces !== false;
     S.funMusica = S.funMusica === true;
     S.funAuto = S.funAuto === true;
+    S.trim = clamp(Math.round(Number(S.trim) || 0), -30, 30);
     S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
     S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
 }
@@ -972,6 +974,7 @@ function alLinea(l) {
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
         S.fwNuevo = true;                  // este programa ya entiende la orden BAT
+        if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
         const cosas = [];
         if (kv.BOOT > 1) cosas.push(`${kv.BOOT} arranques (conectarlo por USB cuenta uno; si lo probaste solo, los demás fueron reinicios)`);
@@ -1386,6 +1389,8 @@ function pintarFunciones() {
         + `<span><b>${x.nombre}</b><small>${x.desc}${x.modo ? ' <em>La hace el robot solo.</em>' : ''}</small></span></label>`).join('');
     $('rb-fn-luces').checked = S.funLuces;
     $('rb-fn-auto').checked = S.funAuto;
+    $('rb-fn-trim').value = S.trim;
+    $('rb-fn-trim-v').textContent = S.trim === 0 ? 'recto' : S.trim > 0 ? 'a la derecha ' + S.trim : 'a la izquierda ' + (-S.trim);
     $('rb-fn-musica').checked = S.funMusica;
     $('rb-fn-giro').value = S.giro90;
     $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
@@ -2180,6 +2185,14 @@ function iniciar() {
     });
     $('rb-fn-iniciar').addEventListener('click', () => iniciarFuncion());
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
+    $('rb-fn-trim').addEventListener('input', e => {
+        S.trim = Number(e.target.value);
+        $('rb-fn-trim-v').textContent = S.trim === 0 ? 'recto' : S.trim > 0 ? 'a la derecha ' + S.trim : 'a la izquierda ' + (-S.trim);
+    });
+    $('rb-fn-trim').addEventListener('change', () => {          // al soltar: se manda y el robot la guarda en su EEPROM
+        guardar();
+        if (S.estado === 'listo') S.cola.enviar(['TRIM ' + S.trim]);
+    });
     $('rb-fn-borrar').addEventListener('click', borrarFuncionGuardada);
     $('rb-fn-auto').addEventListener('change', e => { S.funAuto = e.target.checked; guardar(); });
 
