@@ -915,8 +915,11 @@
                                             <input type="number" id="rb-ln-dur" class="input" min="0" max="3600" step="5"></div>
                                         <label class="rb-check"><input type="checkbox" id="rb-ln-avisos"><span>Luces de estado: verde en la línea, rojo si la perdió</span></label>
                                     </div>
+                                    <p class="hint">Al parar el seguidor aparece aquí qué sensores veían la línea y qué decidió el robot (S1 y S2 son los dos sensores del módulo). Sirve para afinarlo.</p>
+                                    <pre id="rb-ln-log" class="rb-codigo"></pre>
                                     <div class="btn-row">
                                         <button type="button" id="rb-ln-reset" class="btn btn--secondary btn--sm">Restablecer los ajustes de la línea</button>
+                                        <button type="button" id="rb-ln-leer" class="btn btn--secondary btn--sm">Leer el registro de la última carrera</button>
                                     </div>
                                 </div>
                             </div>
