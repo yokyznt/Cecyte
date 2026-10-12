@@ -301,11 +301,13 @@ uint16_t azar() {
 }
 
 // Esquivar sin esperas bloqueantes: cada llamada avanza un paso y regresa, así loop() sigue atendiendo el USB,
-// las luces y la música (antes, durante cada maniobra no oía nada y las notas llegaban tarde o se perdían).
-//   0 avanza  1 pausa  2 atrás (si está pegado)  3 pausa  4 gira a la izquierda  5 pausa y mide
-//   6 gira a la derecha  7 pausa y mide  8 gira hacia el lado libre midiendo  9 pausa
+// las luces y la música.
+//   0 avanza  1 pausa  2 retrocede (si está pegado)  3 pausa
+//   8 gira MIDIENDO hasta ver un camino espacioso (más de escUmbral cm); si da la vuelta entera sin hallarlo,
+//     retrocede un poco, cambia de lado y baja el umbral (en un cuarto chico nada está a 40 cm)   9 pausa
 unsigned long escT = 0, escT0 = 0;
-int escD = 0, escDIzq = 0;
+int escD = 0, escUmbral = 40;
+uint8_t escLibre = 0;
 bool escIzq = false;
 
 void escPaso(uint8_t e, unsigned long dur) {
@@ -324,42 +326,37 @@ void esquivar() {
         return;
       }
       parar();                                                  // algo adelante
+      escUmbral = 40;
       escPaso(1, 60);
       break;
     case 1:
-      if (escD < 6) { atras(VEL); escPaso(2, 150); }            // muy pegado: un respiro
-      else { giraIzq(VEL); escPaso(4, 200); }
+      if (escD < 6) { atras(VEL); escPaso(2, 200); }            // muy pegado: un respiro
+      else { escT0 = t; escLibre = 0; escPaso(8, 0); }
       break;
     case 2:
       parar();
       escPaso(3, 60);
       break;
     case 3:
-      giraIzq(VEL);
-      escPaso(4, 200);
-      break;
-    case 4:
-      parar();
-      escPaso(5, 70);
-      break;
-    case 5:
-      escDIzq = distanciaCm();                                  // lo que ve a la izquierda
-      giraDer(VEL);
-      escPaso(6, 400);                                          // pasa por el centro hasta la derecha
-      break;
-    case 6:
-      parar();
-      escPaso(7, 70);
-      break;
-    case 7:
-      escIzq = escDIzq > distanciaCm();                         // hacia el lado más libre
       escT0 = t;
+      escLibre = 0;
       escPaso(8, 0);
       break;
-    case 8:                                                     // gira midiendo hasta ver paso (> 30 cm), máx. 1,8 s
-      if (t - escT0 > 1800 || distanciaCm() > 30) { parar(); escPaso(9, 40); break; }
+    case 8:
+      if (t - escT0 > 3500) {                                   // una vuelta entera sin camino: otro lado y menos exigente
+        escIzq = !escIzq;
+        if (escUmbral > DIST_OBSTACULO + 10) escUmbral -= 10;
+        atras(VEL);
+        escPaso(2, 300);
+        break;
+      }
+      if (distanciaCm() > escUmbral) {
+        if (++escLibre >= 2) { parar(); escPaso(9, 40); break; }   // dos lecturas libres seguidas: camino
+      } else {
+        escLibre = 0;
+      }
       if (escIzq) giraIzq(VEL); else giraDer(VEL);
-      escPaso(8, 60);
+      escPaso(8, 40);
       break;
     default:
       escEstado = 0;
@@ -803,9 +800,10 @@ void seguirLinea() {
   } else {                                           // perdida
     if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
     lineaEstado(0);
+    const unsigned long perdido = millis() - lnPerdidoDesde;
     if (lnPerdida == 0) parar();
-    else if (lnPerdida == 2) motores(lnVel, lnVel);
-    else if (millis() - lnPerdidoDesde < lnBuscarMs) motores(lnLado * lnVel, -lnLado * lnVel);   // gira hacia donde la vio
+    else if (lnPerdida == 2 || perdido < 350) motores(lnVel, lnVel);                           // un hueco corto: sigue derecho
+    else if (perdido < lnBuscarMs + 350) motores(lnLado * lnVel, -lnLado * lnVel);            // gira hacia donde la vio
     else parar();
   }
 }
@@ -930,6 +928,18 @@ void ejecuta(char *s) {
   } else if (!strcmp(cmd, "LINEA") && a && b) {      // LINEA clave valor: ajustes del seguidor (en RAM)
     lineaConfig(a, atoi(b));
     ok();
+#endif
+#if SEGUIDOR_LINEA
+  } else if (!strcmp(cmd, "SENS")) {                  // diagnóstico: los dos pines de los puertos 6, 7 y 8 (1 = alto)
+    Serial.print(F("SENS"));
+    for (uint8_t q = 0; q < 3; q++) {
+      pinMode(LN_S1[q], INPUT);
+      pinMode(LN_S2[q], INPUT);
+      Serial.print(' ');
+      Serial.print(digitalRead(LN_S1[q]));
+      Serial.print(digitalRead(LN_S2[q]));
+    }
+    Serial.println();
 #endif
   } else if (!strcmp(cmd, "TRIM") && a) {            // TRIM n: corrección de rumbo, se guarda sola
     trim = constrain(atoi(a), -30, 30);
