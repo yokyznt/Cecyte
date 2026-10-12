@@ -1349,9 +1349,19 @@ function guardarFuncion() {
     const fx = { l: luzGuardada(), ex: true };
     let ordenes;
     if (f.modo) {
-        // la hace el propio robot con su sensor: se guarda el modo (y los ajustes de la línea) y se borra el show
+        // la hace el propio robot con su sensor: se guarda el modo (y los ajustes de la línea). La canción, si está
+        // marcada, queda como show de solo notas (bandera 4) y el robot la toca de fondo mientras esquiva o sigue
         const previo = f.linea ? lineaAOrdenes(lineaEnRobot()) : [];
-        ordenes = ['MODE 4'].concat(previo, [{ l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }, 'FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
+        let musica = [{ l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }];
+        if (S.funMusica) {
+            const { cmds, ms } = compilar({ notas: leerNotas(S.notas).notas, bpm: S.bpm });
+            if (ms) {
+                const prog = programaParaRobot(cmds);
+                if (!prog.cabe) return funInfo(`La canción es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una más corta o quita la música.`, 'err');
+                musica = [{ l: 'PCLR', ex: true }].concat(prog.lineas, [{ l: 'PEND 4', ex: true }]);
+            }
+        }
+        ordenes = ['MODE 4'].concat(previo, musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
         const n = leerNotas(S.notas);
@@ -1367,6 +1377,7 @@ function guardarFuncion() {
         funInfo(`Listo: el robot ya sabe hacer «${f.nombre}» sin la página`
             + (solo ? ' y la hace sola 2,5 s después de encenderlo' : '')
             + (f.modo === 6 ? '. También sale con el botón de la placa, después del show' : f.modo ? '. Esquivar y seguir la mano también salen con el botón de la placa' : '. Con el botón de la placa se elige o se corta')
+            + (f.modo && S.funMusica ? ', con la canción de fondo' : '')
             + '. Mientras esté conectado a la página no arranca sola.', 'ok');
     });
 }
