@@ -795,14 +795,14 @@ function formatoDuracion(min) {
 // Con el módulo Me Line Follower (dos sensores). Puertos con dos pines digitales: 6, 7 y 8; el 9 es el
 // botón de la placa y el 10 lo usa el ultrasonido. El programa del robot lo trae como modo 6.
 const SEGUIDOR_ACTIVO = true;
-const LINEA_DEFECTO = { puerto: 6, color: 'negra', velocidad: 130, giro: 50, perdida: 'buscar', buscarMs: 4000, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
+const LINEA_DEFECTO = { puerto: 9, color: 'negra', velocidad: 130, giro: 50, perdida: 'buscar', buscarMs: 4000, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
 const LINEA_PERDIDA = { parar: 0, buscar: 1, recto: 2 };
 const LINEA_CRUCE = { recto: 0, parar: 1, izquierda: 2, derecha: 3 };
 
 function lineaNormaliza(c) {
     const o = Object.assign({}, LINEA_DEFECTO, c || {});
     return {
-        puerto: [6, 7, 8].includes(Number(o.puerto)) ? Number(o.puerto) : LINEA_DEFECTO.puerto,
+        puerto: [6, 7, 8, 9].includes(Number(o.puerto)) ? Number(o.puerto) : LINEA_DEFECTO.puerto,
         color: o.color === 'blanca' ? 'blanca' : 'negra',
         velocidad: clamp(Math.round(Number(o.velocidad) || LINEA_DEFECTO.velocidad), 40, 150),
         giro: clamp(Math.round(Number(o.giro) || LINEA_DEFECTO.giro), 10, 100),
@@ -903,6 +903,7 @@ function cargar() {
         cargador: clamp(Math.round(Number(b.cargador) || 500), 100, 3000),     // mA del cargador (para el tiempo de carga)
         hist: (Array.isArray(b.hist) ? b.hist : []).filter(p => Array.isArray(p) && p.length === 2 && p[0] > 0 && p[1] > 0).slice(-200),
     };
+    if (S.linea && S.linea.puerto === 6) S.linea.puerto = 9;                // el módulo de línea de este robot está en el 9
     if (S.linea && S.linea.velocidad === 80) S.linea.velocidad = 130;      // los valores de fábrica viejos eran muy lentos
     if (S.linea && S.linea.buscarMs === 1500) S.linea.buscarMs = 4000;
     S.linea = lineaNormaliza(S.linea);
