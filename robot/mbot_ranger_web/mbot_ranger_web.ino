@@ -138,7 +138,7 @@ void motorPwm(uint8_t m, int pwm) {
 
 const int VEL = 90;                  // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
-const int DIST_OBSTACULO = 20;       // cm
+const int DIST_OBSTACULO = 10;       // cm: reacciona al estar a esta distancia (antes 20, muy pronto)
 const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
@@ -289,17 +289,37 @@ uint16_t azar() {
 
 void esquivar() {
   int d = distanciaCm();
-  if (d > DIST_OBSTACULO) {
-    adelante(VEL);
-  } else {
+  if (d > DIST_OBSTACULO || distanciaCm() > DIST_OBSTACULO) {   // dos lecturas: un eco falso no lo frena
+    adelante(d > 35 ? VEL : VEL * 2 / 3);                        // a lo que ya está cerca se acerca más despacio
+    return;
+  }
+  // Algo adelante: retrocede un poco y mira a los dos lados para irse hacia el más libre
+  parar();
+  espera(150);
+  atras(VEL);
+  espera(220);
+  parar();
+  espera(120);
+  giraIzq(VEL);                        // un poco a la izquierda y mide
+  espera(380);
+  parar();
+  espera(150);
+  int dIzq = distanciaCm();
+  giraDer(VEL);                        // pasa por el centro hasta la derecha y mide
+  espera(760);
+  parar();
+  espera(150);
+  int dDer = distanciaCm();
+  if (dIzq > dDer && dIzq > DIST_OBSTACULO + 8) {                // la izquierda estaba más libre: vuelve hacia allá
+    giraIzq(VEL);
+    espera(760);
     parar();
-    espera(100);
-    atras(VEL);
-    espera(400);
-    if ((azar() & 1) == 0) giraIzq(VEL); else giraDer(VEL);
-    espera(350 + azar() % 350);
+  } else if (dDer <= DIST_OBSTACULO + 8) {                       // sin salida a los lados: casi media vuelta
+    giraDer(VEL);
+    espera(700 + azar() % 300);
     parar();
   }
+  espera(100);
 }
 
 void seguir() {
