@@ -837,6 +837,11 @@
                                             <input type="range" id="rb-fn-vel" min="40" max="180" step="5">
                                         </div>
                                         <div class="field">
+                                            <label class="field__label" for="rb-fn-trim">Corrección para ir derecho: <span id="rb-fn-trim-v"></span></label>
+                                            <input type="range" id="rb-fn-trim" min="-30" max="30" step="1">
+                                            <p class="hint">Si al avanzar se va hacia la izquierda, súbela (a la derecha); si se va a la derecha, bájala. Se guarda en el robot y vale también sin la página.</p>
+                                        </div>
+                                        <div class="field">
                                             <label class="field__label" for="rb-fn-giro">Lo que tarda en girar 90°: <span id="rb-fn-giro-v"></span></label>
                                             <input type="range" id="rb-fn-giro" min="200" max="1500" step="10">
                                             <p class="hint">Ajústalo si el cuadrado le queda abierto o cerrado: depende del piso y de la velocidad.</p>
