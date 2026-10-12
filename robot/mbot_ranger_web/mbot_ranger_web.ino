@@ -395,7 +395,9 @@ bool botonPresionado() {
 bool botonLiberado = false;
 bool botonAntes = false;
 unsigned long botonBajoDesde = 0;
+bool botonOcupado();
 bool botonFlanco() {
+  if (botonOcupado()) return false;       // el módulo de línea del puerto 9 usa ese pin
   int v = analogRead(A7);
   unsigned long t = millis();
   if (v > 500) {
@@ -737,16 +739,17 @@ void correShow() {
 
 #if SEGUIDOR_LINEA
 // ---------- Seguidor de línea (módulo Me Line Follower: dos sensores digitales) ----------
-// Puertos con dos pines digitales: 6, 7 y 8 (el 9 es el botón de la placa y el 10 el ultrasonido).
-const uint8_t LN_S1[3] = { A10, A9, A8 };
-const uint8_t LN_S2[3] = { A15, A14, A13 };
+// Puertos con dos pines digitales: 6, 7, 8 y 9 (el 10 es el ultrasonido). El 9 comparte el pin A7 con el botón de
+// la placa: con el módulo ahí el botón no se puede usar (la salida del sensor parecería una pulsación).
+const uint8_t LN_S1[4] = { A10, A9, A8, A7 };     // puertos 6, 7, 8 y 9 (el 9 comparte A7 con el botón de la placa)
+const uint8_t LN_S2[4] = { A15, A14, A13, A12 };
 uint8_t lnPuerto = 0, lnColor = 0, lnVel = 130, lnGiro = 50, lnPerdida = 1, lnCruce = 0, lnObst = 0, lnAvisos = 1;
 uint16_t lnBuscarMs = 4000, lnDurS = 0;
 unsigned long lnPerdidoDesde = 0;
 int8_t lnLado = 1;                   // hacia dónde vio la línea por última vez (-1 izquierda, 1 derecha)
 
 void lineaConfig(const char *k, int v) {
-  if (!strcmp(k, "puerto")) lnPuerto = constrain(v, 6, 8) - 6;
+  if (!strcmp(k, "puerto")) lnPuerto = constrain(v, 6, 9) - 6;
   else if (!strcmp(k, "color")) lnColor = v ? 1 : 0;
   else if (!strcmp(k, "vel")) lnVel = constrain(v, 40, 150);
   else if (!strcmp(k, "giro")) lnGiro = constrain(v, 10, 100);
@@ -809,6 +812,16 @@ void seguirLinea() {
 }
 #endif
 
+// El puerto 9 comparte el pin A7 con el botón de la placa: con el seguidor de línea ahí, el botón se ignora
+// (el sensor negro se leería como pulsación y cambiaría de modo solo).
+bool botonOcupado() {
+#if SEGUIDOR_LINEA
+  return lnPuerto == 3;
+#else
+  return false;
+#endif
+}
+
 // ---------- Función guardada (esquivar, seguir la mano o seguir la línea) ----------
 // Al encenderlo (si se marcó) o con el botón de la placa, el robot la hace sin la página.
 // 15 bytes: magia, modo, arranca solo y los ajustes de la línea, que se cargan al encender.
@@ -845,7 +858,7 @@ void fnCargar() {
   if (m > MODO_MAX) return;
   fnModo = m;
 #if SEGUIDOR_LINEA
-  lnPuerto = constrain(EEPROM.read(FN_DIR + 3), 0, 2);
+  lnPuerto = constrain(EEPROM.read(FN_DIR + 3), 0, 3);
   lnColor = EEPROM.read(FN_DIR + 4) ? 1 : 0;
   lnVel = constrain(EEPROM.read(FN_DIR + 5), 40, 150);
   lnGiro = constrain(EEPROM.read(FN_DIR + 6), 10, 100);
@@ -932,7 +945,7 @@ void ejecuta(char *s) {
 #if SEGUIDOR_LINEA
   } else if (!strcmp(cmd, "SENS")) {                  // diagnóstico: los dos pines de los puertos 6, 7 y 8 (1 = alto)
     Serial.print(F("SENS"));
-    for (uint8_t q = 0; q < 3; q++) {
+    for (uint8_t q = 0; q < 4; q++) {
       pinMode(LN_S1[q], INPUT);
       pinMode(LN_S2[q], INPUT);
       Serial.print(' ');

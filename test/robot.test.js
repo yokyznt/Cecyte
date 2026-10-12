@@ -486,8 +486,9 @@ for (const c of R.CANCIONES) {
     const d = R.lineaNormaliza(null);
     assert.deepStrictEqual(d, R.lineaNormaliza(R.LINEA_DEFECTO));
     // valores raros se acotan o vuelven al de fábrica
-    const raro = R.lineaNormaliza({ puerto: 9, color: 'azul', velocidad: 999, giro: -5, perdida: 'volar', cruce: 'x', obstaculoCm: 5000, duracionS: -1, buscarMs: 99999 });
-    assert.strictEqual(raro.puerto, 6, 'el 9 es el botón de la placa');
+    const raro = R.lineaNormaliza({ puerto: 12, color: 'azul', velocidad: 999, giro: -5, perdida: 'volar', cruce: 'x', obstaculoCm: 5000, duracionS: -1, buscarMs: 99999 });
+    assert.strictEqual(raro.puerto, R.LINEA_DEFECTO.puerto, 'un puerto que no existe vuelve al de fábrica');
+    assert.strictEqual(R.lineaNormaliza({ puerto: 9 }).puerto, 9, 'el 9 se acepta (comparte pin con el botón)');
     assert.strictEqual(raro.color, 'negra');
     assert.strictEqual(raro.velocidad, 150);
     assert.strictEqual(raro.giro, 10);
