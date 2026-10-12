@@ -873,6 +873,7 @@ const S = {
     corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
+    musicaIds: [],            // temporizadores de la música que la página manda nota a nota en las funciones autónomas
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
     linea: Object.assign({}, LINEA_DEFECTO),                   // seguidor de líneas (todavía desactivado)
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
@@ -1109,6 +1110,7 @@ async function leerBucle() {
 }
 
 async function cerrar() {
+    pararMusicaAutonoma();
     const era = S.estado;
     clearInterval(S.saludo);
     S.cola.reiniciar();
@@ -1244,6 +1246,28 @@ function lineaEnRobot() {
     return Object.assign({}, S.linea, { avisos: S.linea.avisos && S.funLuces });
 }
 
+// Esquivar, seguir la mano y la línea no pueden esperar notas (tienen que mirar el sensor): la página manda cada
+// nota a su hora, el robot la suena sin esperar, y la canción se repite hasta pulsar Paro.
+function pararMusicaAutonoma() {
+    for (const id of S.musicaIds) clearTimeout(id);
+    S.musicaIds = [];
+}
+
+function musicaAutonoma() {
+    pararMusicaAutonoma();
+    const { cmds, ms } = compilar({ notas: leerNotas(S.notas).notas, bpm: S.bpm });
+    if (!ms) return;
+    let t = 0;
+    for (const c of cmds) {
+        if (c.l.startsWith('T ')) {
+            const linea = c.l;
+            S.musicaIds.push(setTimeout(() => { if (S.estado === 'listo' && S.autonomo) crudo(linea + '\n'); }, t));
+        }
+        t += c.ms || 0;
+    }
+    S.musicaIds.push(setTimeout(() => { if (S.autonomo) musicaAutonoma(); }, ms));
+}
+
 function funcionActual() {
     return FUNCIONES.find(f => f.id === S.funcion && f.v.includes(S.variante)) || null;
 }
@@ -1294,7 +1318,7 @@ function iniciarFuncion(reinicio) {
         } else {
             S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
         }
-        if (S.funMusica) escucharAqui();
+        if (S.funMusica) musicaAutonoma();
         return mensaje(`${f.nombre}: lo hace el robot solo con su sensor. Pulsa Paro para detenerlo.`, 'ok');
     }
     S.autonomo = 0;
@@ -1449,6 +1473,7 @@ function borrarShow() {
 }
 
 function paro() {
+    pararMusicaAutonoma();
     S.ultimaActividad = Date.now();
     S.actuando = false;
     S.enShow = false;
