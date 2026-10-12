@@ -136,7 +136,7 @@ void motorPwm(uint8_t m, int pwm) {
   analogWrite(MOT_PWM[m], abs(pwm));
 }
 
-const int VEL = 90;                  // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
+const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar                 // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
 const int DIST_OBSTACULO = 10;       // cm: reacciona al estar a esta distancia (antes 20, muy pronto)
 const int PIN_BUZZER = 45;
@@ -222,8 +222,8 @@ void rampa() {
   rampaT = t;
   // arranque suave: con 30 por paso los motores pedían de golpe tanta corriente que, a pilas y sin USB, el
   // voltaje caía a ~4 V, el regulador de 5 V se hundía y la placa se reiniciaba al segundo de andar
-  izqAct += constrain(izqObj - izqAct, -8, 8);
-  derAct += constrain(derObj - derAct, -8, 8);
+  izqAct += constrain(izqObj - izqAct, -16, 16);
+  derAct += constrain(derObj - derAct, -16, 16);
   sacaMotores();
 }
 void sacaMotores() {                       // lleva izqAct/derAct a los motores, con la corrección de rumbo
@@ -257,6 +257,7 @@ void color(int r, int g, int b) {
 
 void aplicaModo() {
   parar();
+  tonoApaga();
 #if SEGUIDOR_LINEA
   lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
   lnEstado = 255;
@@ -290,36 +291,36 @@ uint16_t azar() {
 void esquivar() {
   int d = distanciaCm();
   if (d > DIST_OBSTACULO || distanciaCm() > DIST_OBSTACULO) {   // dos lecturas: un eco falso no lo frena
-    adelante(d > 35 ? VEL : VEL * 2 / 3);                        // a lo que ya está cerca se acerca más despacio
+    adelante(VEL);
     return;
   }
   // Algo adelante: retrocede un poco y mira a los dos lados para irse hacia el más libre
   parar();
-  espera(150);
+  espera(60);
   atras(VEL);
-  espera(220);
+  espera(200);
   parar();
-  espera(120);
+  espera(60);
   giraIzq(VEL);                        // un poco a la izquierda y mide
-  espera(380);
+  espera(250);
   parar();
-  espera(150);
+  espera(80);
   int dIzq = distanciaCm();
   giraDer(VEL);                        // pasa por el centro hasta la derecha y mide
-  espera(760);
+  espera(500);
   parar();
-  espera(150);
+  espera(80);
   int dDer = distanciaCm();
   if (dIzq > dDer && dIzq > DIST_OBSTACULO + 8) {                // la izquierda estaba más libre: vuelve hacia allá
     giraIzq(VEL);
-    espera(760);
+    espera(500);
     parar();
   } else if (dDer <= DIST_OBSTACULO + 8) {                       // sin salida a los lados: casi media vuelta
     giraDer(VEL);
-    espera(700 + azar() % 300);
+    espera(450 + azar() % 250);
     parar();
   }
-  espera(100);
+  espera(40);
 }
 
 void seguir() {
@@ -389,6 +390,8 @@ char cola[RING];
 int colaIni = 0, colaFin = 0, colaN = 0;
 bool abortar = false;
 
+unsigned long tonoFin = 0;               // si no es 0, a esta hora se apaga la nota que suena sin esperarla
+
 void drenar() {
   while (Serial.available() > 0) {
     char c = Serial.read();
@@ -401,6 +404,7 @@ void drenar() {
       colaN++;
     }
   }
+  if (tonoFin && (long)(millis() - tonoFin) >= 0) tonoApaga();
   if (!abortar) rampa();                     // drenar() corre en toda espera: de aquí avanza la rampa
 }
 
@@ -428,8 +432,14 @@ uint16_t anchoPermil() {
   return ANCHO_VOL[i] + (uint32_t)(ANCHO_VOL[i + 1] - ANCHO_VOL[i]) * r / 5;
 }
 
-void tono(int hz, int ms) {
-  if (volumen == 0) { espera(ms); return; }
+void tonoApaga() {
+  TCCR5B = 0;
+  TCCR5A = 0;
+  digitalWrite(PIN_BUZZER, LOW);
+  tonoFin = 0;
+}
+
+void tonoInicia(int hz) {                  // enciende el zumbador y sigue: lo apaga tonoApaga() o drenar() al vencer tonoFin
   unsigned long ciclos = 16000000UL / (unsigned long)hz;    // con prescaler 1
   uint8_t cs = 1;
   if (ciclos > 65536UL) { cs = 2; ciclos /= 8; }            // graves: prescaler 8
@@ -442,10 +452,13 @@ void tono(int hz, int ms) {
   ICR5 = tope;
   OCR5B = (uint16_t)ancho;
   TCNT5 = 0;
+}
+
+void tono(int hz, int ms) {
+  if (volumen == 0) { espera(ms); return; }
+  tonoInicia(hz);
   espera(ms);
-  TCCR5B = 0;
-  TCCR5A = 0;
-  digitalWrite(PIN_BUZZER, LOW);
+  tonoApaga();
 }
 
 // ---------- LEDs desde la página ----------
@@ -794,7 +807,11 @@ void ejecuta(char *s) {
       fxHayNota = true;
       fxSucio = true;
     }
-    tono(hz, ms);
+    if (modo == 1 || modo == 2 || modo == 6) {          // esquivar, seguir y línea: la nota suena sin frenar al robot
+      if (volumen) { tonoInicia(hz); tonoFin = millis() + ms; }
+    } else {
+      tono(hz, ms);
+    }
     ok();
   } else if (!strcmp(cmd, "W") && a) {
     espera(constrain(atoi(a), 0, 5000));
