@@ -162,6 +162,7 @@ int pgmFin = 0;                      // bytes que lleva la subida en curso
 unsigned long showT0 = 0;            // el show espera a esta hora (para dejarlo en el piso)
 
 int modo = 0;
+uint8_t escEstado = 0;               // paso de la maniobra de esquivar (ver esquivar())
 int musP = 0;                            // música de fondo guardada: por dónde va en el show (EEPROM)
 unsigned long musT = 0;                  // a esta hora toca la siguiente nota o silencio
 bool abortar = false;                // un "!" de la página: corta lo que esté haciendo
@@ -261,6 +262,7 @@ void color(int r, int g, int b) {
 void aplicaModo() {
   parar();
   tonoApaga();
+  escEstado = 0;
   musP = 0;
   musT = 0;
 #if SEGUIDOR_LINEA
@@ -293,41 +295,70 @@ uint16_t azar() {
   return semilla;
 }
 
+// Esquivar sin esperas bloqueantes: cada llamada avanza un paso y regresa, así loop() sigue atendiendo el USB,
+// las luces y la música (antes, durante cada maniobra no oía nada y las notas llegaban tarde o se perdían).
+//   0 avanza  1 pausa  2 atrás (si está pegado)  3 pausa  4 gira a la izquierda  5 pausa y mide
+//   6 gira a la derecha  7 pausa y mide  8 gira hacia el lado libre midiendo  9 pausa
+unsigned long escT = 0, escT0 = 0;
+int escD = 0, escDIzq = 0;
+bool escIzq = false;
+
+void escPaso(uint8_t e, unsigned long dur) {
+  escEstado = e;
+  escT = millis() + dur;
+}
+
 void esquivar() {
-  int d = distanciaCm();
-  if (d > DIST_OBSTACULO || distanciaCm() > DIST_OBSTACULO) {   // dos lecturas: un eco falso no lo frena
-    adelante(VEL);
-    return;
+  const unsigned long t = millis();
+  if (escEstado != 0 && (long)(t - escT) < 0) return;           // todavía en la pausa o el giro de este paso
+  switch (escEstado) {
+    case 0:
+      escD = distanciaCm();
+      if (escD > DIST_OBSTACULO || distanciaCm() > DIST_OBSTACULO) {   // dos lecturas: un eco falso no lo frena
+        adelante(VEL);
+        return;
+      }
+      parar();                                                  // algo adelante
+      escPaso(1, 60);
+      break;
+    case 1:
+      if (escD < 6) { atras(VEL); escPaso(2, 150); }            // muy pegado: un respiro
+      else { giraIzq(VEL); escPaso(4, 200); }
+      break;
+    case 2:
+      parar();
+      escPaso(3, 60);
+      break;
+    case 3:
+      giraIzq(VEL);
+      escPaso(4, 200);
+      break;
+    case 4:
+      parar();
+      escPaso(5, 70);
+      break;
+    case 5:
+      escDIzq = distanciaCm();                                  // lo que ve a la izquierda
+      giraDer(VEL);
+      escPaso(6, 400);                                          // pasa por el centro hasta la derecha
+      break;
+    case 6:
+      parar();
+      escPaso(7, 70);
+      break;
+    case 7:
+      escIzq = escDIzq > distanciaCm();                         // hacia el lado más libre
+      escT0 = t;
+      escPaso(8, 0);
+      break;
+    case 8:                                                     // gira midiendo hasta ver paso (> 30 cm), máx. 1,8 s
+      if (t - escT0 > 1800 || distanciaCm() > 30) { parar(); escPaso(9, 40); break; }
+      if (escIzq) giraIzq(VEL); else giraDer(VEL);
+      escPaso(8, 60);
+      break;
+    default:
+      escEstado = 0;
   }
-  // Algo adelante: mira a los dos lados y gira hacia el más libre MIDIENDO hasta ver paso, así en una
-  // esquina da la vuelta que haga falta en vez de adivinar un tiempo
-  parar();
-  espera(60);
-  if (d < 6) {                         // muy pegado: un respiro antes de girar
-    atras(VEL);
-    espera(150);
-    parar();
-    espera(60);
-  }
-  giraIzq(VEL);                        // un poco a la izquierda y mide
-  espera(200);
-  parar();
-  espera(70);
-  int dIzq = distanciaCm();
-  giraDer(VEL);                        // pasa por el centro hasta la derecha y mide
-  espera(400);
-  parar();
-  espera(70);
-  int dDer = distanciaCm();
-  const bool izq = dIzq > dDer;
-  unsigned long t0 = millis();
-  while (!abortar && millis() - t0 < 1800) {   // gira hacia el lado libre hasta que haya paso (> 30 cm)
-    if (izq) giraIzq(VEL); else giraDer(VEL);
-    espera(60);
-    if (distanciaCm() > 30) break;
-  }
-  parar();
-  espera(40);
 }
 
 void seguir() {
