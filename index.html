@@ -273,9 +273,6 @@
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
                         </button>
-                        <button type="button" role="tab" id="tab-robot-show" data-section-tab="robot-show" aria-controls="sec-robot-show" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Show guardado</span>
-                        </button>
                         <button type="button" role="tab" id="tab-robot-instalar" data-section-tab="robot-instalar" aria-controls="sec-robot-instalar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span>Instalar</span>
                         </button>
@@ -851,7 +848,7 @@
                                         </div>
                                         <div class="rb-card">
                                             <h4 class="panel__sub">Guardarla en el robot</h4>
-                                            <p class="hint">Se guarda en el robot con las luces y la música marcadas arriba, y la hace sin USB ni computadora: con el botón de la placa o, si lo marcas, sola 2,5 s después de encenderlo. Mientras esté conectado a la página no arranca sola. Comparte lugar con el show guardado: guardar una borra la otra.</p>
+                                            <p class="hint">Se guarda en el robot con las luces y la música marcadas arriba, y la hace sin USB ni computadora: con el botón de la placa o, si lo marcas, sola 2,5 s después de encenderlo. Mientras esté conectado a la página no arranca sola. Cada vez que guardas, reemplaza lo que había guardado antes en el robot.</p>
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-auto"><span>Que empiece sola al encenderlo</span></label>
                                             <div class="btn-row">
                                                 <button type="button" id="rb-fn-guardar" class="btn btn--primary btn--sm" disabled>Guardar la función en el robot</button>
@@ -954,26 +951,6 @@
                                             <p class="hint">Las luces se guardan en el robot: siguen igual (y en movimiento) aunque lo desconectes del USB, y vuelven solas al encenderlo.</p>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Show guardado en el robot -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-show" data-section="robot-show" role="tabpanel" aria-label="Show guardado en el robot" hidden>
-                            <div class="panel__body">
-                                <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Que lo haga solo, sin la página (desconectado)</h4>
-                                    <div class="stack">
-                                            <p class="hint">Guarda en el robot la canción y el baile que tengas en pantalla, más las luces. Después lo hace sin USB ni computadora: se elige con el botón de la placa (después del modo rojo, con las luces del efecto) o, si lo marcas, arranca solo 2,5 s después de encenderlo. El botón de la placa lo corta.</p>
-                                            <label class="rb-check"><input type="checkbox" id="rb-auto"><span>Que empiece solo al encenderlo</span></label>
-                                            <p class="hint">Se repite sin parar si marcas "Repetir hasta pulsar Paro" de arriba. Caben unos 2800 bytes (más o menos 350 notas).</p>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-pgm-guardar" class="btn btn--primary btn--sm" disabled>Guardar el show en el robot</button>
-                                                <button type="button" id="rb-pgm-probar" class="btn btn--secondary btn--sm" disabled>Probar el show guardado</button>
-                                                <button type="button" id="rb-pgm-borrar" class="btn btn--secondary btn--sm" disabled>Borrar el show del robot</button>
-                                            </div>
-                                            <p id="rb-pgm-info" class="msg" role="status"></p>
-                                        </div>
                                 </div>
                             </div>
                         </section>
