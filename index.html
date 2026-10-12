@@ -834,7 +834,7 @@
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-luces"><span>Con luces</span></label>
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-musica"><span>Con música: <b id="rb-fn-cancion"></b></span></label>
                                         </div>
-                                        <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Música y suena en el zumbador del robot, también mientras esquiva o sigue la línea y también guardada en el robot (se repite hasta pulsar Paro).</p>
+                                        <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Música y suena en el zumbador del robot, también mientras esquiva o sigue la mano y también guardada en el robot (se repite hasta pulsar Paro).</p>
                                         <div class="field">
                                             <label class="field__label" for="rb-fn-vel">Velocidad (de lo más lento a lo más rápido): <span id="rb-fn-vel-v"></span></label>
                                             <input type="range" id="rb-fn-vel" min="40" max="180" step="5">
@@ -862,64 +862,7 @@
                                             </div>
                                             <p id="rb-fn-info" class="msg" role="status"></p>
                                         </div>
-                                        <p class="hint">Esquivar obstáculos, Seguir mi mano y Seguir la línea las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
-                                    </div>
-                                </div>
-                                <div id="rb-ln-panel" class="rb-ln-panel" hidden>
-                                    <p class="hint">Necesita el módulo <b>Me Line Follower</b> (dos sensores) en un puerto del Auriga. El robot avanza y corrige hacia el lado donde un sensor ve la línea. Los cambios se aplican en cuanto los haces, aunque ya esté andando.</p>
-    <div class="rb-card">
-                                        <h4 class="panel__sub">Sensor y línea</h4>
-                                        <div class="field"><label class="field__label" for="rb-ln-puerto">Puerto del módulo</label>
-                                            <select id="rb-ln-puerto" class="select">
-                                                <option value="6">Puerto 6</option>
-                                                <option value="7">Puerto 7</option>
-                                                <option value="8">Puerto 8</option>
-                                            <option value="9">Puerto 9</option>
-                                            </select>
-                                            <p class="hint">El 10 lo usa el ultrasonido. El 9 comparte pin con el botón de la placa: con el módulo ahí, el botón queda desactivado (usa Paro de la página).</p></div>
-                                        <div class="field"><label class="field__label" for="rb-ln-color">Color de la línea</label>
-                                            <select id="rb-ln-color" class="select">
-                                                <option value="negra">Línea negra sobre fondo claro</option>
-                                                <option value="blanca">Línea blanca sobre fondo oscuro</option>
-                                            </select></div>
-                                    </div>
-                                    <div class="rb-card">
-                                        <h4 class="panel__sub">Movimiento</h4>
-                                        <div class="field"><label class="field__label" for="rb-ln-giro">Fuerza de la corrección al girar: <span id="rb-ln-giro-v"></span></label>
-                                            <input type="range" id="rb-ln-giro" min="10" max="100" step="5">
-                                            <p class="hint">Más alta gira más fuerte (sirve en curvas cerradas); más baja es más suave.</p></div>
-                                    </div>
-                                    <div class="rb-card">
-                                        <h4 class="panel__sub">Qué hacer si…</h4>
-                                        <div class="field"><label class="field__label" for="rb-ln-perdida">Pierde la línea</label>
-                                            <select id="rb-ln-perdida" class="select">
-                                                <option value="buscar">Buscarla girando hacia el último lado</option>
-                                                <option value="parar">Pararse</option>
-                                                <option value="recto">Seguir recto</option>
-                                            </select></div>
-                                        <div class="field" id="rb-ln-buscar-campo"><label class="field__label" for="rb-ln-buscar">Buscar durante (ms)</label>
-                                            <input type="number" id="rb-ln-buscar" class="input" min="0" max="10000" step="100"></div>
-                                        <div class="field"><label class="field__label" for="rb-ln-cruce">Llega a un cruce (los dos sensores en la línea)</label>
-                                            <select id="rb-ln-cruce" class="select">
-                                                <option value="recto">Seguir recto</option>
-                                                <option value="parar">Pararse</option>
-                                                <option value="izquierda">Girar a la izquierda</option>
-                                                <option value="derecha">Girar a la derecha</option>
-                                            </select></div>
-                                    </div>
-                                    <div class="rb-card">
-                                        <h4 class="panel__sub">Seguridad y avisos</h4>
-                                        <div class="field"><label class="field__label" for="rb-ln-obst">Pararse si hay algo a menos de (cm, 0 = apagado)</label>
-                                            <input type="number" id="rb-ln-obst" class="input" min="0" max="200" step="1"></div>
-                                        <div class="field"><label class="field__label" for="rb-ln-dur">Detenerse solo después de (segundos, 0 = sin límite)</label>
-                                            <input type="number" id="rb-ln-dur" class="input" min="0" max="3600" step="5"></div>
-                                        <label class="rb-check"><input type="checkbox" id="rb-ln-avisos"><span>Luces de estado: verde en la línea, rojo si la perdió</span></label>
-                                    </div>
-                                    <p class="hint">Al parar el seguidor aparece aquí qué sensores veían la línea y qué decidió el robot (S1 y S2 son los dos sensores del módulo). Sirve para afinarlo.</p>
-                                    <pre id="rb-ln-log" class="rb-codigo"></pre>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-ln-reset" class="btn btn--secondary btn--sm">Restablecer los ajustes de la línea</button>
-                                        <button type="button" id="rb-ln-leer" class="btn btn--secondary btn--sm">Leer el registro de la última carrera</button>
+                                        <p class="hint">Esquivar obstáculos y Seguir mi mano las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
                                     </div>
                                 </div>
                             </div>
