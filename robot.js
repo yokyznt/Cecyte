@@ -795,7 +795,7 @@ function formatoDuracion(min) {
 // Con el módulo Me Line Follower (dos sensores). Puertos con dos pines digitales: 6, 7 y 8; el 9 es el
 // botón de la placa y el 10 lo usa el ultrasonido. El programa del robot lo trae como modo 6.
 const SEGUIDOR_ACTIVO = true;
-const LINEA_DEFECTO = { puerto: 6, color: 'negra', velocidad: 80, giro: 50, perdida: 'buscar', buscarMs: 1500, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
+const LINEA_DEFECTO = { puerto: 6, color: 'negra', velocidad: 130, giro: 50, perdida: 'buscar', buscarMs: 4000, cruce: 'recto', obstaculoCm: 0, duracionS: 0, avisos: true };
 const LINEA_PERDIDA = { parar: 0, buscar: 1, recto: 2 };
 const LINEA_CRUCE = { recto: 0, parar: 1, izquierda: 2, derecha: 3 };
 
@@ -904,6 +904,8 @@ function cargar() {
         cargador: clamp(Math.round(Number(b.cargador) || 500), 100, 3000),     // mA del cargador (para el tiempo de carga)
         hist: (Array.isArray(b.hist) ? b.hist : []).filter(p => Array.isArray(p) && p.length === 2 && p[0] > 0 && p[1] > 0).slice(-200),
     };
+    if (S.linea && S.linea.velocidad === 80) S.linea.velocidad = 130;      // los valores de fábrica viejos eran muy lentos
+    if (S.linea && S.linea.buscarMs === 1500) S.linea.buscarMs = 4000;
     S.linea = lineaNormaliza(S.linea);
     if (!Array.isArray(S.leds) || S.leds.length !== LEDS) S.leds = Array.from({ length: LEDS }, () => COLOR_INICIAL);
     S.guardadas = (Array.isArray(S.guardadas) ? S.guardadas : [])
@@ -1111,6 +1113,9 @@ async function leerBucle() {
 
 async function cerrar() {
     pararMusicaAutonoma();
+    S.corriendoFuncion = false;           // lo que corría ya no corre: al volver a conectar no hay estado viejo
+    S.autonomo = 0;
+    S.salirModo = false;
     const era = S.estado;
     clearInterval(S.saludo);
     S.cola.reiniciar();
