@@ -591,8 +591,9 @@ void fxDibuja() {
         break;
     }
     // el anillo es lo que más gasta después de los motores (hasta ~300 mA al 100 %): el 100 % del control
-    // equivale a un 50 % real, y andando baja otro poco; así se ve bien y duran más las pilas
-    uint32_t esc = (uint32_t)k * (moviendo ? fxBrillo * 35 / 100 : fxBrillo / 2);   // k 0..255 por brillo 0..100
+    // equivale a un 50 % real. Es igual andando o quieto: antes bajaba más al moverse y, con el brillo ya
+    // bajo, las luces casi se apagaban justo cuando el robot andaba
+    uint32_t esc = (uint32_t)k * (fxBrillo / 2);   // k 0..255 por brillo 0..100
     ledPon(i, (uint32_t)r * esc / 25500UL, (uint32_t)g * esc / 25500UL, (uint32_t)b * esc / 25500UL);
   }
   ledsMuestra();
