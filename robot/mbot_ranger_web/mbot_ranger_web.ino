@@ -27,6 +27,7 @@
     PCLR             empieza a guardar un show nuevo (borra el anterior)
     PADD T hz ms     añade al show una nota; también PADD W ms, PADD M izq der y PADD S
     PEND f           termina el show; f: 1 = arranca solo al encender, 2 = se repite (3 = las dos)
+    SPD n            velocidad de esquivar y seguir la mano, 40..230 (la línea usa LINEA vel)
     MODE n           cambia de modo (0..5; 5 = el show guardado, solo, sin la página; 6 = seguir la línea)
     FSAVE m [1]      guarda la función m (1 esquivar, 2 seguir la mano, 6 línea, con los ajustes LINEA de ese momento);
                      con 1 arranca sola 2,5 s después de encender. FCLR la borra
@@ -142,6 +143,7 @@ void motorPwm(uint8_t m, int pwm) {
 }
 
 const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar
+int velFn = VEL;                     // velocidad de esquivar y seguir la mano (orden SPD; se guarda con la función)
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
 const int DIST_OBSTACULO = 18;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
 const int PIN_BUZZER = 45;
@@ -319,7 +321,7 @@ void escPaso(uint8_t e, unsigned long dur) {
 void escGira(unsigned long t) {
   if (t - escUltimo > 2500) escIzq = (azar() & 1) == 0;       // otro obstáculo enseguida: sigue hacia el mismo lado
   escUltimo = t;
-  if (escIzq) giraIzq(VEL); else giraDer(VEL);
+  if (escIzq) giraIzq(velFn); else giraDer(velFn);
   escPaso(8, ESC_GIRO_MS + azar() % 250);
 }
 
@@ -330,14 +332,14 @@ void esquivar() {
     case 0:
       escD = distanciaCm();
       if (escD > DIST_OBSTACULO || distanciaCm() > DIST_OBSTACULO) {   // dos lecturas: un eco falso no lo frena
-        adelante(VEL);
+        adelante(velFn);
         return;
       }
       parar();                                                  // algo adelante
       escPaso(1, 60);
       break;
     case 1:
-      if (escD < 6) { atras(VEL); escPaso(2, 200); }            // muy pegado: un respiro
+      if (escD < 6) { atras(velFn); escPaso(2, 200); }            // muy pegado: un respiro
       else escGira(t);
       break;
     case 2:
@@ -358,8 +360,8 @@ void esquivar() {
 
 void seguir() {
   int d = distanciaCm();
-  if (d > 12 && d < 40)      adelante(VEL);
-  else if (d <= 8)           atras(VEL);
+  if (d > 12 && d < 40)      adelante(velFn);
+  else if (d <= 8)           atras(velFn);
   else                       parar();
 }
 
@@ -796,13 +798,23 @@ void seguirLinea() {
   } else {                                           // perdida
     if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
     lineaEstado(0);
-    // En una recta la línea queda ENTRE los dos sensores: ninguno la ve y eso es lo normal. Por eso sigue derecho
-    // un buen rato (3 s) antes de darla por perdida y buscarla girando.
+    // Ninguno la ve: en una recta es lo normal (la línea queda ENTRE los sensores) y en una curva fuerte es que
+    // se salió. Como no se puede distinguir, no se gira en el sitio: sigue derecho un instante y luego AVANZA
+    // zigzagueando en arcos cada vez más largos (hacia el último lado, luego al otro...). En una recta el
+    // zigzag es mínimo porque un sensor la toca enseguida y corrige; en una curva la vuelve a encontrar.
     const unsigned long perdido = millis() - lnPerdidoDesde;
-    if (lnPerdida == 0) parar();
-    else if (lnPerdida == 2 || perdido < 3000) motores(lnVel, lnVel);
-    else if (perdido < 3000 + lnBuscarMs) motores(lnLado * lnVel, -lnLado * lnVel);          // gira hacia donde la vio
-    else parar();
+    if (lnPerdida == 0) {
+      parar();
+    } else if (lnPerdida == 2 || perdido < 150) {
+      motores(lnVel, lnVel);
+    } else if (perdido - 150 > lnBuscarMs) {
+      parar();
+    } else {
+      unsigned long r = perdido - 150, dur = 250;
+      int8_t lado = lnLado;
+      while (r >= dur && dur < 2500) { r -= dur; dur += 250; lado = -lado; }
+      if (lado > 0) motores(lnVel, lnVel / 5); else motores(lnVel / 5, lnVel);   // arco hacia ese lado
+    }
   }
 }
 #endif
@@ -842,6 +854,7 @@ void fnGuardar(int m, bool solo) {
   EEPROM.update(FN_DIR + 13, lnDurS & 0xFF);
   EEPROM.update(FN_DIR + 14, lnDurS >> 8);
 #endif
+  EEPROM.update(FN_DIR + 15, velFn);
   EEPROM.update(FN_DIR, FN_MAGICO);     // al final: nunca queda a medias
   fnModo = m;
 }
@@ -852,6 +865,7 @@ void fnCargar() {
   if (m != 1 && m != 2 && m != 6) return;
   if (m > MODO_MAX) return;
   fnModo = m;
+  { uint8_t v = EEPROM.read(FN_DIR + 15); if (v >= 40 && v <= 230) velFn = v; }
 #if SEGUIDOR_LINEA
   lnPuerto = constrain(EEPROM.read(FN_DIR + 3), 0, 3);
   lnColor = EEPROM.read(FN_DIR + 4) ? 1 : 0;
@@ -949,6 +963,9 @@ void ejecuta(char *s) {
     }
     Serial.println();
 #endif
+  } else if (!strcmp(cmd, "SPD") && a) {              // SPD n: velocidad de esquivar y seguir la mano (40..230)
+    velFn = constrain(atoi(a), 40, 230);
+    ok();
   } else if (!strcmp(cmd, "TRIM") && a) {            // TRIM n: corrección de rumbo, se guarda sola
     trim = constrain(atoi(a), -30, 30);
     EEPROM.update(EE_TRIM, (uint8_t)trim);

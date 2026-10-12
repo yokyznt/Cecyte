@@ -801,6 +801,12 @@
                                         <button type="button" id="rb-bailar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Bailar y cantar</button>
                                         <label class="rb-check"><input type="checkbox" id="rb-repetir"><span>Repetir hasta pulsar Paro</span></label>
                                     </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-baile-guardar" class="btn btn--secondary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar este baile en el robot</button>
+                                        <label class="rb-check"><input type="checkbox" id="rb-baile-auto"><span>Que empiece solo al encenderlo</span></label>
+                                    </div>
+                                    <p id="rb-baile-info" class="msg" role="status"></p>
+                                    <p class="hint">Guardar deja en el robot este baile con su canción y sus luces, y borra cualquier función guardada: así solo baila, sin la página (con el botón de la placa, o solo 2,5 s tras encenderlo si lo marcas; «Repetir» lo repite sin parar).</p>
                                     <p class="hint">Para el baile pon el robot en el piso con espacio libre, o con las ruedas en el aire. Si el USB se desconecta o la página deja de mandar órdenes, los motores se paran solos a los 3 segundos.</p>
 
                                     </div>
@@ -830,7 +836,7 @@
                                         </div>
                                         <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Música y suena en el zumbador del robot, también mientras esquiva o sigue la línea y también guardada en el robot (se repite hasta pulsar Paro).</p>
                                         <div class="field">
-                                            <label class="field__label" for="rb-fn-vel">Velocidad de las ruedas: <span id="rb-fn-vel-v"></span></label>
+                                            <label class="field__label" for="rb-fn-vel">Velocidad (de lo más lento a lo más rápido): <span id="rb-fn-vel-v"></span></label>
                                             <input type="range" id="rb-fn-vel" min="40" max="180" step="5">
                                         </div>
                                         <div class="field">
@@ -879,8 +885,6 @@
                                     </div>
                                     <div class="rb-card">
                                         <h4 class="panel__sub">Movimiento</h4>
-                                        <div class="field"><label class="field__label" for="rb-ln-vel">Velocidad: <span id="rb-ln-vel-v"></span></label>
-                                            <input type="range" id="rb-ln-vel" min="40" max="150" step="5"></div>
                                         <div class="field"><label class="field__label" for="rb-ln-giro">Fuerza de la corrección al girar: <span id="rb-ln-giro-v"></span></label>
                                             <input type="range" id="rb-ln-giro" min="10" max="100" step="5">
                                             <p class="hint">Más alta gira más fuerte (sirve en curvas cerradas); más baja es más suave.</p></div>

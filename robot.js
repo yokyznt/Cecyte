@@ -868,6 +868,7 @@ const S = {
     variante: 'tanque', funcion: '',                 // modelo del robot y función elegida ('' = ninguna)
     funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
     funAuto: false,           // la función guardada arranca sola al encender el robot
+    baileAuto: false,         // el baile guardado arranca solo al encender el robot
     trim: 0,                  // corrección de rumbo del robot (-30..30), la guarda él mismo
     corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
@@ -883,8 +884,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, trim } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, trim }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, trim } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, linea, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, trim }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -925,6 +926,7 @@ function cargar() {
     S.funLuces = S.funLuces !== false;
     S.funMusica = S.funMusica === true;
     S.funAuto = S.funAuto === true;
+    S.baileAuto = S.baileAuto === true;
     S.trim = clamp(Math.round(Number(S.trim) || 0), -30, 30);
     S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
     S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
@@ -949,7 +951,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
         $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1248,7 +1250,7 @@ function actuar(conCancion, conBaile) {
 
 // Los ajustes de la línea tal como van al robot: sin luces de estado si la función va "sin luces".
 function lineaEnRobot() {
-    return Object.assign({}, S.linea, { avisos: S.linea.avisos && S.funLuces });
+    return Object.assign({}, S.linea, { avisos: S.linea.avisos && S.funLuces, velocidad: clamp(S.vel, 40, 150) });
 }
 
 // Esquivar, seguir la mano y la línea no pueden esperar notas (tienen que mirar el sensor): la página manda cada
@@ -1272,6 +1274,9 @@ function musicaAutonoma() {
     }
     S.musicaIds.push(setTimeout(() => { if (S.autonomo) musicaAutonoma(); }, ms));
 }
+
+// Velocidad de esquivar y seguir la mano: el mismo control que las demás (110 equivale a 150 del robot).
+function velAuto() { return clamp(Math.round(S.vel * 15 / 11), 40, 230); }
 
 function funcionActual() {
     return FUNCIONES.find(f => f.id === S.funcion && f.v.includes(S.variante)) || null;
@@ -1321,7 +1326,7 @@ function iniciarFuncion(reinicio) {
             // el robot pinta verde/rojo según la línea solo si las luces son fijas; con un efecto, sigue el efecto
             S.cola.enviar(['MODE 4'].concat(lineaAOrdenes(lineaEnRobot()), [{ l: lineaLuces(), ex: true }, 'VOL ' + S.vol, { l: 'MODE 6', ex: true }]));
         } else {
-            S.cola.enviar([{ l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+            S.cola.enviar(['SPD ' + velAuto(), { l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
         }
         if (S.funMusica) musicaAutonoma();
         return mensaje(`${f.nombre}: lo hace el robot solo con su sensor. Pulsa Paro para detenerlo.`, 'ok');
@@ -1366,7 +1371,7 @@ function guardarFuncion() {
                 musica = [{ l: 'PCLR', ex: true }].concat(prog.lineas, [{ l: 'PEND 4', ex: true }]);
             }
         }
-        ordenes = ['MODE 4'].concat(previo, musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
+        ordenes = ['MODE 4', 'SPD ' + velAuto()].concat(previo, musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
         const n = leerNotas(S.notas);
@@ -1384,6 +1389,35 @@ function guardarFuncion() {
             + (f.modo === 6 ? '. También sale con el botón de la placa, después del show' : f.modo ? '. Esquivar y seguir la mano también salen con el botón de la placa' : '. Con el botón de la placa se elige o se corta')
             + (f.modo && S.funMusica ? ', con la canción de fondo' : '')
             + '. Mientras esté conectado a la página no arranca sola.', 'ok');
+    });
+}
+
+// ---- Guardar el baile (con su canción y sus luces) en el robot: solo baila, sin la página ----
+
+function baileInfo(texto, tipo) {
+    const el = $('rb-baile-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function guardarBaile() {
+    if (S.estado !== 'listo') return baileInfo('Conecta el robot primero.', 'err');
+    const { cmds, ms } = armar(true, true);
+    if (!ms) return baileInfo('No hay nada que guardar: la canción y el baile están vacíos.', 'err');
+    const prog = programaParaRobot(cmds);
+    if (!prog.cabe) return baileInfo(`Es demasiado largo para el robot (${prog.bytes} de ${PGM_MAX} bytes). Usa un pedazo más corto o una velocidad más alta.`, 'err');
+    if (S.corriendoFuncion || S.actuando) paro();
+    if (S.funcion) { S.funcion = ''; pintarFunciones(); }          // el robot ya no tendrá ninguna función: solo baila
+    S.guardarEn = 0;
+    const banderas = (S.baileAuto ? 1 : 0) | (S.repetir ? 2 : 0);
+    const fx = { l: fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx), ex: true };
+    baileInfo(`Guardando el baile en el robot (${prog.lineas.length} órdenes)… no lo desconectes.`);
+    S.cola.enviar(['MODE 4', { l: 'FCLR', ex: true }, 'PCLR'].concat(prog.lineas, ['PEND ' + banderas, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]), () => {
+        S.sucio = true;
+        baileInfo(`Listo: el robot ya sabe bailar y cantar (${(ms / 1000).toFixed(1)} s) sin la página`
+            + (banderas & 1 ? ' y lo hace solo 2,5 s después de encenderlo' : '')
+            + (banderas & 2 ? ', repitiéndolo' : '')
+            + '. Con el botón de la placa se elige o se corta. Guardó solo el baile: ninguna función.', 'ok');
     });
 }
 
@@ -1429,6 +1463,7 @@ function pintarFunciones() {
         + `<span><b>${x.nombre}</b><small>${x.desc}${x.modo ? ' <em>La hace el robot solo.</em>' : ''}</small></span></label>`).join('');
     $('rb-fn-luces').checked = S.funLuces;
     $('rb-fn-auto').checked = S.funAuto;
+    $('rb-baile-auto').checked = S.baileAuto;
     $('rb-fn-trim').value = S.trim;
     $('rb-fn-trim-v').textContent = S.trim === 0 ? 'recto' : S.trim > 0 ? 'a la derecha ' + S.trim : 'a la izquierda ' + (-S.trim);
     $('rb-fn-musica').checked = S.funMusica;
@@ -1436,7 +1471,7 @@ function pintarFunciones() {
     $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
     $('rb-fn-vel').value = S.vel;
     $('rb-fn-vel-v').textContent = S.vel;
-    $('rb-fn-vel').disabled = $('rb-fn-giro').disabled = !!(f && f.modo);   // esas usan su propia velocidad
+    $('rb-fn-giro').disabled = !!(f && f.modo);                // las de sensor no giran por tiempo
     const op = $('rb-cancion').selectedOptions[0];
     $('rb-fn-cancion').textContent = op ? op.textContent : '';
     $('rb-ln-panel').hidden = !(f && f.linea);
@@ -1946,8 +1981,6 @@ function pintarLinea() {
     const c = S.linea;
     $('rb-ln-puerto').value = String(c.puerto);
     $('rb-ln-color').value = c.color;
-    $('rb-ln-vel').value = c.velocidad;
-    $('rb-ln-vel-v').textContent = c.velocidad;
     $('rb-ln-giro').value = c.giro;
     $('rb-ln-giro-v').textContent = c.giro + ' %';
     $('rb-ln-perdida').value = c.perdida;
@@ -1962,7 +1995,7 @@ function pintarLinea() {
 function cambioLinea() {
     S.linea = lineaNormaliza({
         puerto: $('rb-ln-puerto').value, color: $('rb-ln-color').value,
-        velocidad: $('rb-ln-vel').value, giro: $('rb-ln-giro').value,
+        giro: $('rb-ln-giro').value,
         perdida: $('rb-ln-perdida').value, buscarMs: $('rb-ln-buscar').value,
         cruce: $('rb-ln-cruce').value, obstaculoCm: $('rb-ln-obst').value,
         duracionS: $('rb-ln-dur').value, avisos: $('rb-ln-avisos').checked,
@@ -2028,7 +2061,7 @@ function iniciarLineaYBateria() {
     for (const id of ['rb-ln-puerto', 'rb-ln-color', 'rb-ln-perdida', 'rb-ln-cruce', 'rb-ln-buscar', 'rb-ln-obst', 'rb-ln-dur']) {
         $(id).addEventListener('change', cambioLinea);
     }
-    for (const id of ['rb-ln-vel', 'rb-ln-giro']) $(id).addEventListener('input', cambioLinea);
+    $('rb-ln-giro').addEventListener('input', cambioLinea);
     $('rb-ln-avisos').addEventListener('change', cambioLinea);
     $('rb-ln-reset').addEventListener('click', () => { S.linea = lineaNormaliza(null); pintarLinea(); guardar(); });
 
@@ -2149,6 +2182,9 @@ function iniciar() {
         S.vel = Number(e.target.value);
         for (const id of ['rb-vel', 'rb-fn-vel']) $(id).value = S.vel;
         for (const id of ['rb-vel-v', 'rb-fn-vel-v']) $(id).textContent = S.vel;
+        if (S.estado === 'listo' && S.autonomo && !S.cola.ocupado()) {           // esquivar/seguir/línea en marcha: al instante
+            S.cola.enviar(['SPD ' + velAuto()].concat(S.autonomo === 6 ? ['LINEA vel ' + lineaEnRobot().velocidad] : []));
+        }
         cambio('baile');
     };
     $('rb-vel').addEventListener('input', ponVel);
@@ -2174,6 +2210,8 @@ function iniciar() {
     });
     $('rb-fn-iniciar').addEventListener('click', () => iniciarFuncion());
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
+    $('rb-baile-guardar').addEventListener('click', guardarBaile);
+    $('rb-baile-auto').addEventListener('change', e => { S.baileAuto = e.target.checked; guardar(); });
     $('rb-fn-trim').addEventListener('input', e => {
         S.trim = Number(e.target.value);
         $('rb-fn-trim-v').textContent = S.trim === 0 ? 'recto' : S.trim > 0 ? 'a la derecha ' + S.trim : 'a la izquierda ' + (-S.trim);

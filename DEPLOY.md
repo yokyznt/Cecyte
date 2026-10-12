@@ -180,6 +180,9 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   igual al desconectarlo del USB y vuelve solo al encenderlo.
 - **Seguridad:** el botón **Paro** corta nota y motores al momento, y si la página
   deja de mandar órdenes los motores se paran solos a los 3 segundos.
+- **Baile guardado:** en Baile, "Guardar este baile en el robot" deja el baile con su canción y sus luces y borra
+  cualquier función guardada: el robot solo baila, sin la página. **Velocidad:** un solo control (de lo más lento a lo más
+  rápido) en Funciones y Baile sirve para todas las funciones, incluidas esquivar (`SPD`), seguir la mano y la línea.
 - **Funciones guardadas:** en Funciones, "Guardar la función en el robot" deja la función (con la canción y las luces
   marcadas) en su EEPROM y la hace sin USB: con el botón de la placa o, si lo marcas, sola 2,5 s después de
   encenderlo. Cada guardado reemplaza al anterior. Úsalo con las baterías puestas y el interruptor encendido.
