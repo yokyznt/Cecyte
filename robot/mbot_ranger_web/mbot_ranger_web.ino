@@ -94,6 +94,11 @@ void ledsMuestra() {
       "brne 1b          \n\t"
       : "=&d" (c), "+r" (b)
       : "x" (&PORTL), "r" (alto), "r" (bajo));
+    // entre byte y byte (una pausa de ~5 us no afecta al WS2812, que pide >50 us para reiniciarse) se deja pasar
+    // una interrupción pendiente: sin esto, el USB a 115200 pierde bytes mientras se dibuja el anillo
+    sei();
+    __asm__ volatile ("nop");
+    cli();
   }
   SREG = sreg;
 }
@@ -136,9 +141,9 @@ void motorPwm(uint8_t m, int pwm) {
   analogWrite(MOT_PWM[m], abs(pwm));
 }
 
-const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar                 // 0 a 255, para los modos del botón (con 120 y las pilas flojas la placa se reiniciaba)
+const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
-const int DIST_OBSTACULO = 10;       // cm: reacciona al estar a esta distancia (antes 20, muy pronto)
+const int DIST_OBSTACULO = 15;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
 const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
@@ -213,7 +218,7 @@ void notaBateria() {
 }
 
 // izq y der: positivo = esa rueda va hacia adelante.
-// Las ruedas suben en rampa (30 de PWM cada 12 ms): pedirle de golpe toda la corriente a la batería
+// Las ruedas suben en rampa (16 de PWM cada 12 ms): pedirle de golpe toda la corriente a la batería
 // hunde el voltaje y la placa se puede reiniciar. Parar, en cambio, es inmediato.
 // motores() solo fija el objetivo; la rampa avanza dentro de drenar(), que corre en toda espera y en
 // todo tono, así no se frena la música.
@@ -264,7 +269,7 @@ void aplicaModo() {
   tonoApaga();
   escEstado = 0;
   musP = 0;
-  musT = 0;
+  musT = millis() + 1500;               // si la página manda la música, tiene tiempo de adelantarse
 #if SEGUIDOR_LINEA
   lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
   lnEstado = 255;
@@ -416,7 +421,7 @@ bool botonSostenido() {
   unsigned long t0 = millis();
   // con las ruedas andando (o atoradas en una esquina) el ruido de los motores baja la lectura del botón y daba
   // pulsaciones falsas que cambiaban de modo solas: andando se pide una pulsación más larga
-  const unsigned long exigido = moviendo ? 600UL : 150UL;
+  const unsigned long exigido = moviendo ? 600UL : 300UL;
   while (millis() - t0 < exigido) {
     if (analogRead(A7) >= 60) return false;
     drenar();
@@ -737,8 +742,8 @@ void correShow() {
 // Puertos con dos pines digitales: 6, 7 y 8 (el 9 es el botón de la placa y el 10 el ultrasonido).
 const uint8_t LN_S1[3] = { A10, A9, A8 };
 const uint8_t LN_S2[3] = { A15, A14, A13 };
-uint8_t lnPuerto = 0, lnColor = 0, lnVel = 80, lnGiro = 50, lnPerdida = 1, lnCruce = 0, lnObst = 0, lnAvisos = 1;
-uint16_t lnBuscarMs = 1500, lnDurS = 0;
+uint8_t lnPuerto = 0, lnColor = 0, lnVel = 130, lnGiro = 50, lnPerdida = 1, lnCruce = 0, lnObst = 0, lnAvisos = 1;
+uint16_t lnBuscarMs = 4000, lnDurS = 0;
 unsigned long lnPerdidoDesde = 0;
 int8_t lnLado = 1;                   // hacia dónde vio la línea por última vez (-1 izquierda, 1 derecha)
 
@@ -1073,7 +1078,10 @@ void loop() {
 
   // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
   // De 3 sin show, de 4 (página) y de 5 vuelve a 0.
-  if (botonFlanco() && botonSostenido() && millis() - ultimoBoton > 300) {
+  // Con la página al mando (mandó algo en los últimos 15 s) el botón de la placa se ignora: sus pulsaciones
+  // falsas por ruido cambiaban de modo solas (luz azul y paro). Para parar está el Paro de la página.
+  const bool paginaAlMando = ultimaOrden != 0 && millis() - ultimaOrden < 15000UL;
+  if (!paginaAlMando && botonFlanco() && botonSostenido() && millis() - ultimoBoton > 300) {
     ultimoBoton = millis();
     sumaEE(EE_BTN);
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
