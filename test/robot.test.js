@@ -551,6 +551,21 @@ for (const c of R.CANCIONES) {
     assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_SHOW/.test(ino));
 }
 
+// 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz
+{
+    const { notas } = R.leerNotas('C4/4 E4 G4 C5');                 // 262..523 Hz
+    const arriba = R.realzarNotas(notas);
+    assert.deepStrictEqual(arriba.map(n => n.hz), notas.map(n => n.hz * 4), 'dos octavas arriba');
+    assert(Math.min(...arriba.map(n => n.hz)) >= 800 && Math.max(...arriba.map(n => n.hz)) <= 4500);
+    assert.deepStrictEqual(R.realzarNotas(R.leerNotas('C6/4 E6').notas).map(n => n.hz), [1047, 1319], 'ya agudas: sin cambio');
+    const conSilencio = R.realzarNotas(R.leerNotas('C4/4 R/4 E4').notas);
+    assert.strictEqual(conSilencio[1].hz, 0, 'los silencios no cambian');
+    assert.deepStrictEqual(R.realzarNotas([]), []);
+    // una canción que abarca mucho rango solo sube lo que cabe (hasta que la más aguda toque ~4,5 kHz)
+    const ancha = R.leerNotas('C3/4 C7').notas;                      // 131..2093 Hz
+    assert.deepStrictEqual(R.realzarNotas(ancha).map(n => n.hz), [262, 4186]);
+}
+
 // 24) Sin seguidor de línea (se hará con el Raptor) y tiempo de carga de las pilas
 {
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
