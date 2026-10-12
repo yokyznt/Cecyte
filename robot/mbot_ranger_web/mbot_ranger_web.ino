@@ -162,6 +162,9 @@ int pgmFin = 0;                      // bytes que lleva la subida en curso
 unsigned long showT0 = 0;            // el show espera a esta hora (para dejarlo en el piso)
 
 int modo = 0;
+int musP = 0;                            // música de fondo guardada: por dónde va en el show (EEPROM)
+unsigned long musT = 0;                  // a esta hora toca la siguiente nota o silencio
+bool abortar = false;                // un "!" de la página: corta lo que esté haciendo
 bool moviendo = false;
 unsigned long ultimoBoton = 0;
 unsigned long ultimaOrden = 0;
@@ -258,6 +261,8 @@ void color(int r, int g, int b) {
 void aplicaModo() {
   parar();
   tonoApaga();
+  musP = 0;
+  musT = 0;
 #if SEGUIDOR_LINEA
   lnT0 = 0;                            // el seguidor empieza su cuenta de tiempo de cero cada vez
   lnEstado = 255;
@@ -294,32 +299,34 @@ void esquivar() {
     adelante(VEL);
     return;
   }
-  // Algo adelante: retrocede un poco y mira a los dos lados para irse hacia el más libre
+  // Algo adelante: mira a los dos lados y gira hacia el más libre MIDIENDO hasta ver paso, así en una
+  // esquina da la vuelta que haga falta en vez de adivinar un tiempo
   parar();
   espera(60);
-  atras(VEL);
+  if (d < 6) {                         // muy pegado: un respiro antes de girar
+    atras(VEL);
+    espera(150);
+    parar();
+    espera(60);
+  }
+  giraIzq(VEL);                        // un poco a la izquierda y mide
   espera(200);
   parar();
-  espera(60);
-  giraIzq(VEL);                        // un poco a la izquierda y mide
-  espera(250);
-  parar();
-  espera(80);
+  espera(70);
   int dIzq = distanciaCm();
   giraDer(VEL);                        // pasa por el centro hasta la derecha y mide
-  espera(500);
+  espera(400);
   parar();
-  espera(80);
+  espera(70);
   int dDer = distanciaCm();
-  if (dIzq > dDer && dIzq > DIST_OBSTACULO + 8) {                // la izquierda estaba más libre: vuelve hacia allá
-    giraIzq(VEL);
-    espera(500);
-    parar();
-  } else if (dDer <= DIST_OBSTACULO + 8) {                       // sin salida a los lados: casi media vuelta
-    giraDer(VEL);
-    espera(450 + azar() % 250);
-    parar();
+  const bool izq = dIzq > dDer;
+  unsigned long t0 = millis();
+  while (!abortar && millis() - t0 < 1800) {   // gira hacia el lado libre hasta que haya paso (> 30 cm)
+    if (izq) giraIzq(VEL); else giraDer(VEL);
+    espera(60);
+    if (distanciaCm() > 30) break;
   }
+  parar();
   espera(40);
 }
 
@@ -376,7 +383,10 @@ bool botonFlanco() {
 // flanco se exige que siga baja 150 ms seguidos (atendiendo el USB mientras tanto).
 bool botonSostenido() {
   unsigned long t0 = millis();
-  while (millis() - t0 < 150) {
+  // con las ruedas andando (o atoradas en una esquina) el ruido de los motores baja la lectura del botón y daba
+  // pulsaciones falsas que cambiaban de modo solas: andando se pide una pulsación más larga
+  const unsigned long exigido = moviendo ? 600UL : 150UL;
+  while (millis() - t0 < exigido) {
     if (analogRead(A7) >= 60) return false;
     drenar();
   }
@@ -388,7 +398,6 @@ bool botonSostenido() {
 const int RING = 256;
 char cola[RING];
 int colaIni = 0, colaFin = 0, colaN = 0;
-bool abortar = false;
 
 unsigned long tonoFin = 0;               // si no es 0, a esta hora se apaga la nota que suena sin esperarla
 
@@ -405,6 +414,7 @@ void drenar() {
     }
   }
   if (tonoFin && (long)(millis() - tonoFin) >= 0) tonoApaga();
+  musicaFondo();
   if (!abortar) rampa();                     // drenar() corre en toda espera: de aquí avanza la rampa
 }
 
@@ -594,6 +604,34 @@ void fxRestaurar() {
   fxDibuja();
   Serial.print(F("FX guardado: modo "));
   Serial.println(m);
+}
+
+// Música de fondo de las funciones guardadas (esquivar, seguir la mano y línea): toca las notas T y W del show
+// guardado con la bandera 4, sin esperarlas, y las repite. La llama drenar(), que corre en toda espera.
+void musicaFondo() {
+  if (!(modo == 1 || modo == 2 || modo == 6) || abortar) return;
+  unsigned long t = millis();
+  if ((long)(t - musT) < 0) return;                    // sonando o en silencio
+  if (!pgmValido() || !(pgmBanderas() & 4)) return;
+  const int largo = pgmLargo();
+  if (musP >= largo) musP = 0;
+  uint8_t op = EEPROM.read(PGM_DIR + 4 + musP++);
+  if (op == 1 && musP + 4 <= largo) {
+    int hz = EEPROM.read(PGM_DIR + 4 + musP) | (EEPROM.read(PGM_DIR + 4 + musP + 1) << 8);
+    int ms = EEPROM.read(PGM_DIR + 4 + musP + 2) | (EEPROM.read(PGM_DIR + 4 + musP + 3) << 8);
+    musP += 4;
+    ms = constrain(ms, 1, 5000);
+    if (volumen) { tonoInicia(constrain(hz, 40, 8000)); tonoFin = t + ms; }
+    musT = t + ms;
+  } else if (op == 2 && musP + 2 <= largo) {
+    musT = t + constrain(EEPROM.read(PGM_DIR + 4 + musP) | (EEPROM.read(PGM_DIR + 4 + musP + 1) << 8), 0, 5000);
+    musP += 2;
+  } else if (op == 3) {
+    musP += 2;
+  } else if (op != 4) {
+    musP = 0;
+    musT = t + 1000;
+  }
 }
 
 // ---------- Show guardado: canta y baila solo, sin la página ----------
@@ -809,6 +847,7 @@ void ejecuta(char *s) {
     }
     if (modo == 1 || modo == 2 || modo == 6) {          // esquivar, seguir y línea: la nota suena sin frenar al robot
       if (volumen) { tonoInicia(hz); tonoFin = millis() + ms; }
+      musT = millis() + 3000;                          // la página manda la música: la guardada espera
     } else {
       tono(hz, ms);
     }
