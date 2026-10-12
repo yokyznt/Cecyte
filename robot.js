@@ -781,6 +781,18 @@ function tiempoCarga({ pct, capacidadMah = 2000, corrienteMa = 500, quimica = 'n
     return Math.round(faltante * 1.4 / corrienteMa * 60);
 }
 
+// El zumbador de la placa suena mucho más fuerte en agudos (cerca de su resonancia, 2-4 kHz) que en graves, y el
+// volumen ya está en su tope (el pulso al 50 %). Sube TODA la canción las octavas enteras que haga falta para que su
+// nota más grave pase de ~800 Hz sin que la más aguda se salga de ~4,5 kHz: las notas siguen siendo las mismas.
+function realzarNotas(notas, minHz = 800, maxHz = 4500) {
+    const hzs = notas.map(n => n.hz).filter(h => h > 0);
+    if (!hzs.length) return notas;
+    const lo = Math.min(...hzs), hi = Math.max(...hzs);
+    let f = 1;
+    while (lo * f < minHz && hi * f * 2 <= maxHz) f *= 2;
+    return f === 1 ? notas : notas.map(n => (n.hz > 0 ? Object.assign({}, n, { hz: Math.min(8000, n.hz * f) }) : n));
+}
+
 function formatoDuracion(min) {
     if (!(min >= 0)) return '';
     if (min < 1) return 'menos de 1 min';
@@ -792,7 +804,7 @@ function formatoDuracion(min) {
 
 const lib = {
     BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
-    PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion,
+    PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
@@ -825,6 +837,7 @@ const S = {
     funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
     funAuto: false,           // la función guardada arranca sola al encender el robot
     baileAuto: false,         // el baile guardado arranca solo al encender el robot
+    fuerte: true,             // sube las canciones de octava para que el zumbador suene más fuerte
     trim: 0,                  // corrección de rumbo del robot (-30..30), la guarda él mismo
     corriendoFuncion: false,  // hay una función en marcha (para las luces y para parar bien)
     autonomo: 0,              // modo del robot (1 o 2) si la función la hace él solo con su sensor
@@ -839,8 +852,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, trim } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, trim }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -878,6 +891,7 @@ function cargar() {
     S.funMusica = S.funMusica === true;
     S.funAuto = S.funAuto === true;
     S.baileAuto = S.baileAuto === true;
+    S.fuerte = S.fuerte !== false;
     S.trim = clamp(Math.round(Number(S.trim) || 0), -30, 30);
     S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
     S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
@@ -1150,12 +1164,15 @@ function lineaLuces() {
     return fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx);
 }
 
+// Las notas de la canción tal como suenan en el robot (más agudas si está marcado "que suene más fuerte")
+function notasRobot(notas) { return S.fuerte ? realzarNotas(notas) : notas; }
+
 // Devuelve { cmds, ms } con la canción y/o el baile que haya en pantalla
 function armar(conCancion, conBaile) {
     const n = leerNotas(S.notas), b = leerBaile(S.pasos);
     mostrarErrores(n.errores, b.errores);
     return compilar({
-        notas: conCancion ? n.notas : [],
+        notas: conCancion ? notasRobot(n.notas) : [],
         pasos: conBaile ? b.pasos : [],
         bpm: S.bpm, vel: S.vel,
     });
@@ -1203,7 +1220,7 @@ function pararMusicaAutonoma() {
 
 function musicaAutonoma() {
     pararMusicaAutonoma();
-    const { cmds, ms } = compilar({ notas: leerNotas(S.notas).notas, bpm: S.bpm });
+    const { cmds, ms } = compilar({ notas: notasRobot(leerNotas(S.notas).notas), bpm: S.bpm });
     if (!ms) return;
     let t = 0;
     for (const c of cmds) {
@@ -1227,7 +1244,7 @@ function armarFuncion(f) {
     const n = leerNotas(S.notas);
     mostrarErrores(n.errores, leerBaile(S.pasos).errores);
     return compilar({
-        notas: S.funMusica ? n.notas : [],
+        notas: S.funMusica ? notasRobot(n.notas) : [],
         pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm),
         bpm: S.bpm, vel: S.vel, continuo: true,
     });
@@ -1298,7 +1315,7 @@ function guardarFuncion() {
         // de solo notas (bandera 4) y el robot la toca de fondo mientras esquiva o sigue
         let musica = [{ l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }];
         if (S.funMusica) {
-            const { cmds, ms } = compilar({ notas: leerNotas(S.notas).notas, bpm: S.bpm });
+            const { cmds, ms } = compilar({ notas: notasRobot(leerNotas(S.notas).notas), bpm: S.bpm });
             if (ms) {
                 const prog = programaParaRobot(cmds);
                 if (!prog.cabe) return funInfo(`La canción es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una más corta o quita la música.`, 'err');
@@ -1309,7 +1326,7 @@ function guardarFuncion() {
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
         const n = leerNotas(S.notas);
-        const { cmds, ms } = compilar({ notas: S.funMusica ? n.notas : [], pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
+        const { cmds, ms } = compilar({ notas: S.funMusica ? notasRobot(n.notas) : [], pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
         if (!ms) return funInfo('Esa función no tiene pasos.', 'err');
         const prog = programaParaRobot(cmds);
         if (!prog.cabe) return funInfo(`Es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una canción más corta o quita la música.`, 'err');
@@ -1520,6 +1537,7 @@ function pintarTodo() {
     $('rb-fxvel').value = S.velFx;
     $('rb-fxvel-v').textContent = S.velFx + ' %';
     $('rb-vol').value = S.vol;
+    $('rb-fuerte').checked = S.fuerte;
     $('rb-vol-v').textContent = S.vol + ' %';
     $('rb-vivo').checked = S.vivo;
     $('rb-repetir').checked = S.repetir;
@@ -2140,6 +2158,7 @@ function iniciar() {
         $('rb-fxvel-v').textContent = S.velFx + ' %';
         cambio('led');
     });
+    $('rb-fuerte').addEventListener('change', e => { S.fuerte = e.target.checked; cambio('cancion'); });
     $('rb-vol').addEventListener('input', e => {
         S.vol = Number(e.target.value);
         $('rb-vol-v').textContent = S.vol + ' %';
