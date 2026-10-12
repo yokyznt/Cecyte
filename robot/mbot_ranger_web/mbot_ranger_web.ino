@@ -143,7 +143,7 @@ void motorPwm(uint8_t m, int pwm) {
 
 const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página
-const int DIST_OBSTACULO = 15;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
+const int DIST_OBSTACULO = 18;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
 const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
@@ -302,17 +302,25 @@ uint16_t azar() {
 
 // Esquivar sin esperas bloqueantes: cada llamada avanza un paso y regresa, así loop() sigue atendiendo el USB,
 // las luces y la música.
-//   0 avanza  1 pausa  2 retrocede (si está pegado)  3 pausa
-//   8 gira MIDIENDO hasta ver un camino espacioso (más de escUmbral cm); si da la vuelta entera sin hallarlo,
-//     retrocede un poco, cambia de lado y baja el umbral (en un cuarto chico nada está a 40 cm)   9 pausa
-unsigned long escT = 0, escT0 = 0;
-int escD = 0, escUmbral = 40;
-uint8_t escLibre = 0;
+// Al ver algo enfrente: se detiene, retrocede un poco si está pegado y GIRA un rato fijo hacia otro lado
+// (medir mientras gira falla con paredes en ángulo, que no devuelven eco) y sigue; si todavía hay algo, gira de
+// nuevo hacia el mismo lado, así da más vuelta hasta hallar camino.
+//   0 avanza  1 pausa  2 retrocede (si está pegado)  3 pausa  8 gira  9 pausa
+unsigned long escT = 0, escUltimo = 0;
+int escD = 0;
 bool escIzq = false;
+const unsigned long ESC_GIRO_MS = 600;   // lo que gira cada vez (unos 120° a velocidad VEL); se suma un poco al azar
 
 void escPaso(uint8_t e, unsigned long dur) {
   escEstado = e;
   escT = millis() + dur;
+}
+
+void escGira(unsigned long t) {
+  if (t - escUltimo > 2500) escIzq = (azar() & 1) == 0;       // otro obstáculo enseguida: sigue hacia el mismo lado
+  escUltimo = t;
+  if (escIzq) giraIzq(VEL); else giraDer(VEL);
+  escPaso(8, ESC_GIRO_MS + azar() % 250);
 }
 
 void esquivar() {
@@ -326,37 +334,22 @@ void esquivar() {
         return;
       }
       parar();                                                  // algo adelante
-      escUmbral = 40;
       escPaso(1, 60);
       break;
     case 1:
       if (escD < 6) { atras(VEL); escPaso(2, 200); }            // muy pegado: un respiro
-      else { escT0 = t; escLibre = 0; escPaso(8, 0); }
+      else escGira(t);
       break;
     case 2:
       parar();
       escPaso(3, 60);
       break;
     case 3:
-      escT0 = t;
-      escLibre = 0;
-      escPaso(8, 0);
+      escGira(t);
       break;
     case 8:
-      if (t - escT0 > 3500) {                                   // una vuelta entera sin camino: otro lado y menos exigente
-        escIzq = !escIzq;
-        if (escUmbral > DIST_OBSTACULO + 10) escUmbral -= 10;
-        atras(VEL);
-        escPaso(2, 300);
-        break;
-      }
-      if (distanciaCm() > escUmbral) {
-        if (++escLibre >= 2) { parar(); escPaso(9, 40); break; }   // dos lecturas libres seguidas: camino
-      } else {
-        escLibre = 0;
-      }
-      if (escIzq) giraIzq(VEL); else giraDer(VEL);
-      escPaso(8, 40);
+      parar();
+      escPaso(9, 60);
       break;
     default:
       escEstado = 0;
@@ -803,10 +796,12 @@ void seguirLinea() {
   } else {                                           // perdida
     if (lnPerdidoDesde == 0) lnPerdidoDesde = millis();
     lineaEstado(0);
+    // En una recta la línea queda ENTRE los dos sensores: ninguno la ve y eso es lo normal. Por eso sigue derecho
+    // un buen rato (3 s) antes de darla por perdida y buscarla girando.
     const unsigned long perdido = millis() - lnPerdidoDesde;
     if (lnPerdida == 0) parar();
-    else if (lnPerdida == 2 || perdido < 350) motores(lnVel, lnVel);                           // un hueco corto: sigue derecho
-    else if (perdido < lnBuscarMs + 350) motores(lnLado * lnVel, -lnLado * lnVel);            // gira hacia donde la vio
+    else if (lnPerdida == 2 || perdido < 3000) motores(lnVel, lnVel);
+    else if (perdido < 3000 + lnBuscarMs) motores(lnLado * lnVel, -lnLado * lnVel);          // gira hacia donde la vio
     else parar();
   }
 }
