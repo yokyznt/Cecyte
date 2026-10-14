@@ -8,6 +8,7 @@
 
 import { kv } from '@vercel/kv';
 import { verifyToken, parseCookies } from '../lib/auth.js';
+import { limpiarHorario } from '../lib/validar.js';
 
 const SCHEDULE_KEY = 'cecyte_schedule';
 
@@ -38,10 +39,11 @@ export default async function handler(req, res) {
             return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
         }
 
-        const schedule = req.body;
-        if (!Array.isArray(schedule)) {
-            return res.status(400).json({ error: 'Formato inválido: se esperaba un arreglo.' });
+        const limpio = limpiarHorario(req.body);
+        if (!limpio.ok) {
+            return res.status(400).json({ error: limpio.error });
         }
+        const schedule = limpio.datos;
 
         try {
             await kv.set(SCHEDULE_KEY, schedule);

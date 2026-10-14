@@ -9,10 +9,11 @@
 
 import { kv } from '@vercel/kv';
 import { verifyToken, parseCookies } from '../lib/auth.js';
+import { limpiarGrupo, GRUPOS_POR_DEFECTO, MAX_GRUPOS } from '../lib/validar.js';
 
 const GROUPS_KEY = 'cecyte_groups';
 const SCHEDULE_KEY = 'cecyte_schedule';
-const DEFAULT_GROUPS = ['501 Programación'];
+const DEFAULT_GROUPS = GRUPOS_POR_DEFECTO;
 
 export default async function handler(req, res) {
     if (req.method === 'GET') {
@@ -32,16 +33,19 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
         const { name } = req.body || {};
-        const trimmed = typeof name === 'string' ? name.trim() : '';
+        const trimmed = limpiarGrupo(name);
 
         if (!trimmed) {
-            return res.status(400).json({ error: 'Ponle un nombre al grupo.' });
+            return res.status(400).json({ error: 'Ponle un nombre al grupo (hasta 60 letras, sin caracteres raros).' });
         }
 
         try {
             const groups = (await kv.get(GROUPS_KEY)) || DEFAULT_GROUPS;
             if (groups.includes(trimmed)) {
                 return res.status(400).json({ error: 'Ese grupo ya existe.' });
+            }
+            if (groups.length >= MAX_GRUPOS) {
+                return res.status(400).json({ error: `Ya hay ${MAX_GRUPOS} grupos: borra alguno antes de agregar otro.` });
             }
             const updated = [...groups, trimmed];
             await kv.set(GROUPS_KEY, updated);
@@ -53,19 +57,18 @@ export default async function handler(req, res) {
 
     if (req.method === 'DELETE') {
         const { name } = req.body || {};
-        if (!name) {
+        if (typeof name !== 'string' || !name) {
             return res.status(400).json({ error: 'Falta el nombre del grupo a eliminar.' });
         }
 
         try {
             const groups = (await kv.get(GROUPS_KEY)) || DEFAULT_GROUPS;
             const updatedGroups = groups.filter(g => g !== name);
-            await kv.set(GROUPS_KEY, updatedGroups);
-
-            // También se van las materias que pertenecían a ese grupo
+            // También se van las materias que pertenecían a ese grupo. Las dos llaves se escriben en un solo
+            // paso (MSET es atómico): antes, si fallaba a la mitad quedaban materias de un grupo que ya no existía.
             const schedule = (await kv.get(SCHEDULE_KEY)) || [];
             const updatedSchedule = schedule.filter(item => item.group !== name);
-            await kv.set(SCHEDULE_KEY, updatedSchedule);
+            await kv.mset({ [GROUPS_KEY]: updatedGroups, [SCHEDULE_KEY]: updatedSchedule });
 
             return res.status(200).json({ groups: updatedGroups, schedule: updatedSchedule });
         } catch (err) {
