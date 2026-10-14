@@ -1231,3 +1231,49 @@ window.onload = async function() {
     setInterval(loadGroups, 15000); // refresca la lista de grupos por si se agrego/borro alguno
     setInterval(() => loadBell(true), 15000); // refresca el estado "ESP32 en linea" del timbre
 }
+
+// ==================== Modo oscuro (opcional, se recuerda en este navegador) ====================
+
+function aplicarTema(oscuro) {
+    document.documentElement.dataset.tema = oscuro ? 'oscuro' : 'claro';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', oscuro ? '#10231a' : '#ffffff');
+    const boton = document.getElementById('theme-toggle');
+    if (boton) {
+        boton.setAttribute('aria-pressed', String(oscuro));
+        document.getElementById('theme-toggle-text').textContent = oscuro ? 'Modo claro' : 'Modo oscuro';
+    }
+}
+
+function alternarTema() {
+    const oscuro = document.documentElement.dataset.tema !== 'oscuro';
+    try { localStorage.setItem('cecyte_tema', oscuro ? 'oscuro' : 'claro'); } catch (e) { /* sin almacenamiento */ }
+    aplicarTema(oscuro);
+}
+
+(function iniciarTema() {
+    let guardado = null;
+    try { guardado = localStorage.getItem('cecyte_tema'); } catch (e) { /* sin almacenamiento */ }
+    aplicarTema(guardado === 'oscuro');
+})();
+
+// ==================== Agregar el horario al calendario (.ics) ====================
+
+function descargarCalendario() {
+    if (!currentStudentGroup) {
+        return showNotificationToast('Elige tu grupo', 'Primero elige tu grupo para armar el calendario.', 'info');
+    }
+    const { texto, eventos } = Calendario.construirICS(scheduleDatabase, currentStudentGroup);
+    if (!eventos) {
+        return showNotificationToast('Sin materias', 'Este grupo todavía no tiene materias para exportar.', 'info');
+    }
+    const url = URL.createObjectURL(new Blob([texto], { type: 'text/calendar;charset=utf-8' }));
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = 'horario-' + currentStudentGroup.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') + '.ics';
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showNotificationToast('Calendario listo', `Se descargó el horario (${eventos} materias). Ábrelo para agregarlo a tu calendario.`, 'success');
+}
