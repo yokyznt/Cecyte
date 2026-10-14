@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href="manifest.webmanifest">
     <meta name="description" content="Horario de clases del CECyTE Plantel 18: qué materia va ahora, cuál sigue y avisos de cambio de clase.">
     <title>CECyTE Plantel 18 - Control de Horarios y Notificaciones</title>
     <link rel="icon" type="image/png" href="logo-cecyte.png">
@@ -59,6 +60,10 @@
                     <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
                     <span id="live-clock">--:--:--</span>
                 </div>
+
+                <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false" onclick="alternarTema()">
+                    <span id="theme-toggle-text">Modo oscuro</span>
+                </button>
 
                 <nav class="seg" aria-label="Cambiar de vista">
                     <button type="button" onclick="switchView('student')" id="tab-student" class="seg__btn" aria-pressed="true" aria-label="Vista Alumnos">
@@ -157,6 +162,9 @@
             <section class="panel" aria-labelledby="schedule-heading">
                 <div class="panel__head">
                     <h3 id="schedule-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Horario de Clases</h3>
+                    <button type="button" id="ics-btn" class="btn btn--secondary btn--sm" onclick="descargarCalendario()" title="Descarga un archivo para agregar tu horario a Google Calendar, Apple u Outlook">
+                        <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Agregar a mi calendario
+                    </button>
                 </div>
 
                 <div id="schedule-empty" class="empty-state hidden">
@@ -1044,6 +1052,7 @@
         </form>
     </dialog>
 
+    <script src="calendario.js"></script>
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
     <script src="robot.js"></script>

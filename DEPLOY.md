@@ -213,3 +213,15 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   botón de la placa y con solo dos sensores no se distingue "centrada" de "perdida"). Se retomará al armar el Dashing
   Raptor. El historial de git (PR #16, #28 a #31) conserva el código, con el registro `LOG` para afinarlo.
 - El firmware ocupa unos 14 KB de los 16 KB (64 páginas) que admite esta placa; ver la nota del flasheo.
+
+## Alumnos: instalable, sin conexión, modo oscuro y calendario
+
+- **Instalable (PWA):** `manifest.webmanifest` + `sw.js`. En el celular el navegador ofrece "Instalar" / "Agregar a la
+  pantalla de inicio". El service worker usa **red primero** (siempre lo más nuevo con Internet) y guarda copia de los
+  archivos de la página y de `/api/schedule` y `/api/groups`; sin Internet muestra la última copia. No guarda sesión,
+  timbre, push ni firmware. Al cambiar archivos estáticos no hace falta tocar nada; si algún día se cambia la forma de
+  guardar, subir `CACHE` (`cecyte-v1`) en `sw.js`.
+- **Modo oscuro:** botón en el encabezado; se recuerda en ese navegador (`localStorage: cecyte_tema`). Solo cambia tokens en
+  `styles.css` (`html[data-tema="oscuro"]`).
+- **Agregar a mi calendario:** descarga un `.ics` con las materias del grupo elegido, repetidas cada semana (`calendario.js`).
+- **Pruebas:** `npm test` corre todas (robot, admin, timbre, calendario/PWA, API y seguridad).
