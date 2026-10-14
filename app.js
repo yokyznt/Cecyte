@@ -471,6 +471,9 @@ async function submitLogin(e) {
             document.getElementById('admin-password').value = '';
             showAdminContent();
         } else {
+            // 429 = demasiados intentos fallidos: el servidor dice cuánto esperar
+            const datos = res.status === 429 ? await res.json().catch(() => ({})) : {};
+            errorMsg.innerText = datos.error || 'Contraseña incorrecta.';
             errorMsg.classList.remove('hidden');
         }
     } catch (err) {

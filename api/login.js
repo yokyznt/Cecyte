@@ -2,9 +2,14 @@
 // Si la contraseña coincide con ADMIN_PASSWORD (variable de entorno en Vercel),
 // manda una cookie httpOnly firmada que dura 12 horas.
 
+import { kv } from '@vercel/kv';
 import { signToken } from '../lib/auth.js';
+import { ipDe, bloqueado, anotarFallo, olvidar } from '../lib/limite.js';
 
-export default function handler(req, res) {
+const MAX_FALLOS = 5;            // intentos fallidos por IP...
+const VENTANA_S = 10 * 60;        // ...en 10 minutos
+
+export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método no permitido' });
     }
@@ -13,11 +18,19 @@ export default function handler(req, res) {
         return res.status(500).json({ error: 'El servidor no tiene configurada ADMIN_PASSWORD en Vercel.' });
     }
 
+    const clave = `login_fallos:${ipDe(req)}`;
+    if (await bloqueado(kv, clave, MAX_FALLOS)) {
+        res.setHeader('Retry-After', String(VENTANA_S));
+        return res.status(429).json({ error: 'Demasiados intentos. Espera unos minutos y vuelve a intentar.' });
+    }
+
     const { password } = req.body || {};
 
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (typeof password !== 'string' || password !== process.env.ADMIN_PASSWORD) {
+        await anotarFallo(kv, clave, VENTANA_S);
         return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
+    await olvidar(kv, clave);
 
     let token;
     try {
