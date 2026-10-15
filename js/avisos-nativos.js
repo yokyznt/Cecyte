@@ -92,6 +92,7 @@
 
     let ocupado = false;
     let repetir = false;
+    let ultimaFirma = '';
 
     // Cancela lo pendiente y vuelve a agendar los próximos días
     async function reprogramar() {
@@ -102,12 +103,16 @@
         try {
             const p = await LN.checkPermissions();
             if (p.display !== 'granted') return;
+            const lista = armarLista(new Date());
+            // El horario se vuelve a traer cada 15 s: solo se agenda de nuevo si la lista cambió de verdad
+            const firma = JSON.stringify(lista.map(n => [n.id, +n.schedule.at, n.body]));
             const pendientes = await LN.getPending();
+            if (firma === ultimaFirma && pendientes.notifications.length === lista.length) return;
             if (pendientes.notifications.length) {
                 await LN.cancel({ notifications: pendientes.notifications.map(n => ({ id: n.id })) });
             }
-            const lista = armarLista(new Date());
             if (lista.length) await LN.schedule({ notifications: lista });
+            ultimaFirma = firma;
         } catch (e) {
             console.error('No se pudieron agendar los avisos:', e);
         } finally {
