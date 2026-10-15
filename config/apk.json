@@ -1,0 +1,9 @@
+{
+    "appId": "com.yokyznt.cecyte",
+    "appName": "CECyTE 18",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "apiBase": "https://cecyteo.vercel.app",
+    "versionUrl": "https://cecyteo.vercel.app/version.json",
+    "descargaUrl": "https://github.com/yokyznt/Cecyte/releases/latest"
+}

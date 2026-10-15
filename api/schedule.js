@@ -7,7 +7,8 @@
 // alumno carga la pagina (o cada 15s mientras la tiene abierta), la vuelve a leer.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, parseCookies } from '../lib/auth.js';
+import { verifyToken, adminToken } from '../lib/auth.js';
+import { cors } from '../lib/cors.js';
 import { limpiarHorario } from '../lib/validar.js';
 
 const SCHEDULE_KEY = 'cecyte_schedule';
@@ -22,6 +23,7 @@ const DEFAULT_SCHEDULE = [
 ];
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     if (req.method === 'GET') {
         try {
             const data = await kv.get(SCHEDULE_KEY);
@@ -34,8 +36,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        const cookies = parseCookies(req);
-        if (!verifyToken(cookies.admin_token)) {
+        if (!verifyToken(adminToken(req))) {
             return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
         }
 

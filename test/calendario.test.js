@@ -43,7 +43,7 @@ assert(html.includes('rel="manifest" href="manifest.webmanifest"') && html.inclu
 const sw = fs.readFileSync(path.join(raiz, 'sw.js'), 'utf8');
 assert(sw.includes("API_GUARDABLE = ['/api/schedule', '/api/groups']"));
 assert(/req\.method !== 'GET'/.test(sw) && /url\.origin !== self\.location\.origin/.test(sw));
-['/', '/index.html', '/app.js', '/styles.css', '/calendario.js'].forEach(u => assert(sw.includes(`'${u}'`), 'precache ' + u));
+['/', '/index.html', '/app.js', '/css/tokens.css', '/css/components.css', '/calendario.js'].forEach(u => assert(sw.includes(`'${u}'`), 'precache ' + u));
 assert(/addEventListener\('push'/.test(sw) && /addEventListener\('notificationclick'/.test(sw), 'sigue dando los avisos push');
 
 console.log('calendario.test.js: todo bien');

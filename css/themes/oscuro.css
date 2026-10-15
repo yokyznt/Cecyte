@@ -1,0 +1,41 @@
+/* ==================== Modo oscuro (opcional: botón del encabezado, se recuerda en el navegador) ====================
+   Solo cambia los tokens: --black pasa a ser la superficie oscura de los chips y botones negros, y --ink el texto. */
+.theme-btn {
+    min-height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px;
+    background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
+}
+.theme-btn:hover { background: var(--green-50); }
+.theme-btn:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; }
+
+html[data-tema="oscuro"] {
+    color-scheme: dark;
+    --green-950: oklch(0.93 0.04 150);
+    --green-900: oklch(0.9 0.06 150);
+    --green-800: oklch(0.84 0.1 150);
+    --green-300: oklch(0.45 0.09 152);
+    --green-200: oklch(0.36 0.06 153);
+    --green-100: oklch(0.3 0.045 155);
+    --green-50:  oklch(0.26 0.035 155);
+    --black:   oklch(0.13 0.012 160);
+    --black-2: oklch(0.2 0.014 160);
+    --rose-700: oklch(0.82 0.12 22);
+    --rose-100: oklch(0.3 0.06 20);
+    --paper:   oklch(0.2 0.01 160);
+    --surface: oklch(0.23 0.012 160);
+    --page:    oklch(0.17 0.014 158);
+    --mint:    oklch(0.3 0.04 152);
+    --line:    oklch(0.33 0.016 155);
+    --line-strong: oklch(0.43 0.02 155);
+    --ink:     oklch(0.95 0.008 150);
+    --ink-2:   oklch(0.82 0.014 155);
+    --ink-3:   oklch(0.7 0.016 155);
+    --grid:    oklch(0.8 0.1 152 / 0.06);
+    --orange-100: oklch(0.32 0.06 60);
+    --orange-700: oklch(0.58 0.15 45);
+    --orange-800: oklch(0.84 0.1 55);
+}
+html[data-tema="oscuro"] .btn--secondary { background: var(--surface); }
+html[data-tema="oscuro"] .seg__btn[aria-pressed="true"],
+html[data-tema="oscuro"] .week th.is-today,
+html[data-tema="oscuro"] .day-tab[aria-selected="true"] { background: var(--green-700); border-color: var(--green-700); }
+html[data-tema="oscuro"] .site-header { background: oklch(0.17 0.014 158 / 0.88); }

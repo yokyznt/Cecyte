@@ -26,6 +26,7 @@ const { default: schedule } = await import(root + 'api/schedule.js');
 const { default: groups } = await import(root + 'api/groups.js');
 const { default: subscribe } = await import(root + 'api/push/subscribe.js');
 const { signToken, verifyToken } = await import(root + 'lib/auth.js');
+const { default: session } = await import(root + 'api/session.js');
 const { limpiarHorario } = await import(root + 'lib/validar.js');
 
 async function call(handler, { method = 'GET', body, headers = {} } = {}) {
@@ -34,6 +35,7 @@ async function call(handler, { method = 'GET', body, headers = {} } = {}) {
         status(c) { out.status = c; return this; },
         setHeader(k, v) { out.headers[k.toLowerCase()] = v; },
         json(o) { out.body = o; return this; },
+        end() { return this; },
     };
     await handler({ method, body, headers }, res);
     return out;
@@ -114,5 +116,35 @@ const viejo = String(Date.now() - 13 * 3600 * 1000);
 const firma = crypto.createHmac('sha256', process.env.AUTH_SECRET).update(viejo).digest('hex');
 assert.strictEqual(verifyToken(`${viejo}.${firma}`), false, 'vencido (más de 12 h)');
 assert.strictEqual(verifyToken(''), false);
+
+// 6) app de Android: CORS solo para su origen y sesión por token Bearer (la cookie sigue sirviendo en la web)
+const APP = 'https://localhost';
+r = await call(schedule, { headers: { origin: APP } });
+assert.strictEqual(r.headers['access-control-allow-origin'], APP, 'el origen de la app recibe CORS');
+assert(!r.headers['access-control-allow-credentials'], 'sin credenciales abiertas');
+r = await call(schedule, { headers: { origin: 'https://sitio-ajeno.example' } });
+assert.strictEqual(r.headers['access-control-allow-origin'], undefined, 'un origen ajeno no recibe CORS');
+r = await call(schedule, { method: 'GET', headers: {} });
+assert.strictEqual(r.headers['access-control-allow-origin'], undefined, 'mismo origen: sin cabeceras CORS');
+r = await call(schedule, { method: 'OPTIONS', headers: { origin: APP } });
+assert.strictEqual(r.status, 204, 'preflight de la app');
+assert(/Authorization/.test(r.headers['access-control-allow-headers']));
+r = await call(schedule, { method: 'OPTIONS', headers: { origin: 'https://sitio-ajeno.example' } });
+assert.strictEqual(r.status, 403, 'preflight de un origen ajeno');
+
+const bearer = { authorization: 'Bearer ' + signToken(), origin: APP };
+assert.strictEqual((await call(session, { headers: bearer })).body.loggedIn, true, 'Bearer válido abre sesión');
+assert.strictEqual((await call(session, { headers: { authorization: 'Bearer ' + signToken() + 'x', origin: APP } })).body.loggedIn, false, 'Bearer alterado');
+assert.strictEqual((await call(session, { headers: { authorization: 'Bearer', origin: APP } })).body.loggedIn, false, 'Bearer vacío');
+r = await call(schedule, { method: 'POST', headers: bearer, body: [materia({ id: 9 })] });
+assert.strictEqual(r.status, 200, 'Bearer puede guardar horario');
+
+// el token solo viaja en el cuerpo si la petición viene de la app; en la web queda en la cookie HttpOnly
+r = await call(login, { method: 'POST', body: { password: 'clave-correcta' }, headers: { ...desde('5.5.5.5'), origin: APP } });
+assert.strictEqual(r.status, 200);
+assert.strictEqual(verifyToken(r.body.token), true, 'la app recibe el token');
+r = await call(login, { method: 'POST', body: { password: 'clave-correcta' }, headers: { ...desde('6.6.6.6'), origin: 'https://cecyteo.vercel.app' } });
+assert.strictEqual(r.body.token, undefined, 'la web no recibe el token en el cuerpo');
+assert(/admin_token=/.test(r.headers['set-cookie']));
 
 console.log('api-seguridad.test.mjs: todo bien');

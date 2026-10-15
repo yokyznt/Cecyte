@@ -21,7 +21,8 @@
 // así que él le pregunta a esta API cada ~5 segundos si hay algo nuevo.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, parseCookies } from '../lib/auth.js';
+import { verifyToken, adminToken } from '../lib/auth.js';
+import { cors } from '../lib/cors.js';
 
 const BELL_KEY = 'cecyte_bell';
 const SEEN_KEY = 'cecyte_bell_seen';
@@ -74,7 +75,7 @@ async function getBell() {
 }
 
 function isAdmin(req) {
-    return verifyToken(parseCookies(req).admin_token);
+    return verifyToken(adminToken(req));
 }
 
 // Texto para el ESP32 (ver arriba)
@@ -104,6 +105,7 @@ async function logEvents(ev) {
 }
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     if (req.method === 'GET') {
         const deviceKey = req.query.key;
         const isDevice = !!process.env.BELL_DEVICE_KEY && deviceKey === process.env.BELL_DEVICE_KEY;

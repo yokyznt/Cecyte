@@ -1,0 +1,6 @@
+android
+www
+scripts
+capacitor.config.json
+config/apk.json
+*.apk

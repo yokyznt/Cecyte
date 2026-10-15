@@ -5,11 +5,13 @@
 import { kv } from '@vercel/kv';
 import { signToken } from '../lib/auth.js';
 import { ipDe, bloqueado, anotarFallo, olvidar } from '../lib/limite.js';
+import { cors, origenPermitido } from '../lib/cors.js';
 
 const MAX_FALLOS = 5;            // intentos fallidos por IP...
 const VENTANA_S = 10 * 60;        // ...en 10 minutos
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método no permitido' });
     }
@@ -45,5 +47,7 @@ export default async function handler(req, res) {
         `admin_token=${token}; HttpOnly; Path=/; Max-Age=43200; SameSite=Lax${isProd ? '; Secure' : ''}`
     );
 
-    return res.status(200).json({ ok: true });
+    // La app de Android no usa cookies: recibe el mismo token en el cuerpo. La web no lo ve (sigue en cookie HttpOnly).
+    const desdeApp = origenPermitido(req.headers.origin);
+    return res.status(200).json(desdeApp ? { ok: true, token } : { ok: true });
 }
