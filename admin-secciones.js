@@ -1,5 +1,5 @@
 // ==================== Admin: navegación por apartados y secciones ====================
-// Tres apartados (Horario, Timbre y Robot) y, dentro de cada uno, sus secciones. Cada apartado lleva
+// Apartados y, dentro de cada uno, sus secciones. Cada apartado lleva
 // data-apartado="<id>", cada sección data-section="<id>", y las pestañas data-apartado-tab / data-section-tab.
 // Una sección a la vez, a todo el ancho. Funciona con teclado (flechas, Inicio, Fin), recuerda la última
 // sección y se puede abrir directo con un enlace: https://.../#admin-timbre
@@ -8,10 +8,12 @@
 const APARTADOS = {
     horario: ['horarios', 'grupos', 'alertas'],
     timbre: ['timbre', 'ritmo', 'esp32'],
-    robot: ['robot-musica', 'robot-baile', 'robot-funciones', 'robot-luces', 'robot-instalar'],
+    robot: ['robot-musica', 'robot-baile', 'robot-funciones', 'robot-luces', 'robot-instalar'], // @robot:line
 };
 const ADMIN_SECCIONES = Object.values(APARTADOS).flat();
-const ALIAS_SECCION = { robot: 'robot-musica' };          // enlaces viejos: #admin-robot
+const ALIAS_SECCION = {
+    robot: 'robot-musica',   // @robot:line
+};                           // enlaces viejos
 const PRIMERA_SECCION = 'horarios';
 const apartadoDe = id => Object.keys(APARTADOS).find(a => APARTADOS[a].includes(id));
 const ultimaPorApartado = {};                              // la sección que tenía cada apartado al salir de él
@@ -53,7 +55,7 @@ function mostrarSeccionAdmin(id, { enfocar = false, recordar = true, desplazar =
         }
     });
 
-    document.dispatchEvent(new CustomEvent('seccion-admin', { detail: { id, apartado: ap } }));   // lo escucha robot.js (barra fija)
+    document.dispatchEvent(new CustomEvent('seccion-admin', { detail: { id, apartado: ap } }));   // quien necesite saber la sección activa lo escucha
 
     if (recordar) {
         try { history.replaceState(null, '', '#admin-' + id); } catch (e) { /* abierto como archivo */ }

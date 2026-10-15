@@ -1,0 +1,53 @@
+/* Layout adaptable: zonas seguras, horizontal y tablet.
+   Va después de componentes y páginas, y solo agrega reglas que no existían (no cambia el aspecto en vertical). */
+
+/* ==================== Zonas seguras ====================
+   En el APK, Capacitor (SystemBars) inyecta --safe-area-inset-*; en la web basta env(). Con 0 no cambia nada. */
+:root {
+    --inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+    --inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+    --inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+    --inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+}
+
+html { scroll-padding-top: calc(76px + var(--inset-top)); }
+body { padding-left: var(--inset-left); padding-right: var(--inset-right); }
+.site-header { padding-top: var(--inset-top); }
+.site-footer { padding-bottom: var(--inset-bottom); }
+.toasts { margin-bottom: var(--inset-bottom); }
+
+/* ==================== Horizontal en celular ====================
+   Poca altura: la cabecera deja de ser pegajosa y baja a 52 px para que quepa más contenido. */
+@media (orientation: landscape) and (max-height: 520px) {
+    .site-header { position: static; }
+    .site-header__inner { height: 52px; }
+    .now__title { font-size: 2.1rem; }
+    .now__count { font-size: 3rem; }
+}
+
+/* ==================== Tablet y horizontal ancho ====================
+   Entre 700 y 999 px el original apilaba "Ahora" y "Hoy"; con pantalla apaisada caben lado a lado. */
+@media (min-width: 700px) and (max-width: 999px) and (orientation: landscape) {
+    .today-grid { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
+}
+
+/* ==================== Pantallas muy anchas ==================== */
+@media (min-width: 1400px) {
+    .container { max-width: 1320px; margin-inline: auto; }
+}
+
+/* ==================== Aviso de versión nueva (solo APK) ==================== */
+.update-banner {
+    position: sticky; top: 0; z-index: 60;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: calc(10px + var(--inset-top)) 16px 10px;
+    background: var(--orange-100); color: var(--ink);
+    border-bottom: 2px solid var(--orange-500);
+    font-size: var(--fs-sm); font-weight: 600;
+}
+.update-banner span { flex: 1 1 220px; }
+.update-banner a { color: var(--orange-800); font-weight: 800; text-decoration: underline; }
+.update-banner button {
+    min-width: 44px; min-height: 44px; border: 0; background: none;
+    font-size: 1.4rem; line-height: 1; color: var(--ink-2);
+}

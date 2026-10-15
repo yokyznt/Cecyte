@@ -231,25 +231,47 @@ function findNextClassLabel(day, afterSlotKey = null) {
 }
 
 // ==================== Sincronizacion con el servidor ====================
+// Copia local de lo último que llegó del servidor: sin Internet (o en el APK sin red) se sigue viendo el horario.
+function cachear(clave, datos) {
+    try { localStorage.setItem('cecyte_cache_' + clave, JSON.stringify({ t: Date.now(), datos })); } catch (e) { /* sin almacenamiento */ }
+}
+
+function leerCache(clave) {
+    try {
+        const v = JSON.parse(localStorage.getItem('cecyte_cache_' + clave));
+        return v && Array.isArray(v.datos) ? v : null;
+    } catch (e) { return null; }
+}
+
 // Trae el horario guardado en el servidor y repinta ambas vistas.
 async function loadSchedule() {
+    const updatedEl = document.getElementById('schedule-updated');
     try {
-        const res = await fetch('/api/schedule');
-        if (!res.ok) return;
+        const res = await API.fetch('/api/schedule');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         scheduleDatabase = await res.json();
         scheduleLoaded = true;
-        const updatedEl = document.getElementById('schedule-updated');
+        cachear('schedule', scheduleDatabase);
         if (updatedEl) updatedEl.innerText = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
         renderStudentSchedule();
         if (isAdminLoggedIn) renderAdminTable();
+        document.dispatchEvent(new CustomEvent('horario-actualizado'));
     } catch (err) {
         console.error('No se pudo cargar el horario:', err);
+        const copia = leerCache('schedule');
+        if (copia && !scheduleLoaded) {
+            scheduleDatabase = copia.datos;
+            scheduleLoaded = true;
+            if (updatedEl) updatedEl.innerText = 'Sin conexión · guardado ' + new Date(copia.t).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            renderStudentSchedule();
+            document.dispatchEvent(new CustomEvent('horario-actualizado'));
+        }
     }
 }
 
 // Manda al servidor el arreglo completo actualizado (solo funciona con sesion activa)
 async function saveScheduleToServer() {
-    const res = await fetch('/api/schedule', {
+    const res = await API.fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -269,12 +291,14 @@ async function saveScheduleToServer() {
 // Trae la lista de grupos del servidor y actualiza los selectores en pantalla.
 async function loadGroups() {
     try {
-        const res = await fetch('/api/groups');
-        if (!res.ok) return;
+        const res = await API.fetch('/api/groups');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         groupsList = await res.json();
+        cachear('groups', groupsList);
     } catch (err) {
         console.error('No se pudieron cargar los grupos:', err);
-        groupsList = [];
+        const copia = leerCache('groups');
+        groupsList = copia ? copia.datos : [];
     }
 
     // Si el grupo guardado en este celular ya no existe, o no hay ninguno guardado, usa el primero disponible
@@ -320,8 +344,10 @@ function changeGroup(group) {
     updateCurrentClassCard();
     checkScheduleAndNotify();
 
+    document.dispatchEvent(new CustomEvent('grupo-cambiado'));
+
     // Si ya tenia notificaciones activadas, mueve la suscripcion push al grupo nuevo
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if (!(window.Plataforma && Plataforma.nativo) && 'Notification' in window && Notification.permission === 'granted') {
         subscribeToPush();
     }
 }
@@ -334,7 +360,7 @@ async function addGroup(e) {
     if (!name) return;
 
     try {
-        const res = await fetch('/api/groups', {
+        const res = await API.fetch('/api/groups', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -362,7 +388,7 @@ async function deleteGroup(name) {
     if (!confirm(`¿Seguro que quieres eliminar el grupo "${name}"? También se van a borrar todas sus materias del horario.`)) return;
 
     try {
-        const res = await fetch('/api/groups', {
+        const res = await API.fetch('/api/groups', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -424,7 +450,7 @@ function switchView(view) {
 // Revisa con el servidor si ya hay una sesion de admin valida en este dispositivo
 async function checkAdminSession() {
     try {
-        const res = await fetch('/api/session');
+        const res = await API.fetch('/api/session');
         const data = await res.json();
         isAdminLoggedIn = !!data.loggedIn;
     } catch (err) {
@@ -459,7 +485,7 @@ async function submitLogin(e) {
     errorMsg.classList.add('hidden');
 
     try {
-        const res = await fetch('/api/login', {
+        const res = await API.fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -467,6 +493,8 @@ async function submitLogin(e) {
         });
 
         if (res.ok) {
+            const datos = await res.json().catch(() => ({}));
+            if (datos.token) API.guardarToken(datos.token);   // solo en el APK; la web usa la cookie
             isAdminLoggedIn = true;
             document.getElementById('admin-password').value = '';
             showAdminContent();
@@ -483,7 +511,8 @@ async function submitLogin(e) {
 }
 
 async function logoutAdmin() {
-    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+    await API.fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => null);
+    API.guardarToken(null);
     isAdminLoggedIn = false;
     showAdminLogin();
 }
@@ -771,6 +800,22 @@ function checkScheduleAndNotify() {
     }
 }
 
+// Mensaje que le llega al alumno: NO dice que materia termina, solo avisa que va a terminar
+// y dice con detalle la materia que sigue y su profesor. Lo usan el aviso en pantalla y las
+// notificaciones locales del APK (js/avisos-nativos.js); el cron del servidor arma el mismo texto.
+function textoAviso(prevClass, nextSlot, nextClass) {
+    const lineas = [];
+    if (prevClass) lineas.push('La clase actual está por terminar.');
+    if (nextSlot && nextSlot.receso) {
+        lineas.push('Sigue: Receso.');
+    } else if (nextClass) {
+        lineas.push(`Comienza: ${nextClass.subject}, con el/la profesor(a) ${nextClass.teacher}.`);
+    } else if (!prevClass) {
+        lineas.push('No hay más clases por el momento.');
+    }
+    return lineas.join('\n');
+}
+
 function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
     const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
@@ -785,18 +830,7 @@ function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
         sigueTexto = 'Sin clase';
     }
 
-    // Mensaje que le llega al alumno: NO dice que materia termina, solo avisa que va a terminar
-    // y dice con detalle la materia que sigue y su profesor.
-    const avisoLineas = [];
-    if (prevClass) avisoLineas.push('La clase actual está por terminar.');
-    if (nextSlot && nextSlot.receso) {
-        avisoLineas.push('Sigue: Receso.');
-    } else if (nextClass) {
-        avisoLineas.push(`Comienza: ${nextClass.subject}, con el/la profesor(a) ${nextClass.teacher}.`);
-    } else if (!prevClass) {
-        avisoLineas.push('No hay más clases por el momento.');
-    }
-    const avisoTexto = avisoLineas.join('\n');
+    const avisoTexto = textoAviso(prevClass, nextSlot, nextClass);
 
     // 1. Toast dentro de la pagina (para cuando la pestaña esta abierta y visible)
     showNotificationToast('Aviso de Clase', avisoTexto, 'info');
@@ -813,6 +847,7 @@ function fireClassChangeAlert(prevClass, nextSlot, nextClass) {
 // Registra el Service Worker (necesario para que las notificaciones funcionen en Android/Chrome)
 let swRegistration = null;
 async function registerServiceWorker() {
+    if (window.Plataforma && Plataforma.nativo) return null;   // el APK usa avisos locales, no service worker
     if (!('serviceWorker' in navigator)) return null;
     try {
         swRegistration = await navigator.serviceWorker.register('/sw.js');
@@ -827,6 +862,7 @@ async function registerServiceWorker() {
 // Manda una notificacion real del sistema (banner fuera de la pagina), si hay permiso concedido.
 // Usa el Service Worker porque Chrome en Android NO deja usar "new Notification()" directo.
 async function sendSystemNotification(title, body) {
+    if (window.Plataforma && Plataforma.nativo) return AvisosNativos.notificarAhora(title, body);
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
     try {
@@ -846,6 +882,19 @@ async function sendSystemNotification(title, body) {
 let lastSubscribedGroup = localStorage.getItem('cecyte_push_group') || null;
 
 function requestNotificationPermission() {
+    if (window.Plataforma && Plataforma.nativo) {
+        AvisosNativos.activar().then(r => {
+            if (r.ok) {
+                updateNotificationStatus(r.exactas ? 'Activado en este dispositivo' : 'Activado (avisos aproximados)');
+                showNotificationToast('Notificaciones Activadas', r.exactas
+                    ? 'Este dispositivo avisará cada cambio de clase aunque la app esté cerrada.'
+                    : 'Activadas. Para que suenen justo a la hora, permite las alarmas exactas en los ajustes de la app.', 'success');
+            } else {
+                updateNotificationStatus('Permiso denegado');
+            }
+        });
+        return;
+    }
     if (!('Notification' in window)) {
         updateNotificationStatus('No soportado en este navegador');
         return;
@@ -873,12 +922,13 @@ function urlBase64ToUint8Array(base64String) {
 
 // Suscribe este dispositivo a notificaciones push reales (funcionan con la pagina cerrada)
 async function subscribeToPush() {
+    if (window.Plataforma && Plataforma.nativo) return;   // en el APK no hay Web Push
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     if (!currentStudentGroup) return; // sin grupo elegido todavia, no hay a quien avisar
 
     try {
         const reg = swRegistration || await navigator.serviceWorker.ready;
-        const keyRes = await fetch('/api/push/public-key');
+        const keyRes = await API.fetch('/api/push/public-key');
         const { publicKey } = await keyRes.json();
         if (!publicKey) return;
 
@@ -890,7 +940,7 @@ async function subscribeToPush() {
             });
         }
 
-        await fetch('/api/push/subscribe', {
+        await API.fetch('/api/push/subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ group: currentStudentGroup, previousGroup: lastSubscribedGroup, subscription })
@@ -1008,7 +1058,7 @@ async function importSchedule() {
     const newGroups = [...new Set(parsed.map(i => i.group))].filter(g => !groupsList.includes(g));
     for (const g of newGroups) {
         try {
-            const res = await fetch('/api/groups', {
+            const res = await API.fetch('/api/groups', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
@@ -1070,7 +1120,7 @@ let bellConfig = { times: [], rhythm: [], rhythms: {}, offDates: [], specials: {
 async function loadBell(fromPoll = false) {
     if (!isAdminLoggedIn) return;
     try {
-        const res = await fetch('/api/bell', { credentials: 'same-origin', cache: 'no-store' });
+        const res = await API.fetch('/api/bell', { credentials: 'same-origin', cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
 
@@ -1146,7 +1196,7 @@ async function saveBell(msgId = 'bell-save-msg') {
     msg.innerText = 'Guardando...';
 
     try {
-        const res = await fetch('/api/bell', {
+        const res = await API.fetch('/api/bell', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -1181,7 +1231,7 @@ async function ringBellNow() {
     msg.innerText = 'Enviando orden...';
 
     try {
-        const res = await fetch('/api/bell', {
+        const res = await API.fetch('/api/bell', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -1218,7 +1268,11 @@ window.onload = async function() {
     await loadSchedule(); // trae el horario real del servidor
     await registerServiceWorker();
 
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if (window.Plataforma && Plataforma.nativo) {
+        AvisosNativos.estado().then(r => {
+            if (r.activo) updateNotificationStatus(r.exactas ? 'Activado en este dispositivo' : 'Activado (avisos aproximados)');
+        });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
         updateNotificationStatus('Activado en este dispositivo');
         subscribeToPush(); // refresca la suscripcion push por si acaso
     }
@@ -1234,27 +1288,32 @@ window.onload = async function() {
 
 // ==================== Modo oscuro (opcional, se recuerda en este navegador) ====================
 
-function aplicarTema(oscuro) {
-    document.documentElement.dataset.tema = oscuro ? 'oscuro' : 'claro';
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', oscuro ? '#10231a' : '#ffffff');
+function actualizarBotonTema() {
     const boton = document.getElementById('theme-toggle');
-    if (boton) {
-        boton.setAttribute('aria-pressed', String(oscuro));
-        document.getElementById('theme-toggle-text').textContent = oscuro ? 'Modo claro' : 'Modo oscuro';
-    }
+    if (!boton || !window.Tema) return;
+    const etiqueta = Tema.etiqueta();
+    document.getElementById('theme-toggle-text').textContent = Tema.modo() === 'auto' ? 'Auto' : etiqueta;
+    boton.setAttribute('aria-label', 'Tema: ' + etiqueta + '. Pulsa para cambiarlo.');
+    boton.removeAttribute('aria-pressed');
 }
 
 function alternarTema() {
-    const oscuro = document.documentElement.dataset.tema !== 'oscuro';
-    try { localStorage.setItem('cecyte_tema', oscuro ? 'oscuro' : 'claro'); } catch (e) { /* sin almacenamiento */ }
-    aplicarTema(oscuro);
+    if (window.Tema) Tema.ciclar();
 }
 
-(function iniciarTema() {
-    let guardado = null;
-    try { guardado = localStorage.getItem('cecyte_tema'); } catch (e) { /* sin almacenamiento */ }
-    aplicarTema(guardado === 'oscuro');
+window.addEventListener('tema-cambiado', actualizarBotonTema);
+actualizarBotonTema();
+
+// ==================== Marca (nombre, subtítulo y logo salen de config/app.config.js) ====================
+(function aplicarMarca() {
+    const marca = (window.APP_CONFIG && APP_CONFIG.marca) || null;
+    if (!marca) return;
+    const poner = (sel, txt) => document.querySelectorAll(sel).forEach(el => { el.textContent = txt; });
+    document.title = marca.nombre + ' - ' + marca.subtitulo;
+    poner('.brand__name', marca.nombre);
+    poner('.site-footer__name', marca.nombre);
+    poner('.site-footer__sub', marca.subtitulo);
+    document.querySelectorAll('.brand__logo').forEach(img => { img.src = marca.logo; });
 })();
 
 // ==================== Agregar el horario al calendario (.ics) ====================
@@ -1267,10 +1326,22 @@ function descargarCalendario() {
     if (!eventos) {
         return showNotificationToast('Sin materias', 'Este grupo todavía no tiene materias para exportar.', 'info');
     }
+    const nombre = 'horario-' + currentStudentGroup.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') + '.ics';
+    if (window.Plataforma && Plataforma.nativo) {
+        // En el APK no hay descargas por enlace: se guarda en caché y se abre el menú de compartir de Android
+        const FS = Plataforma.plugin('Filesystem');
+        const Share = Plataforma.plugin('Share');
+        if (FS && Share) {
+            FS.writeFile({ path: nombre, data: texto, directory: 'CACHE', encoding: 'utf8' })
+                .then(r => Share.share({ title: 'Horario ' + currentStudentGroup, url: r.uri, dialogTitle: 'Agregar a mi calendario' }))
+                .catch(err => { if (!/cancel/i.test(String(err && err.message))) showNotificationToast('No se pudo compartir', 'Intenta de nuevo.', 'info'); });
+            return;
+        }
+    }
     const url = URL.createObjectURL(new Blob([texto], { type: 'text/calendar;charset=utf-8' }));
     const enlace = document.createElement('a');
     enlace.href = url;
-    enlace.download = 'horario-' + currentStudentGroup.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') + '.ics';
+    enlace.download = nombre;
     document.body.appendChild(enlace);
     enlace.click();
     enlace.remove();

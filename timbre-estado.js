@@ -160,7 +160,7 @@ function aBase64(bytes) {
 }
 
 async function postFirmware(cuerpo) {
-    const res = await fetch('/api/firmware', {
+    const res = await API.fetch('/api/firmware', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

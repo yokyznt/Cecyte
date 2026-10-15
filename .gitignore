@@ -6,3 +6,7 @@ timbre/secretos.h
 .playwright-mcp/
 .impeccable/
 .env*
+www/
+*.apk
+keystore.properties
+android/local.properties

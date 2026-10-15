@@ -8,7 +8,8 @@
 // materia por materia.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, parseCookies } from '../lib/auth.js';
+import { verifyToken, adminToken } from '../lib/auth.js';
+import { cors } from '../lib/cors.js';
 import { limpiarGrupo, GRUPOS_POR_DEFECTO, MAX_GRUPOS } from '../lib/validar.js';
 
 const GROUPS_KEY = 'cecyte_groups';
@@ -16,6 +17,7 @@ const SCHEDULE_KEY = 'cecyte_schedule';
 const DEFAULT_GROUPS = GRUPOS_POR_DEFECTO;
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     if (req.method === 'GET') {
         try {
             const groups = await kv.get(GROUPS_KEY);
@@ -26,8 +28,7 @@ export default async function handler(req, res) {
     }
 
     // POST y DELETE requieren sesion de admin
-    const cookies = parseCookies(req);
-    if (!verifyToken(cookies.admin_token)) {
+    if (!verifyToken(adminToken(req))) {
         return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
     }
 

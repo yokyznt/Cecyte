@@ -8,7 +8,7 @@ puedas editar. Sigue esto en orden, no te lo saltes.
 
 Vercel jala el proyecto desde un repositorio de GitHub. Crea un repo nuevo
 (puede ser privado) y sube TODA esta carpeta tal cual está: `index.html`,
-`styles.css`, `app.js`, la carpeta `api/`, la carpeta `lib/`, `package.json`
+`css/`, `fonts/`, `js/`, `config/`, `app.js`, la carpeta `api/`, la carpeta `lib/`, `package.json`
 y `.gitignore`.
 
 ## 2. Importa el proyecto en Vercel
@@ -76,10 +76,10 @@ Agrega estas en Vercel (Settings → Environment Variables), igual que
 
 | Nombre | Valor |
 |---|---|
-| `VAPID_PUBLIC_KEY` | `BD8vIRFQ1Z8tjXIbvDlRD5ht0CzEhAIKk80cLYBWDUapLC2sFMgD_OPwok3G7UD7R9FOcxzBmk0Ki7zfx2bBP4k` |
-| `VAPID_PRIVATE_KEY` | `Z1cTqOgMxJJeIkSOaNCDuZJ-C1qfly7KjDEppU7PUvU` |
+| `VAPID_PUBLIC_KEY` | Llave pública VAPID: genérala con `npx web-push generate-vapid-keys` (ver `ROTAR_CLAVES.md`). **No pegues aquí el valor real.** |
+| `VAPID_PRIVATE_KEY` | Llave privada VAPID del mismo par. Solo en Vercel, nunca en el repositorio. |
 | `VAPID_SUBJECT` | `mailto:tu-correo@ejemplo.com` (pon un correo real tuyo) |
-| `CRON_SECRET` | `adceaa2162599e16a40fbf4b7e99d361cb2f143c507b7866` |
+| `CRON_SECRET` | Texto aleatorio largo (mínimo 32 caracteres). Es el mismo que va en la URL del cron en cron-job.org. |
 
 Guarda y vuelve a desplegar (Redeploy) para que las tome.
 
@@ -115,7 +115,7 @@ le pregunta a la página cada ~10 segundos, así que no hay que reprogramarlo.
 
 | Nombre | Valor |
 |---|---|
-| `BELL_DEVICE_KEY` | `55a7a7dcdbed739050a5f1e54a9720c41303fd1a732cea74` |
+| `BELL_DEVICE_KEY` | Texto aleatorio de 32 caracteres hexadecimales; el mismo valor va en `timbre/secretos.h` del ESP32. |
 
 Guarda y haz Redeploy. Esa misma llave va en `DEVICE_KEY` dentro de
 `timbre_esp32.ino` (es lo que le permite al ESP32 leer las horas sin sesión de admin).
@@ -220,8 +220,12 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   pantalla de inicio". El service worker usa **red primero** (siempre lo más nuevo con Internet) y guarda copia de los
   archivos de la página y de `/api/schedule` y `/api/groups`; sin Internet muestra la última copia. No guarda sesión,
   timbre, push ni firmware. Al cambiar archivos estáticos no hace falta tocar nada; si algún día se cambia la forma de
-  guardar, subir `CACHE` (`cecyte-v1`) en `sw.js`.
-- **Modo oscuro:** botón en el encabezado; se recuerda en ese navegador (`localStorage: cecyte_tema`). Solo cambia tokens en
-  `styles.css` (`html[data-tema="oscuro"]`).
+  guardar, subir `CACHE` (`cecyte-v2`) en `sw.js`.
+- **Tema:** botón en el encabezado que alterna Automático (sigue al sistema), Claro y Oscuro; se recuerda en ese navegador (`localStorage: cecyte_tema`). Solo cambia tokens en
+  `css/themes/oscuro.css` (`html[data-tema="oscuro"]`).
 - **Agregar a mi calendario:** descarga un `.ics` con las materias del grupo elegido, repetidas cada semana (`calendario.js`).
 - **Pruebas:** `npm test` corre todas (robot, admin, timbre, calendario/PWA, API y seguridad).
+
+## App de Android (APK)
+
+Ver `ANDROID.md`. Rotar las llaves (VAPID y `CRON_SECRET`): ver `ROTAR_CLAVES.md`.

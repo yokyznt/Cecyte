@@ -1,0 +1,21 @@
+{
+    "appId": "com.yokyznt.cecyte",
+    "appName": "CECyTE 18",
+    "webDir": "www",
+    "android": {
+        "backgroundColor": "#FFFFFF"
+    },
+    "plugins": {
+        "SystemBars": {
+            "insetsHandling": "css"
+        },
+        "SplashScreen": {
+            "launchAutoHide": false,
+            "backgroundColor": "#FFFFFF"
+        },
+        "LocalNotifications": {
+            "smallIcon": "ic_stat_cecyte",
+            "iconColor": "#0B5A2E"
+        }
+    }
+}

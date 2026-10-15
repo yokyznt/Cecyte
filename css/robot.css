@@ -1,0 +1,132 @@
+/* Robot mBot Ranger (solo web de escritorio; el APK no lo incluye) */
+
+/* ==================== Robot mBot Ranger ==================== */
+@media (min-width: 1100px) { .admin-top .panel__body > .rb-full { grid-column: 1 / -1; } }
+
+.rb-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.rb-check input { width: 20px; height: 20px; accent-color: var(--green-700); }
+.rb-paro { border-color: var(--rose-700); color: var(--rose-700); }
+.rb-paro:hover:not(:disabled) { background: var(--rose-100); border-color: var(--rose-700); }
+.rb-prog { width: 100%; height: 8px; accent-color: var(--green-700); }
+
+/* Anillo de 12 LEDs: cada botón es un LED y se pinta del color que tiene */
+.rb-leds { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 28px 40px; align-items: start; }
+@media (max-width: 700px) { .rb-leds { grid-template-columns: 1fr; } }
+.rb-anillo {
+    position: relative; width: min(100%, 300px); aspect-ratio: 1; margin-inline: auto;
+    border-radius: 50%; background: var(--black-2); border: 1px solid var(--black);
+}
+.rb-led {
+    position: absolute; width: 44px; height: 44px; translate: -50% -50%;
+    border-radius: 50%; border: 2px solid oklch(1 0 0 / 0.55); background: var(--c, #000);
+    color: #fff; font-size: var(--fs-cap); font-weight: 700; text-shadow: 0 0 3px #000, 0 0 3px #000;
+    font-variant-numeric: tabular-nums; cursor: pointer;
+    transition: scale 120ms var(--ease-out);
+}
+.rb-led:hover { scale: 1.08; }
+.rb-led[aria-pressed="true"] { outline: 3px solid #fff; outline-offset: 2px; scale: 1.12; }
+.rb-leds > .stack { max-width: 440px; }
+.rb-color { width: 100%; max-width: 220px; height: 44px; padding: 3px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; }
+.rb-paleta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.rb-sw { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; min-height: 44px; padding: 4px 2px; border: 0; background: transparent; cursor: pointer; }
+.rb-sw__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); transition: scale 120ms var(--ease-out); }
+.rb-sw__name { font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
+.rb-sw:hover .rb-sw__dot { scale: 1.1; }
+.rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
+
+.rb-audio { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
+.rb-audio summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.rb-audio[open] > .stack { padding-bottom: 12px; }
+.rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
+.rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.rb-instalar ol { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.rb-instalar a { color: var(--green-800); font-weight: 700; }
+
+/* Funciones por modelo: una tarjeta por función, la elegida resaltada */
+.rb-fn-grupo { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.rb-fn-lista { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.rb-fn { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); cursor: pointer; }
+.rb-fn:hover { background: var(--green-50); }
+.rb-fn:has(input:checked) { border-color: var(--green-700); background: var(--green-50); }
+.rb-fn:has(input:focus-visible) { outline: 3px solid var(--green-700); outline-offset: 2px; }
+.rb-fn input { flex: none; width: 20px; height: 20px; margin-top: 2px; accent-color: var(--green-700); }
+.rb-fn span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rb-fn b { font-size: var(--fs-sm); }
+.rb-fn small { font-size: var(--fs-cap); color: var(--ink-2); }
+.rb-fn em { font-style: normal; font-weight: 700; color: var(--green-800); }
+
+/* ==================== Medidor de batería (cabecera del robot) ==================== */
+.panel__head .rb-bateria { margin-left: auto; margin-right: 12px; }
+.rb-bateria { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.rb-bateria[hidden] { display: none; }
+.rb-bateria__linea { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.rb-bateria__pct { font-size: 1.5rem; line-height: 1; font-weight: 800; color: var(--ink); }
+.rb-bateria__v { font-size: var(--fs-sm); color: var(--ink-3); }
+.rb-bateria__barra {
+    position: relative; flex: 0 0 clamp(180px, 24vw, 320px); height: 24px;
+    border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); overflow: hidden;
+}
+.rb-bateria__relleno { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--green-600); transform: scaleX(0); transform-origin: left center; transition: transform 400ms var(--ease-out), background-color 200ms; }
+.rb-bateria[data-nivel="baja"] .rb-bateria__relleno { background: var(--orange-500); }
+.rb-bateria[data-nivel="critica"] .rb-bateria__relleno { background: var(--rose-700); }
+.rb-bateria[data-nivel="sin"] .rb-bateria__barra { opacity: 0.5; }
+.rb-bateria__tiempo { font-size: var(--fs-md); color: var(--ink-2); font-weight: 600; }
+.rb-bateria__aviso { padding: 3px 10px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 700; background: var(--orange-100); color: var(--orange-800); }
+.rb-bateria[data-nivel="critica"] .rb-bateria__aviso { background: var(--rose-100); color: var(--rose-700); }
+@media (max-width: 560px) { .panel__head .rb-bateria { margin-left: 0; flex-basis: 100%; order: 3; } }
+
+.rb-ajustes { width: 100%; max-width: 720px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
+.rb-ajustes summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.rb-ajustes[open] > .stack { padding-bottom: 12px; }
+
+/* Barra fija del apartado Robot: parar y reproducir lo de la sección que se está viendo */
+.rb-barra {
+    position: sticky; bottom: 12px; z-index: 25; margin-top: 18px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 14px;
+    background: var(--surface); box-shadow: 0 8px 24px -14px rgb(0 0 0 / 0.45);
+}
+.rb-barra .btn { min-height: 48px; }
+.rb-barra__que { font-size: var(--fs-sm); color: var(--ink-2); }
+.rb-barra__que b { color: var(--ink); }
+
+/* El estado de la cabecera lleva a Instalar, donde está la conexión */
+.rb-badge-conectar { cursor: pointer; }
+.rb-badge-conectar:hover { background: var(--green-100); }
+.rb-badge-conectar:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; }
+
+/* Avance y mensajes dentro de la barra fija */
+.rb-barra .rb-prog { flex: 1 1 160px; min-width: 120px; width: auto; }
+.rb-barra .msg { flex: 1 1 100%; margin: 0; }
+.rb-barra .msg:empty { display: none; }
+
+/* Teclado de notas del robot */
+/* Teclas pegadas: una sola línea entre ellas, el marco redondea el conjunto y las negras van
+   centradas justo en la unión de dos blancas. */
+.rb-piano { position: relative; display: flex; height: clamp(170px, 22vw, 240px); border: 1px solid var(--line-strong); border-radius: 0 0 10px 10px; overflow: hidden; background: #fff; user-select: none; touch-action: none; }
+.rb-tecla { flex: 1 1 0; min-width: 0; margin: 0; padding: 0 0 8px; border: 0; border-radius: 0; background: #fff; color: var(--ink-2); display: flex; align-items: flex-end; justify-content: center; font-size: var(--fs-cap); font-weight: 700; cursor: pointer; }
+.rb-tecla + .rb-tecla { box-shadow: inset 1px 0 0 var(--line-strong); }
+.rb-tecla:hover { background: var(--green-50); }
+.rb-piano .rb-tecla--negra { position: absolute; top: 0; z-index: 1; flex: none; width: 4%; height: 60%; translate: -50% 0; background: #1d2b24; border-radius: 0 0 4px 4px; box-shadow: none; color: #fff; }
+.rb-tecla--negra:hover { background: #2f4a3c; }
+.rb-tecla.is-down, .rb-tecla.is-down:hover { background: var(--green-700); color: #fff; }
+.rb-tecla:focus-visible { outline: 3px solid var(--green-700); outline-offset: -4px; z-index: 2; }
+.rb-oct { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
+
+/* Robot: la conexión siempre arriba, y cada sección en tarjetas */
+.rb-conexion .panel__body { display: flex; flex-direction: column; gap: 12px; }
+.rb-panel > .panel__body {
+    display: grid; gap: 20px; align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1000px) {
+    .rb-panel > .panel__body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.rb-card {
+    display: flex; flex-direction: column; gap: 14px; min-width: 0;
+    padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.rb-card--ancho { grid-column: 1 / -1; }
+.rb-card > .panel__sub { font-size: var(--fs-md); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.rb-card .rb-leds { margin-top: 2px; }
+.rb-apartado > .rb-conexion { margin-bottom: 18px; }

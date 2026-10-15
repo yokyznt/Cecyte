@@ -1,0 +1,71 @@
+/* CECyTE Plantel 18 — Sistema visual
+   Cuaderno escolar: blanco limpio sobre cuadrícula menta, verde institucional
+   como color de acción y estado, negro para lo formal (marca, cifras, timbre, pie).
+   Sin dependencias: todo el diseño vive aquí. */
+
+/* ==================== Tokens ==================== */
+:root {
+    color-scheme: light;
+
+    /* Verde institucional */
+    --green-950: oklch(0.26 0.06 158);
+    --green-900: oklch(0.33 0.08 156);
+    --green-800: oklch(0.40 0.10 154);
+    --green-700: oklch(0.47 0.12 153);
+    --green-600: oklch(0.56 0.14 151);
+    --green-400: oklch(0.74 0.14 150);
+    --green-300: oklch(0.83 0.10 150);
+    --green-200: oklch(0.905 0.06 150);
+    --green-100: oklch(0.945 0.04 150);
+    --green-50:  oklch(0.975 0.02 150);
+
+    /* Negro (con un toque de verde para que no sea gris muerto) */
+    --black:   oklch(0.19 0.012 160);
+    --black-2: oklch(0.27 0.014 160);
+
+    --rose-700: oklch(0.47 0.18 22);
+    --rose-100: oklch(0.955 0.03 20);
+
+    /* Blancos y neutros */
+    --paper:   oklch(0.988 0.006 150);
+    --surface: oklch(1 0 0);
+    --page:    oklch(0.94 0.026 152);   /* fondo de la página: verde grisáceo para que las tarjetas blancas resalten */
+    --mint:    oklch(0.905 0.05 152);
+    --line:    oklch(0.915 0.014 150);
+    --line-strong: oklch(0.84 0.02 150);
+    --ink:     var(--black);
+    --ink-2:   oklch(0.42 0.02 160);
+    --ink-3:   oklch(0.52 0.018 160);
+    --grid:    oklch(0.5 0.12 152 / 0.09);
+
+    --font-ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+
+    /* Escala fija (razón ~1.2) */
+    --fs-cap: 0.75rem;
+    --fs-sm: 0.875rem;
+    --fs-md: 1rem;
+    --fs-lg: 1.1875rem;
+    --fs-xl: 1.4375rem;
+    --fs-2xl: 1.75rem;
+    --fs-3xl: 2.25rem;
+
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 26px;
+
+    --shadow-1: 0 1px 2px oklch(0.3 0.05 155 / 0.06), 0 4px 10px -6px oklch(0.3 0.05 155 / 0.14);
+    --shadow-2: 0 1px 2px oklch(0.3 0.05 155 / 0.07), 0 12px 18px -12px oklch(0.3 0.06 155 / 0.24);
+    --shadow-pop: 0 2px 4px oklch(0.2 0.04 160 / 0.10), 0 18px 40px -14px oklch(0.2 0.04 160 / 0.35);
+
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Acentos naranja (el del logo): lo que sigue y la acción a propósito */
+:root {
+    --orange-100: oklch(0.955 0.045 70);
+    --orange-500: oklch(0.69 0.17 48);
+    --orange-700: oklch(0.52 0.15 45);
+    --orange-800: oklch(0.45 0.14 45);
+}

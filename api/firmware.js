@@ -12,7 +12,8 @@
 
 import crypto from 'crypto';
 import { kv } from '@vercel/kv';
-import { verifyToken, parseCookies } from '../lib/auth.js';
+import { verifyToken, adminToken } from '../lib/auth.js';
+import { cors } from '../lib/cors.js';
 
 const FW_META_KEY = 'cecyte_fw_meta';
 const MAX_CHUNKS = 12;
@@ -22,7 +23,7 @@ const MAX_BYTES = 1_310_720;        // tamaño de la partición OTA del ESP32 (e
 const chunkKey = (id, i) => `cecyte_fw_chunk_${id}_${i}`;
 
 function isAdmin(req) {
-    return verifyToken(parseCookies(req).admin_token);
+    return verifyToken(adminToken(req));
 }
 
 async function readFirmware(meta) {
@@ -33,6 +34,7 @@ async function readFirmware(meta) {
 }
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     try {
         if (req.method === 'GET') {
             const isDevice = !!process.env.BELL_DEVICE_KEY && req.query.key === process.env.BELL_DEVICE_KEY;

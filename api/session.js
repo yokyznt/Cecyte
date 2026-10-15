@@ -1,9 +1,11 @@
 // GET /api/session — le dice al front si este dispositivo ya tiene sesion de admin activa.
+// Acepta la cookie (web) o el token Bearer (APK).
 
-import { verifyToken, parseCookies } from '../lib/auth.js';
+import { verifyToken, adminToken } from '../lib/auth.js';
+import { cors } from '../lib/cors.js';
 
 export default function handler(req, res) {
-    const cookies = parseCookies(req);
-    const loggedIn = verifyToken(cookies.admin_token);
+    if (cors(req, res)) return;
+    const loggedIn = verifyToken(adminToken(req));
     return res.status(200).json({ loggedIn });
 }
