@@ -328,6 +328,7 @@ for (const c of R.CANCIONES) {
     assert(/botonFlanco\(\) && botonSostenido\(\)/.test(ino), 'el botón exige una pulsación sostenida');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
+    assert(new RegExp(`VEL_TURBO = ${R.VEL_TURBO};`).test(ino), 'VEL_TURBO distinto entre página y firmware');
     assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
 }
 
@@ -642,3 +643,13 @@ for (const c of R.CANCIONES) {
 }
 
 console.log('robot.test.js: todo bien');
+
+// 32) Turbo: con tope VEL_TURBO la palanca al frente pide más que con el tope normal, nunca más que VEL_TURBO
+{
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100).izq, R.VEL_MAX);
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100, R.VEL_TURBO).izq, R.VEL_TURBO);
+    assert(R.VEL_TURBO > R.VEL_MAX && R.VEL_TURBO <= 255);
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100, 9999).izq, R.VEL_TURBO);
+    const g = R.mezclaJoystick(1, 0, 100, R.VEL_TURBO);
+    assert(g.izq === R.VEL_TURBO && g.der === -R.VEL_TURBO);
+}

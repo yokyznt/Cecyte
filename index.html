@@ -54,11 +54,8 @@
         <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
         <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
         <symbol id="i-flecha" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
-        <symbol id="i-curva" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></symbol>
         <symbol id="i-altavoz" viewBox="0 0 24 24"><path d="M11 4.7 6.5 9H3v6h3.5l4.5 4.3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
         <symbol id="i-foco" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
-        <symbol id="i-mano" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
-        <symbol id="i-esquivar" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3"/><path d="m15 9 6-6"/></symbol>
         <symbol id="i-mando" viewBox="0 0 24 24"><path d="M6 11h4"/><path d="M8 9v4"/><path d="M15 12h.01"/><path d="M18 10h.01"/><path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59C2.6 9.42 2 14.46 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.41-1.41A2 2 0 0 1 9.83 16h4.34a2 2 0 0 1 1.41.59L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.55-.6-6.58-.69-7.26A4 4 0 0 0 17.32 5z"/></symbol>
         <symbol id="i-celular" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
         <symbol id="i-centrar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/></symbol>
@@ -69,6 +66,7 @@
         <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
         <symbol id="i-luna" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
         <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
+        <symbol id="i-rayo" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
         <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
     </svg>
 
@@ -704,32 +702,21 @@
                                     <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                                     <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
                                     <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
-                                    <div class="rb-modos" role="group" aria-label="Modo">
-                                        <button type="button" class="rb-btn rb-btn--chico" data-modo="manual" aria-pressed="true" aria-label="Manual" title="Manual"><svg class="icon" aria-hidden="true"><use href="#i-mando"/></svg></button>
-                                        <button type="button" class="rb-btn rb-btn--chico" data-modo="1" aria-pressed="false" aria-label="Esquivar obstáculos" title="Esquivar obstáculos"><svg class="icon" aria-hidden="true"><use href="#i-esquivar"/></svg></button>
-                                        <button type="button" class="rb-btn rb-btn--chico" data-modo="2" aria-pressed="false" aria-label="Seguir mi mano" title="Seguir mi mano"><svg class="icon" aria-hidden="true"><use href="#i-mano"/></svg></button>
-                                    </div>
+                                    <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
                                 </header>
 
                                 <div class="rb-mando__cuerpo">
-                                    <div class="rb-cruz" id="rb-cruz" role="group" aria-label="Dirección">
-                                        <button type="button" class="rb-btn rb-cruz__c rb-cruz__nw" data-dir="-0.5,1" aria-label="Adelante a la izquierda"><svg class="icon" aria-hidden="true" style="scale:-1 1"><use href="#i-curva"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__n" data-dir="0,1" aria-label="Adelante"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__c rb-cruz__ne" data-dir="0.5,1" aria-label="Adelante a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-curva"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__w" data-dir="-1,0" aria-label="Girar a la izquierda"><svg class="icon" aria-hidden="true" style="rotate:-90deg"><use href="#i-flecha"/></svg></button>
-                                        <span class="rb-cruz__centro" aria-hidden="true"></span>
-                                        <button type="button" class="rb-btn rb-cruz__e" data-dir="1,0" aria-label="Girar a la derecha"><svg class="icon" aria-hidden="true" style="rotate:90deg"><use href="#i-flecha"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__c rb-cruz__sw" data-dir="-0.5,-1" aria-label="Atrás a la izquierda"><svg class="icon" aria-hidden="true" style="scale:-1 -1"><use href="#i-curva"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__s" data-dir="0,-1" aria-label="Atrás"><svg class="icon" aria-hidden="true" style="rotate:180deg"><use href="#i-flecha"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cruz__c rb-cruz__se" data-dir="0.5,-1" aria-label="Atrás a la derecha"><svg class="icon" aria-hidden="true" style="scale:1 -1"><use href="#i-curva"/></svg></button>
+                                    <div class="rb-joy" id="rb-joy" role="application" aria-label="Palanca: arrastra para mover el robot">
+                                        <span class="rb-joy__aro" aria-hidden="true"></span>
+                                        <span class="rb-joy__mando" id="rb-joy-mando" aria-hidden="true"></span>
                                     </div>
 
                                     <div class="rb-incl" id="rb-incl-panel">
-                                        <button type="button" id="rb-incl-mant" class="rb-incl__aro" aria-label="Mantén pulsado para manejar"><svg class="icon" aria-hidden="true"><use href="#i-celular"/></svg></button>
+                                        <div class="rb-nivel" aria-hidden="true"><span class="rb-nivel__punto" id="rb-nivel-punto"></span></div>
                                         <div class="rb-incl__ajustes">
-                                            <button type="button" id="rb-incl-cal" class="rb-btn rb-btn--chico" aria-label="Calibrar" title="Calibrar"><svg class="icon" aria-hidden="true"><use href="#i-centrar"/></svg></button>
-                                            <button type="button" id="rb-incl-inv-g" class="rb-btn rb-btn--chico" aria-pressed="false" aria-label="Invertir giro" title="Invertir giro"><svg class="icon" aria-hidden="true"><use href="#i-invertir"/></svg></button>
-                                            <button type="button" id="rb-incl-inv-a" class="rb-btn rb-btn--chico" aria-pressed="false" aria-label="Invertir avance" title="Invertir avance"><svg class="icon" aria-hidden="true" style="rotate:90deg"><use href="#i-invertir"/></svg></button>
+                                            <button type="button" id="rb-incl-cal" class="rb-btn rb-btn--chico" aria-label="Centrar: tomar esta posición como el cero" title="Centrar"><svg class="icon" aria-hidden="true"><use href="#i-centrar"/></svg></button>
+                                            <button type="button" id="rb-incl-inv-a" class="rb-btn rb-btn--chico" aria-pressed="false" aria-label="Invertir adelante y atrás" title="Invertir adelante y atrás"><svg class="icon" aria-hidden="true" style="rotate:90deg"><use href="#i-invertir"/></svg></button>
+                                            <button type="button" id="rb-incl-inv-g" class="rb-btn rb-btn--chico" aria-pressed="false" aria-label="Invertir izquierda y derecha" title="Invertir izquierda y derecha"><svg class="icon" aria-hidden="true"><use href="#i-invertir"/></svg></button>
                                         </div>
                                         <span id="rb-incl-estado" class="rb-incl__txt"></span>
                                     </div>
@@ -744,27 +731,31 @@
                                     </div>
 
                                     <div class="rb-caras">
-                                        <button type="button" class="rb-btn rb-cara rb-cara--claxon" data-nota="440,450" aria-label="Claxon"><svg class="icon" aria-hidden="true"><use href="#i-altavoz"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cara rb-cara--musica" data-abre="rb-bandeja-notas" aria-label="Notas" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg></button>
-                                        <button type="button" class="rb-btn rb-cara rb-cara--luces" data-abre="rb-bandeja-luces" aria-label="Luces" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-foco"/></svg></button>
+                                        <button type="button" id="rb-claxon" class="rb-btn rb-cara rb-cara--claxon" aria-label="Claxon: mantenlo pulsado para que siga sonando"><svg class="icon" aria-hidden="true"><use href="#i-altavoz"/></svg></button>
+                                        <button type="button" class="rb-btn rb-cara rb-cara--musica" data-abre="rb-menu-musica" aria-label="Canciones" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg></button>
+                                        <button type="button" class="rb-btn rb-cara rb-cara--luces" data-abre="rb-menu-luces" aria-label="Luces" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-foco"/></svg></button>
                                         <button type="button" id="rb-incl-on" class="rb-btn rb-cara rb-cara--incl" aria-pressed="false" aria-label="Manejar inclinando el celular"><svg class="icon" aria-hidden="true" style="rotate:-25deg"><use href="#i-celular"/></svg></button>
                                     </div>
                                 </div>
 
-                                <div class="rb-bandeja" id="rb-bandeja-notas" hidden>
-                                <button type="button" class="rb-nota" data-nota="523,160" style="--n:0" aria-label="Do" title="Do"></button>
-                                <button type="button" class="rb-nota" data-nota="659,160" style="--n:1" aria-label="Mi" title="Mi"></button>
-                                <button type="button" class="rb-nota" data-nota="784,160" style="--n:2" aria-label="Sol" title="Sol"></button>
-                                <button type="button" class="rb-nota" data-nota="1047,200" style="--n:3" aria-label="Do" title="Do"></button>
+                                <div class="rb-menu" id="rb-menu-musica" role="dialog" aria-label="Canciones" hidden>
+                                    <div class="rb-menu__lista" id="rb-canciones"></div>
                                 </div>
-                                <div class="rb-bandeja" id="rb-bandeja-luces" hidden>
-                                <button type="button" class="rb-sw rb-sw--arco" data-luz="arcoiris" aria-label="Arcoíris" title="Arcoíris"></button>
-                                <button type="button" class="rb-sw rb-sw--pulso" data-luz="respirar" aria-label="Respirar" title="Respirar"></button>
-                                <button type="button" class="rb-sw rb-sw--puntos" data-luz="persecucion" aria-label="Persecución" title="Persecución"></button>
-                                <button type="button" class="rb-sw " data-luz="fijo" data-color="#ff2a2a" aria-label="Rojo" title="Rojo" style="--c:#ff2a2a"></button>
-                                <button type="button" class="rb-sw " data-luz="fijo" data-color="#22d05a" aria-label="Verde" title="Verde" style="--c:#22d05a"></button>
-                                <button type="button" class="rb-sw " data-luz="fijo" data-color="#2f6bff" aria-label="Azul" title="Azul" style="--c:#2f6bff"></button>
-                                <button type="button" class="rb-sw rb-sw--apagar" data-luz="fijo" data-color="#000000" aria-label="Apagar" title="Apagar"></button>
+                                <div class="rb-menu rb-menu--luces" id="rb-menu-luces" role="dialog" aria-label="Luces" hidden>
+                                    <div class="rb-menu__rejilla">
+                                    <button type="button" class="rb-sw rb-sw--arco" data-luz="arcoiris" aria-label="Arcoíris" title="Arcoíris"></button>
+                                    <button type="button" class="rb-sw rb-sw--pulso" data-luz="respirar" aria-label="Respirar" title="Respirar"></button>
+                                    <button type="button" class="rb-sw rb-sw--puntos" data-luz="persecucion" aria-label="Persecución" title="Persecución"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#ff2a2a" aria-label="Rojo" title="Rojo" style="--c:#ff2a2a"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#ff9d00" aria-label="Naranja" title="Naranja" style="--c:#ff9d00"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#ffe600" aria-label="Amarillo" title="Amarillo" style="--c:#ffe600"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#22d05a" aria-label="Verde" title="Verde" style="--c:#22d05a"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#19c9ff" aria-label="Celeste" title="Celeste" style="--c:#19c9ff"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#2f6bff" aria-label="Azul" title="Azul" style="--c:#2f6bff"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#b04dff" aria-label="Morado" title="Morado" style="--c:#b04dff"></button>
+                                    <button type="button" class="rb-sw " data-luz="fijo" data-color="#ffffff" aria-label="Blanco" title="Blanco" style="--c:#ffffff"></button>
+                                    <button type="button" class="rb-sw rb-sw--apagar" data-luz="fijo" data-color="#000000" aria-label="Apagar" title="Apagar"></button>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -812,9 +803,19 @@
                                     </div>
                                 </div>
                                 <div class="rb-card">
-                                    <h4 class="panel__sub">Melodía o ritmo de un audio o un MIDI</h4>
+                                    <h4 class="panel__sub">Agregar canciones</h4>
                                     <div class="stack">
-                                            <p class="hint">Sube una canción (MP3, WAV, OGG) o un archivo MIDI. Puede sacar <b>la melodía</b> (la voz si la canción la tiene, o el instrumento principal si es solo instrumental) o solo <b>el ritmo</b>. El archivo no sale de tu navegador. Después puedes editarlo, escucharlo y guardarlo con un nombre.</p>
+                                        <label class="rb-soltar" for="rb-audio">
+                                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+                                            <span>Elegir audio o MIDI</span>
+                                        </label>
+                                        <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" multiple class="sr-only">
+                                        <progress id="rb-aud-prog" class="rb-aud-prog" max="1" value="0" hidden></progress>
+                                        <ul id="rb-aud-lista" class="rb-aud-lista" aria-live="polite"></ul>
+                                        <p id="rb-aud-info" class="msg" role="status"></p>
+                                        <details class="rb-avanzado">
+                                            <summary>Ajustes manuales</summary>
+                                            <div class="stack">
                                             <div class="grid-2">
                                                 <div class="field"><label class="field__label" for="rb-aud-que">Qué sacar</label>
                                                     <select id="rb-aud-que" class="select">
@@ -832,15 +833,11 @@
                                                 <label class="rb-check"><input type="checkbox" id="rb-aud-tonal" checked><span>Ajustar las notas a la tonalidad</span></label>
                                                 <label class="rb-check"><input type="checkbox" id="rb-aud-subir" checked><span>Subir al registro donde suena bien el zumbador</span></label>
                                             </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-audio">Archivo</label>
-                                                <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" class="input">
-                                            </div>
                                             <div class="grid-2">
                                                 <div class="field"><label class="field__label" for="rb-aud-ini">Empezar en (segundos)</label>
                                                     <input type="number" id="rb-aud-ini" class="input" min="0" step="0.5" value="0"></div>
                                                 <div class="field"><label class="field__label" for="rb-aud-dur">Duración (máximo 60 s)</label>
-                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="20"></div>
+                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="30"></div>
                                             </div>
                                             <div class="grid-2">
                                                 <div class="field"><label class="field__label" for="rb-aud-modo">Cómo convertir el ritmo</label>
@@ -862,8 +859,9 @@
                                             <div class="btn-row">
                                                 <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir</button>
                                             </div>
-                                            <p id="rb-aud-info" class="msg" role="status"></p>
-                                        </div>
+                                            </div>
+                                        </details>
+                                    </div>
                                 </div>
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>

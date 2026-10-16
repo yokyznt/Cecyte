@@ -13,7 +13,7 @@
     PING             -> PONG mbot-web 1
     T hz ms          suena una nota (hz 40..8000, ms 1..5000)
     W ms             espera sin sonar (0..5000)
-    M izq der        motores -180..180 (positivo = adelante); toma el control (modo 4)
+    M izq der        motores -235..235 (positivo = adelante; arriba de 180 solo para el turbo); toma el control (modo 4)
     S                para los motores
     L i r g b        un LED (i = 1..12) o todos (i = 0)
     LS <72 hex>      los 12 LEDs de golpe: RRGGBB x 12
@@ -144,7 +144,8 @@ void motorPwm(uint8_t m, int pwm) {
 
 const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar
 int velFn = VEL;                     // velocidad de esquivar y seguir la mano (orden SPD; se guarda con la función)
-const int VEL_MAX = 180;             // tope de lo que puede pedir la página
+const int VEL_MAX = 180;             // tope de lo que puede pedir la página (programas guardados, baile y funciones)
+const int VEL_TURBO = 235;           // tope de la orden M (modo turbo del mando); la rampa de motores() evita el tirón de corriente
 const int DIST_OBSTACULO = 18;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
 const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
@@ -773,7 +774,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "M") && a && b) {
     if (modo != MODO_WEB) { modo = MODO_WEB; aplicaModo(); }
-    motores(constrain(atoi(a), -VEL_MAX, VEL_MAX), constrain(atoi(b), -VEL_MAX, VEL_MAX));
+    motores(constrain(atoi(a), -VEL_TURBO, VEL_TURBO), constrain(atoi(b), -VEL_TURBO, VEL_TURBO));
     ok();
   } else if (!strcmp(cmd, "S")) {
     parar();
