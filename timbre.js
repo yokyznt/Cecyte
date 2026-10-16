@@ -268,8 +268,17 @@ const RITMOS_BASE = [
     ['Fin de clase', [150, 100, 150, 100, 150, 300, 600]]
 ];
 
+// ¿El timbre (ESP32) debería estar reportándose y lleva demasiado sin hacerlo? Solo cuenta en horario escolar
+// (lunes a viernes, 07:00 a 15:00 hora local). lastSeen y ahora son milisegundos; lastSeen vacío = nunca se ha visto.
+function esp32SinSenal(lastSeen, ahora, minutos = 15) {
+    const d = new Date(ahora);
+    const dia = d.getDay(), min = d.getHours() * 60 + d.getMinutes();
+    if (dia < 1 || dia > 5 || min < 7 * 60 || min >= 15 * 60) return false;
+    return !lastSeen || ahora - lastSeen > minutos * 60000;
+}
+
 if (typeof module !== 'undefined') {
-    module.exports = { arrastrarSeleccion, resumenDeAudio, normalizarRitmo, intervalosARitmo, golpesAIntervalos, detectarGolpes, detectarSostenido, audioARitmo, parseMidi, midiARitmo, toquesARitmo, ritmoDeTexto, ritmoACodigo };
+    module.exports = { esp32SinSenal, arrastrarSeleccion, resumenDeAudio, normalizarRitmo, intervalosARitmo, golpesAIntervalos, detectarGolpes, detectarSostenido, audioARitmo, parseMidi, midiARitmo, toquesARitmo, ritmoDeTexto, ritmoACodigo };
 }
 
 // ---------- Interfaz ----------

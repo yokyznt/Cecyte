@@ -387,6 +387,7 @@ async function addGroup(e) {
 async function deleteGroup(name) {
     if (!confirm(`¿Seguro que quieres eliminar el grupo "${name}"? También se van a borrar todas sus materias del horario.`)) return;
 
+    const materias = scheduleDatabase.filter(i => i.group === name);   // para poder deshacer
     try {
         const res = await API.fetch('/api/groups', {
             method: 'DELETE',
@@ -407,7 +408,37 @@ async function deleteGroup(name) {
         renderGroupsList();
         renderAdminTable();
         renderStudentSchedule();
-        showNotificationToast('Grupo Eliminado', `Se eliminó el grupo ${name} y sus materias.`, 'warning');
+        showNotificationToast('Grupo Eliminado', `Se eliminó el grupo ${name} y sus materias.`, 'warning',
+            { accion: { texto: 'Deshacer', alHacer: () => restaurarGrupo(name, materias) } });
+    } catch (err) {
+        showNotificationToast('Error', 'No se pudo conectar con el servidor.', 'warning');
+    }
+}
+
+// Vuelve a crear un grupo borrado y le devuelve sus materias (el grupo queda al final de la lista)
+async function restaurarGrupo(name, materias) {
+    try {
+        const res = await API.fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showNotificationToast('No se pudo deshacer', data.error || 'Intenta de nuevo.', 'warning');
+            return;
+        }
+        groupsList = data.groups;
+        const ids = new Set(scheduleDatabase.map(i => i.id));
+        scheduleDatabase = scheduleDatabase.concat(materias.filter(m => !ids.has(m.id)));
+        const guardado = await saveScheduleToServer();
+        populateGroupSelectors();
+        renderGroupsList();
+        renderAdminTable();
+        renderStudentSchedule();
+        if (guardado) showNotificationToast('Grupo restaurado', `${name} volvió con sus materias.`, 'success');
+        else showNotificationToast('Grupo restaurado a medias', `${name} volvió, pero sus materias no se pudieron guardar. Impórtalas de nuevo.`, 'warning');
     } catch (err) {
         showNotificationToast('Error', 'No se pudo conectar con el servidor.', 'warning');
     }
@@ -720,10 +751,13 @@ async function saveScheduleItem(e) {
     renderStudentSchedule();
 }
 
+// Borra una materia sin preguntar: el aviso trae «Deshacer» unos segundos
 async function deleteScheduleItem(id) {
-    if (!confirm('¿Estás seguro de eliminar este registro del horario?')) return;
+    const borrada = scheduleDatabase.find(i => i.id === id);
+    if (!borrada) return;
 
     const previousState = scheduleDatabase;
+    const lugar = previousState.indexOf(borrada);
     scheduleDatabase = scheduleDatabase.filter(i => i.id !== id);
 
     const saved = await saveScheduleToServer();
@@ -736,7 +770,25 @@ async function deleteScheduleItem(id) {
 
     renderAdminTable();
     renderStudentSchedule();
-    showNotificationToast('Registro Eliminado', 'Se actualizó el horario para todos.', 'warning');
+    showNotificationToast('Registro Eliminado', `${borrada.subject} (${borrada.group}). Se actualizó el horario para todos.`, 'warning',
+        { accion: { texto: 'Deshacer', alHacer: () => restaurarRegistro(borrada, lugar) } });
+}
+
+// Vuelve a poner una materia borrada en su lugar (solo ella: no pisa lo que otro admin haya cambiado mientras tanto)
+async function restaurarRegistro(registro, lugar) {
+    if (scheduleDatabase.some(i => i.id === registro.id)) return;
+    const antes = scheduleDatabase;
+    scheduleDatabase = antes.slice();
+    scheduleDatabase.splice(Math.min(lugar, antes.length), 0, registro);
+    const guardado = await saveScheduleToServer();
+    if (!guardado) {
+        scheduleDatabase = antes;
+        showNotificationToast('No se pudo deshacer', 'Intenta agregar la materia de nuevo.', 'warning');
+    } else {
+        showNotificationToast('Registro restaurado', `${registro.subject} (${registro.group}) volvió al horario.`, 'success');
+    }
+    renderAdminTable();
+    renderStudentSchedule();
 }
 
 // ==================== Motor de Notificaciones Automaticas ====================
@@ -977,7 +1029,8 @@ function renderAlertLog() {
     `).join('');
 }
 
-function showNotificationToast(title, message, type = 'info') {
+// opciones.accion = { texto, alHacer }: agrega un botón al aviso (p. ej. «Deshacer») y lo deja visible 8 s en vez de 5
+function showNotificationToast(title, message, type = 'info', opciones = {}) {
     const container = document.getElementById('notification-container');
     const toast = document.createElement('div');
     const iconByType = { success: 'check', info: 'bell', warning: 'alert' };
@@ -996,11 +1049,21 @@ function showNotificationToast(title, message, type = 'info') {
 
     container.appendChild(toast);
 
-    // Se cierra solo a los 5 segundos
-    setTimeout(() => {
+    const cerrar = () => {
         toast.classList.add('is-leaving');
         setTimeout(() => toast.remove(), 300);
-    }, 5000);
+    };
+    const accion = opciones.accion;
+    if (accion) {
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'toast__accion';
+        boton.textContent = accion.texto;
+        boton.addEventListener('click', () => { boton.disabled = true; cerrar(); accion.alHacer(); });
+        toast.querySelector('.toast__body').appendChild(boton);
+    }
+    // Se cierra solo a los 5 segundos (8 si trae botón)
+    setTimeout(cerrar, accion ? 8000 : 5000);
 }
 
 // ==================== Importar Horario por codigo (JSON) ====================
@@ -1161,6 +1224,18 @@ function renderBellStatus() {
     } else {
         box.className = 'badge badge--off';
         text.innerText = ageSec === null ? 'ESP32 sin conexión (nunca visto)' : 'ESP32 sin conexión';
+    }
+
+    // Banner rojo en todo el panel: en horario escolar, el timbre lleva más de 15 min sin reportarse
+    const alerta = document.getElementById('esp-alerta');
+    if (alerta) {
+        const sinSenal = esp32SinSenal(bellConfig.lastSeen, bellConfig.serverNow || Date.now());
+        alerta.hidden = !sinSenal;
+        if (sinSenal) {
+            alerta.textContent = ageSec === null
+                ? 'El timbre (ESP32) no se ha conectado: no sonará a sus horas. Revisa que esté encendido y con WiFi.'
+                : `El timbre (ESP32) lleva ${Math.round(ageSec / 60)} min sin reportarse: puede no sonar a sus horas. Revisa que esté encendido y con WiFi.`;
+        }
     }
 }
 
