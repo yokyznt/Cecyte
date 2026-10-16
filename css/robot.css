@@ -157,7 +157,7 @@
 .rb-abrir__btn:active { translate: 0 6px; box-shadow: 0 2px 0 var(--m-base, #000); }
 .rb-abrir__btn .icon { width: 64px; height: 64px; stroke-width: 1.6; }
 .rb-abrir__btn:focus-visible { outline: 3px solid var(--green-600); outline-offset: 4px; }
-.rb-mando { display: none; }
+.rb-mando { display: none; background: var(--m-fondo); color: var(--m-texto); }
 
 /* ---- Abierto ---- */
 .rb-pantalla-completa { overflow: hidden; }
@@ -198,7 +198,7 @@
 .rb-modos { display: flex; gap: 8px; margin-left: auto; }
 .rb-estado { display: grid; place-items: center; width: 24px; height: 44px; }
 .rb-estado__punto { width: 12px; height: 12px; border-radius: 50%; background: oklch(0.5 0.02 160); transition: background 0.2s, box-shadow 0.2s; }
-.is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25), 0 0 14px var(--m-verde); }
+.is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25); }
 .is-conectando .rb-estado__punto { background: var(--m-ambar); animation: rb-latido 0.9s ease-in-out infinite; }
 .is-sinprograma .rb-estado__punto { background: var(--m-rojo); }
 .is-listo #rb-ctl-bt, .is-conectando #rb-ctl-bt { display: none; }
