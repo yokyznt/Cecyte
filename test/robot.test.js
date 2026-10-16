@@ -612,6 +612,14 @@ for (const c of R.CANCIONES) {
     const m = J(0.3, 0.6, 20);
     assert(Math.abs(m.izq) <= 36 && Math.abs(m.der) <= 36, 'vmax 20 % = 36');
     assert.deepStrictEqual(J(NaN, undefined, 60), { izq: 0, der: 0 }, 'valores raros no mueven');
+    // hacia atrás es un volante: el robot retrocede hacia donde empujas, así que la rueda de ese lado es la que va más lenta
+    const a = J(0.5, -0.9, 100);
+    assert(a.izq < a.der && a.der < 0, 'atrás-derecha: la izquierda retrocede más (la parte de atrás se va a la derecha)');
+    const b = J(-0.5, -0.9, 100);
+    assert(b.der < b.izq && b.izq < 0, 'atrás-izquierda: al revés');
+    const d = J(0.5, 0.9, 100);
+    assert(d.izq > d.der && d.der > 0, 'adelante-derecha: la izquierda avanza más (curva a la derecha)');
+    assert.deepStrictEqual(J(1, -0.1, 100).izq > 0, true, 'casi en el sitio, a la derecha: sigue girando a la derecha');
 }
 
 // 31) Cola «último gana» (control en vivo): una sola M en camino y la más reciente reemplaza a la pendiente

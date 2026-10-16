@@ -233,8 +233,10 @@ void rampa() {
 void sacaMotores() {                       // lleva izqAct/derAct a los motores, con la corrección de rumbo
   int li = izqAct, ld = derAct;
   if (trim > 0) ld = ld * (100 - trim) / 100; else li = li * (100 + trim) / 100;
-  motorPwm(0, -li);
-  motorPwm(1, ld);
+  // El motor 0 es la rueda derecha (y va con signo invertido) y el motor 1 la izquierda: así «izq» y «der» son
+  // las ruedas de verdad (probado con el robot en el aire: antes M 120 0 movía la rueda derecha)
+  motorPwm(0, -ld);
+  motorPwm(1, li);
 }
 void motores(int izq, int der) {
   izqObj = izq;

@@ -160,7 +160,10 @@ function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
     const mag = Math.hypot(x, y);
     if (mag < ZONA) return { izq: 0, der: 0 };
     const k = Math.min(1, (mag - ZONA) / (1 - ZONA)) / mag;   // reescala fuera de la zona muerta y limita al círculo
-    const sx = x * k, sy = y * k;
+    // Hacia atrás la palanca es un volante: el robot retrocede hacia donde empujas (la x se invierte). Entre
+    // y = -0.15 y y = -0.35 pasa de una a otra, para que girar en el sitio no tenga un salto.
+    const volante = y >= -0.15 ? 1 : y <= -0.35 ? -1 : 1 - 2 * (-0.15 - y) / 0.2;
+    const sx = x * k * volante, sy = y * k;
     let izq = sy + sx, der = sy - sx;
     const m = Math.max(1, Math.abs(izq), Math.abs(der));
     izq /= m; der /= m;
