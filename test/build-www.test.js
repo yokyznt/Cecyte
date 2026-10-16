@@ -25,7 +25,7 @@ const nav = www('admin-secciones.js');
 assert(/horario:\s*\[/.test(nav) && /timbre:\s*\[/.test(nav));
 if (conRobot) {
     ['robot.js', 'css/robot.css', 'js/robot-bluetooth.js', 'js/robot-control.js'].forEach(f => assert(existe(f), f + ' va en el APK'));
-    assert(html.includes('id="sec-robot-control"') && html.includes('id="rb-joy"'), 'pestaña de control');
+    assert(html.includes('id="sec-robot-control"') && html.includes('id="rb-mando"'), 'pestaña de control');
     assert(html.includes('js/robot-bluetooth.js') && html.includes('js/robot-control.js'), 'scripts del robot');
     assert(/robot:\s*\['robot-control'/.test(nav), 'el apartado Robot empieza por Control');
     assert(!html.includes('@web:line'), 'sin marcas internas de la web');

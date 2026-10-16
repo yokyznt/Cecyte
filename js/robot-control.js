@@ -1,8 +1,9 @@
-// Control en tiempo real del robot desde el celular (o la compu): joystick táctil, inclinar el teléfono,
-// claxon, luces rápidas y modos automáticos. Va en la pestaña «Control» del apartado Robot.
+// Mando del robot en tiempo real (celular o compu): cruz de dirección, claxon, notas, luces, modos y,
+// opcionalmente, inclinar el teléfono. Va en la pestaña «Control» del apartado Robot y se abre a pantalla completa
+// (en el APK, forzando horizontal).
 //
-// Seguridad: arranca al 60 % de la velocidad; al soltar el joystick se manda «M 0 0»; al salir de la pestaña,
-// bloquear la pantalla, perder el enlace o pulsar PARO se frena; y el firmware frena solo si pasan 3 s sin órdenes.
+// Seguridad: arranca al 60 % de la velocidad; al soltar una tecla se manda «M 0 0»; al cerrar el mando, cambiar de
+// pestaña, bloquear la pantalla, perder el enlace o pulsar PARO se frena; y el firmware frena solo si pasan 3 s sin órdenes.
 // Depende de robot.js (Robot.mezclaJoystick y RobotEnlace).
 (function (raiz) {
     const MS_REVISION = 66;       // ~15 veces por segundo
@@ -10,35 +11,23 @@
     const $ = id => document.getElementById(id);
 
     const C = {
-        x: 0, y: 0,               // la palanca, de -1 a 1
+        x: 0, y: 0,               // dirección pedida, de -1 a 1
         vmax: 60,
         movido: false, ultimo: '', ultimoEnvio: 0,
         inclinar: false, mantiene: false, ref: null, g: { x: 0, y: 0, z: 0 },
-        activa: false, luz: null,
+        activa: false,
+        presionadas: new Map(),   // quién mantiene una dirección (puntero o tecla) -> [x, y]
     };
 
     const vibrar = patron => { try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) { /* sin vibración */ } };
     const enlace = () => raiz.RobotEnlace || null;
     const listo = () => !!(enlace() && enlace().listo());
+    const abierto = () => $('sec-robot-control').classList.contains('is-pantalla');
+    const apretado = id => $(id).getAttribute('aria-pressed') === 'true';
 
-    // ---------- Palanca ----------
+    // ---------- Envío ----------
 
-    function pintarPalanca() {
-        const joy = $('rb-joy'), mando = $('rb-joy-mando');
-        if (!joy || !mando) return;
-        const r = joy.getBoundingClientRect();
-        const alcance = Math.max(0, r.width / 2 - mando.offsetWidth / 2);
-        mando.style.transform = `translate(${(C.x * alcance).toFixed(1)}px, ${(-C.y * alcance).toFixed(1)}px)`;
-        const m = raiz.Robot.mezclaJoystick(C.x, C.y, C.vmax);
-        $('rb-joy-txt').textContent = `Izquierda ${m.izq} · Derecha ${m.der}`;
-    }
-
-    function fijar(x, y) {
-        C.x = x; C.y = y;
-        pintarPalanca();
-    }
-
-    // Lo que se manda al robot: la palanca, o la inclinación mientras se mantiene el botón
+    // Lo que se manda al robot: la cruz, o la inclinación mientras se mantiene el aro
     function fuente() {
         if (C.inclinar) return C.mantiene ? inclinacion() : { x: 0, y: 0 };
         return { x: C.x, y: C.y };
@@ -69,8 +58,10 @@
 
     // Frena ya, sin esperar al siguiente turno (al soltar, salir o perder el enlace)
     function frenar(conParo) {
-        fijar(0, 0);
+        C.presionadas.clear();
+        C.x = 0; C.y = 0;
         C.mantiene = false;
+        document.querySelectorAll('#rb-mando .is-down').forEach(b => b.classList.remove('is-down'));
         if (!listo()) return;
         if (conParo) enlace().paro();
         else if (C.movido) enlace().mover(0, 0);
@@ -78,36 +69,52 @@
         C.ultimo = '';
     }
 
-    function iniciarPalanca() {
-        const joy = $('rb-joy');
-        let id = null;
-        const llevar = e => {
-            const r = joy.getBoundingClientRect();
-            let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
-            let dy = -(e.clientY - (r.top + r.height / 2)) / (r.height / 2);
-            const m = Math.hypot(dx, dy);
-            if (m > 1) { dx /= m; dy /= m; }
-            fijar(dx, dy);
-        };
-        joy.addEventListener('pointerdown', e => {
-            if (id !== null) return;
-            id = e.pointerId;
-            try { joy.setPointerCapture(id); } catch (err) { /* sin captura */ }
-            joy.classList.add('is-activo');
-            llevar(e);
-            e.preventDefault();
+    // ---------- Cruz de dirección (toque o teclado) ----------
+
+    // Manda la última dirección que sigue apretada
+    function actualizarDireccion() {
+        const dirs = [...C.presionadas.values()];
+        const d = dirs.length ? dirs[dirs.length - 1] : [0, 0];
+        C.x = d[0]; C.y = d[1];
+    }
+
+    function mantener(quien, dir, boton) {
+        C.presionadas.set(quien, dir);
+        if (boton) boton.classList.add('is-down');
+        actualizarDireccion();
+    }
+
+    function soltar(quien, boton) {
+        C.presionadas.delete(quien);
+        if (boton) boton.classList.remove('is-down');
+        actualizarDireccion();
+    }
+
+    function iniciarCruz() {
+        document.querySelectorAll('[data-dir]').forEach(b => {
+            const dir = b.dataset.dir.split(',').map(Number);
+            b.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                try { b.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+                mantener(e.pointerId, dir, b);
+                vibrar(8);
+            });
+            const fin = e => soltar(e.pointerId, b);
+            for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, fin);
         });
-        joy.addEventListener('pointermove', e => { if (e.pointerId === id) llevar(e); });
-        const soltar = e => {
-            if (e.pointerId !== id) return;
-            id = null;
-            joy.classList.remove('is-activo');
-            frenar(false);
-        };
-        joy.addEventListener('pointerup', soltar);
-        joy.addEventListener('pointercancel', soltar);
-        joy.addEventListener('lostpointercapture', soltar);
-        window.addEventListener('resize', pintarPalanca);
+
+        // Teclado: flechas o WASD, solo con el mando abierto
+        const teclas = { ArrowUp: [0, 1], w: [0, 1], ArrowDown: [0, -1], s: [0, -1], ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0] };
+        document.addEventListener('keydown', e => {
+            if (!abierto() || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Escape') { cerrarMando(); return; }
+            if (e.key === ' ') { e.preventDefault(); frenar(true); return; }
+            const dir = teclas[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+            if (!dir) return;
+            e.preventDefault();
+            mantener('k' + e.key.toLowerCase(), dir, null);
+        });
+        document.addEventListener('keyup', e => soltar('k' + e.key.toLowerCase(), null));
     }
 
     // ---------- Inclinar el celular ----------
@@ -124,16 +131,21 @@
     function inclinacion() {
         if (!C.ref) return { x: 0, y: 0 };
         const g = gravedad();
-        const giro = ($('rb-incl-inv-g').checked ? -1 : 1) * (g.x - C.ref.x) / 0.5;
-        const avance = ($('rb-incl-inv-a').checked ? -1 : 1) * (g.z - C.ref.z) / 0.5;
+        const giro = (apretado('rb-incl-inv-g') ? -1 : 1) * (g.x - C.ref.x) / 0.5;
+        const avance = (apretado('rb-incl-inv-a') ? -1 : 1) * (g.z - C.ref.z) / 0.5;
         const k = v => Math.max(-1, Math.min(1, v));
         return { x: k(giro), y: k(avance) };
     }
 
     function calibrar() {
         C.ref = gravedad();
-        $('rb-incl-estado').textContent = 'Calibrado. Mantén pulsado «Mantén para manejar» e inclina.';
+        $('rb-incl-estado').textContent = '';
         vibrar(20);
+    }
+
+    function alternar(id) {
+        const b = $(id);
+        b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
     }
 
     function iniciarInclinar() {
@@ -143,34 +155,43 @@
             const t = 9.81, f = 0.25;                     // filtro pasa-bajos: quita temblores
             C.g = { x: C.g.x + ((a.x / t) - C.g.x) * f, y: C.g.y + ((a.y / t) - C.g.y) * f, z: C.g.z + ((a.z / t) - C.g.z) * f };
         });
-        $('rb-incl-on').addEventListener('change', e => {
-            C.inclinar = e.target.checked;
+        $('rb-incl-on').addEventListener('click', () => {
+            alternar('rb-incl-on');
+            C.inclinar = apretado('rb-incl-on');
             C.ref = null;
             frenar(false);
-            $('rb-incl-opciones').hidden = !C.inclinar;
-            $('rb-joy').classList.toggle('is-apagado', C.inclinar);
-            $('rb-incl-estado').textContent = C.inclinar ? 'Pulsa Calibrar con el teléfono como lo agarras.' : '';
+            $('rb-mando').classList.toggle('es-incl', C.inclinar);
+            $('rb-incl-estado').textContent = '';
+            if (C.inclinar) calibrar();                   // arranca calibrado con el teléfono como lo traes
         });
         $('rb-incl-cal').addEventListener('click', calibrar);
+        $('rb-incl-inv-g').addEventListener('click', () => alternar('rb-incl-inv-g'));
+        $('rb-incl-inv-a').addEventListener('click', () => alternar('rb-incl-inv-a'));
         const mant = $('rb-incl-mant');
         const ya = v => {
-            if (C.inclinar && C.ref) C.mantiene = v;
-            else if (v) $('rb-incl-estado').textContent = 'Primero pulsa Calibrar.';
-            if (!v) frenar(false);
+            if (v && C.inclinar && C.ref) { C.mantiene = true; mant.classList.add('is-down'); }
+            else if (!v) { frenar(false); mant.classList.remove('is-down'); }
         };
         mant.addEventListener('pointerdown', e => { e.preventDefault(); try { mant.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ } ya(true); });
         for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) mant.addEventListener(ev, () => ya(false));
     }
 
-    // ---------- Botones rápidos ----------
+    // ---------- Botones de acción, bandejas y modos ----------
+
+    function cerrarBandejas(menos) {
+        document.querySelectorAll('.rb-bandeja').forEach(b => { if (b !== menos) b.hidden = true; });
+        document.querySelectorAll('[data-abre]').forEach(b => b.setAttribute('aria-expanded', String(!!menos && b.dataset.abre === menos.id)));
+    }
 
     function iniciarBotones() {
-        $('rb-ctl-paro').addEventListener('click', () => { frenar(true); vibrar([60, 40, 60]); });
+        $('rb-ctl-paro').addEventListener('pointerdown', e => { e.preventDefault(); frenar(true); vibrar([60, 40, 60]); });
+        $('rb-ctl-paro').addEventListener('click', e => { if (e.detail === 0) frenar(true); });     // teclado / lector de pantalla
         $('rb-ctl-vmax').addEventListener('input', e => {
             C.vmax = Number(e.target.value);
-            $('rb-ctl-vmax-v').textContent = C.vmax + ' %';
-            pintarPalanca();
+            $('rb-ctl-vmax-v').textContent = C.vmax;
         });
+        $('rb-ctl-bt').addEventListener('click', () => { const b = $('rb-conectar'); if (b) b.click(); });
+
         document.querySelectorAll('[data-nota]').forEach(b => b.addEventListener('click', () => {
             if (!listo()) return;
             const [hz, ms] = b.dataset.nota.split(',').map(Number);
@@ -178,10 +199,21 @@
             vibrar(12);
         }));
         document.querySelectorAll('[data-luz]').forEach(b => b.addEventListener('click', () => {
-            if (!listo()) return;
-            enlace().luces(b.dataset.luz, b.dataset.color || null);
+            if (listo()) enlace().luces(b.dataset.luz, b.dataset.color || null);
             vibrar(12);
+            cerrarBandejas(null);
         }));
+        document.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => {
+            const bandeja = $(b.dataset.abre);
+            const abrir = bandeja.hidden;
+            cerrarBandejas(abrir ? bandeja : null);
+            bandeja.hidden = !abrir;
+        }));
+        // Tocar fuera de una bandeja la cierra
+        document.addEventListener('pointerdown', e => {
+            if (!e.target.closest('.rb-bandeja, [data-abre]')) cerrarBandejas(null);
+        });
+
         document.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => {
             if (!listo()) return;
             const m = b.dataset.modo;
@@ -192,24 +224,35 @@
         }));
     }
 
-    // ---------- Pantalla completa: el control ocupa todo, sin cabecera ni pestañas ----------
+    // ---------- Abrir y cerrar el mando ----------
 
-    function pantallaCompleta(si) {
-        const sec = $('sec-robot-control'), boton = $('rb-ctl-full');
-        sec.classList.toggle('is-pantalla', si);
-        document.body.classList.toggle('rb-pantalla-completa', si);
-        boton.setAttribute('aria-pressed', String(si));
-        boton.textContent = si ? 'Salir de pantalla completa' : 'Pantalla completa';
-        window.scrollTo(0, 0);
-        pintarPalanca();
+    const orientacion = () => raiz.Plataforma && raiz.Plataforma.plugin('ScreenOrientation');
+
+    async function fijarHorizontal(si) {
+        try {
+            const O = orientacion();
+            if (O) { if (si) await O.lock({ orientation: 'landscape' }); else await O.unlock(); }
+        } catch (e) { /* sin bloqueo de orientación: el aviso de girar se encarga */ }
     }
 
-    // La usa el botón atrás de Android: true si había pantalla completa y la cerró
-    function salirPantalla() {
+    function abrirMando(si) {
         const sec = $('sec-robot-control');
-        if (!sec || !sec.classList.contains('is-pantalla')) return false;
+        sec.classList.toggle('is-pantalla', si);
+        document.body.classList.toggle('rb-pantalla-completa', si);
+        window.scrollTo(0, 0);
+        if (!si) cerrarBandejas(null);
+        fijarHorizontal(si);
+    }
+
+    function cerrarMando() {
         frenar(false);
-        pantallaCompleta(false);
+        abrirMando(false);
+    }
+
+    // La usa el botón atrás de Android: true si había mando abierto y lo cerró
+    function salirPantalla() {
+        if (!abierto()) return false;
+        cerrarMando();
         return true;
     }
 
@@ -234,24 +277,28 @@
         const [txt, clase] = textos[e] || textos.desconectado;
         $('rb-ctl-estado').className = 'badge badge--' + clase;
         $('rb-ctl-estado-txt').textContent = txt;
-        $('sec-robot-control').classList.toggle('is-sin-enlace', e !== 'listo');
-        if (e !== 'listo') { C.movido = false; C.ultimo = ''; fijar(0, 0); C.mantiene = false; }
+        $('rb-mando-estado').setAttribute('aria-label', txt);
+        $('rb-mando-estado').title = txt;
+        const sec = $('sec-robot-control');
+        for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
+        sec.classList.toggle('is-sin-enlace', e !== 'listo');
+        if (e !== 'listo') { C.movido = false; C.ultimo = ''; C.x = 0; C.y = 0; C.presionadas.clear(); C.mantiene = false; }
     }
 
     function iniciar() {
-        if (!$('rb-joy') || !raiz.Robot || !raiz.Robot.mezclaJoystick) return;
-        iniciarPalanca();
+        if (!$('rb-mando') || !raiz.Robot || !raiz.Robot.mezclaJoystick) return;
+        iniciarCruz();
         iniciarInclinar();
         iniciarBotones();
-        $('rb-ctl-full').addEventListener('click', () => pantallaCompleta(!$('sec-robot-control').classList.contains('is-pantalla')));
-        pintarPalanca();
+        $('rb-ctl-full').addEventListener('click', () => abrirMando(true));
+        $('rb-ctl-salir').addEventListener('click', cerrarMando);
         pintarEstado();
         setInterval(revisar, MS_REVISION);
 
         document.addEventListener('robot-estado', pintarEstado);
         document.addEventListener('seccion-admin', e => {
             const activa = e.detail && e.detail.id === 'robot-control';
-            if (C.activa && !activa) { frenar(false); pantallaCompleta(false); }
+            if (C.activa && !activa) cerrarMando();
             C.activa = activa;
             pantallaEncendida(activa);
         });

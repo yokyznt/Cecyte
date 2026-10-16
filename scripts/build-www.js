@@ -20,7 +20,7 @@ const CARPETAS = ['css', 'fonts', 'js'];
 
 // Frases que mencionan al robot dentro de textos que sí viajan
 const REEMPLAZOS = [
-    ['Horario, timbre y robot en un solo lugar', 'Horario y timbre en un solo lugar'],
+    
 ];
 
 function quitarMarcas(texto) {

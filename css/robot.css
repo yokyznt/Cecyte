@@ -131,51 +131,182 @@
 .rb-card .rb-leds { margin-top: 2px; }
 .rb-apartado > .rb-conexion { margin-bottom: 18px; }
 
-/* ==================== Control en tiempo real (joystick) ==================== */
-.rb-ctl { display: grid; gap: 22px; align-items: start; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 700px), (orientation: landscape) { .rb-ctl { grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr); } }
-.rb-ctl__mando { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.rb-ctl__botones { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.rb-ctl__grupo { display: flex; flex-direction: column; gap: 8px; }
-.rb-ctl__fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.rb-ctl__paro { min-height: 64px; font-size: var(--fs-lg); font-weight: 800; border: 3px solid var(--rose-600, #c0392b); }
-.is-sin-enlace .rb-ctl__botones .btn:not(.rb-ctl__paro), .is-sin-enlace .rb-joy { opacity: 0.45; }
-
-.rb-joy {
-    position: relative; touch-action: none; user-select: none; -webkit-user-select: none;
-    width: min(76vmin, 320px); aspect-ratio: 1; border-radius: 50%;
-    display: grid; place-items: center; cursor: grab;
-}
-.rb-joy.is-activo { cursor: grabbing; }
-.rb-joy.is-apagado { opacity: 0.35; pointer-events: none; }
-.rb-joy__aro {
-    position: absolute; inset: 0; border-radius: 50%;
-    border: 3px solid var(--green-600); background: var(--green-50);
-    box-shadow: inset 0 0 0 18px color-mix(in oklch, var(--green-200) 40%, transparent);
-}
-.rb-joy__aro::before, .rb-joy__aro::after { content: ""; position: absolute; background: var(--green-300); opacity: 0.6; }
-.rb-joy__aro::before { left: 50%; top: 12%; bottom: 12%; width: 2px; translate: -50% 0; }
-.rb-joy__aro::after { top: 50%; left: 12%; right: 12%; height: 2px; translate: 0 -50%; }
-.rb-joy__mando {
-    position: relative; width: 36%; aspect-ratio: 1; border-radius: 50%;
-    background: var(--green-700); border: 3px solid var(--green-900, var(--green-800));
-    will-change: transform;
-}
-.rb-joy.is-activo .rb-joy__mando { background: var(--green-600); }
-.rb-joy__txt { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink-2); text-align: center; }
-.rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
-@media (orientation: landscape) and (max-height: 520px) {
-    .rb-joy { width: min(64vh, 280px); }
+/* ==================== Control del robot: un mando en horizontal ==================== */
+/* Fuera del mando solo hay un botón grande; al abrirlo ocupa toda la pantalla (en el APK se fuerza horizontal). */
+.rb-control {
+    --m-fondo: oklch(0.2 0.018 160);
+    --m-tapa: oklch(0.33 0.022 160);
+    --m-tapa-2: oklch(0.4 0.024 160);
+    --m-base: oklch(0.13 0.02 160);
+    --m-texto: oklch(0.93 0.02 150);
+    --m-verde: oklch(0.78 0.17 150);
+    --m-azul: oklch(0.74 0.13 240);
+    --m-ambar: oklch(0.82 0.15 75);
+    --m-lila: oklch(0.74 0.12 305);
+    --m-rojo: oklch(0.58 0.23 27);
 }
 
-/* Pantalla completa del control: ocupa todo y deja la palanca y los botones a mano */
+/* ---- Cerrado: un solo botón ---- */
+.rb-abrir { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 16px; }
+.rb-abrir__btn {
+    display: grid; place-items: center; width: 132px; height: 132px; border: 0; border-radius: 34px; cursor: pointer;
+    background: var(--m-fondo, var(--black)); color: var(--m-verde, var(--green-400));
+    box-shadow: 0 8px 0 var(--m-base, #000), 0 14px 24px -8px oklch(0.2 0.04 160 / 0.5);
+    transition: translate 0.08s, box-shadow 0.08s;
+}
+.rb-abrir__btn:active { translate: 0 6px; box-shadow: 0 2px 0 var(--m-base, #000); }
+.rb-abrir__btn .icon { width: 64px; height: 64px; stroke-width: 1.6; }
+.rb-abrir__btn:focus-visible { outline: 3px solid var(--green-600); outline-offset: 4px; }
+.rb-mando { display: none; }
+
+/* ---- Abierto ---- */
 .rb-pantalla-completa { overflow: hidden; }
-#sec-robot-control.is-pantalla {
-    position: fixed; inset: 0; z-index: 90; margin: 0; border-radius: 0; overflow-y: auto;
-    background: var(--surface);
-    padding: var(--inset-top, 0px) var(--inset-right, 0px) var(--inset-bottom, 0px) var(--inset-left, 0px);
+.rb-control.is-pantalla {
+    position: fixed; inset: 0; z-index: 90; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+    background: var(--m-fondo); color: var(--m-texto);
 }
-#sec-robot-control.is-pantalla .panel__head { padding-block: 8px; }
-#sec-robot-control.is-pantalla .rb-ctl { padding-block: 8px; align-items: center; min-height: calc(100dvh - 64px); }
-#sec-robot-control.is-pantalla .rb-joy { width: min(64vh, 62vw, 340px); }
-#sec-robot-control.is-pantalla .rb-ctl__mando > .hint { display: none; }
+.rb-control.is-pantalla .rb-abrir { display: none; }
+.rb-control.is-pantalla .rb-mando {
+    --t: clamp(56px, min(calc((100dvh - 120px) / 3 - 6px), 21vw), 112px);   /* lado de una tecla de la cruz */
+    --tc: calc(var(--t) * 0.98);                                              /* lado de un botón de acción */
+    display: flex; flex-direction: column; height: 100%; position: relative; user-select: none; -webkit-user-select: none;
+    padding: var(--inset-top) var(--inset-right) var(--inset-bottom) var(--inset-left);
+    background:
+        radial-gradient(120% 90% at 50% 0%, oklch(0.26 0.03 160), transparent 70%),
+        var(--m-fondo);
+}
+
+/* Teclas con relieve: se hunden al apretarlas */
+.rb-btn {
+    display: grid; place-items: center; margin: 0; padding: 0; border: 0; cursor: pointer; touch-action: none;
+    border-radius: 20px; background: var(--m-tapa); color: var(--m-texto);
+    box-shadow: 0 5px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14);
+    transition: translate 0.06s, box-shadow 0.06s, background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+}
+.rb-btn .icon { width: 44%; height: 44%; stroke-width: 2.2; pointer-events: none; }
+.rb-btn.is-down, .rb-btn:active { translate: 0 4px; box-shadow: 0 1px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.08); background: var(--m-tapa-2); }
+.rb-btn:focus-visible, .rb-paro-gran:focus-visible, .rb-sw:focus-visible, .rb-nota:focus-visible, .rb-incl__aro:focus-visible { outline: 3px solid var(--m-verde); outline-offset: 3px; }
+.rb-btn--chico { width: 44px; height: 44px; border-radius: 14px; box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-btn--chico .icon { width: 22px; height: 22px; stroke-width: 2.2; }
+.rb-btn--chico.is-down, .rb-btn--chico:active { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); }
+.rb-btn[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
+.rb-btn[hidden] { display: none; }
+
+/* Barra de arriba */
+.rb-mando__barra { display: flex; align-items: center; gap: 12px; padding: 10px 14px 8px; }
+.rb-modos { display: flex; gap: 8px; margin-left: auto; }
+.rb-estado { display: grid; place-items: center; width: 24px; height: 44px; }
+.rb-estado__punto { width: 12px; height: 12px; border-radius: 50%; background: oklch(0.5 0.02 160); transition: background 0.2s, box-shadow 0.2s; }
+.is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25), 0 0 14px var(--m-verde); }
+.is-conectando .rb-estado__punto { background: var(--m-ambar); animation: rb-latido 0.9s ease-in-out infinite; }
+.is-sinprograma .rb-estado__punto { background: var(--m-rojo); }
+.is-listo #rb-ctl-bt, .is-conectando #rb-ctl-bt { display: none; }
+@keyframes rb-latido { 50% { opacity: 0.3; } }
+
+/* Cuerpo: cruz · paro y velocidad · botones de acción */
+.rb-mando__cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2vw; padding: 0 3vw 10px; }
+
+.rb-cruz, .rb-incl { grid-column: 1; grid-row: 1; }
+.rb-cruz { display: grid; grid-template-columns: repeat(3, var(--t)); grid-template-rows: repeat(3, var(--t)); gap: 6px; }
+.rb-cruz > .rb-btn { width: 100%; height: 100%; border-radius: 22px; }
+.rb-cruz__n, .rb-cruz__s, .rb-cruz__e, .rb-cruz__w { background: var(--m-tapa-2); }
+.rb-cruz__n { grid-area: 1 / 2; } .rb-cruz__w { grid-area: 2 / 1; } .rb-cruz__e { grid-area: 2 / 3; } .rb-cruz__s { grid-area: 3 / 2; }
+.rb-cruz__nw { grid-area: 1 / 1; } .rb-cruz__ne { grid-area: 1 / 3; } .rb-cruz__sw { grid-area: 3 / 1; } .rb-cruz__se { grid-area: 3 / 3; }
+.rb-cruz__c { background: var(--m-tapa); color: oklch(0.78 0.03 160); }
+.rb-cruz__c .icon { width: 34%; height: 34%; }
+.rb-cruz__n .icon, .rb-cruz__s .icon, .rb-cruz__e .icon, .rb-cruz__w .icon { width: 52%; height: 52%; stroke-width: 2.6; }
+.rb-cruz .rb-btn.is-down { background: var(--m-verde); color: var(--m-base); }
+.rb-cruz__centro { grid-area: 2 / 2; place-self: center; width: 34%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(oklch(0.16 0.02 160), oklch(0.24 0.02 160)); box-shadow: inset 0 2px 6px oklch(0 0 0 / 0.5); }
+
+/* Paro (la pieza más grande del centro) y velocidad */
+.rb-centro { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.rb-paro-gran {
+    --p: clamp(84px, min(30dvh, 26vw), 132px);
+    display: grid; place-items: center; width: var(--p); height: var(--p); border: 0; padding: 0; cursor: pointer; touch-action: none;
+    background: var(--m-rojo); color: #fff;
+    clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+    filter: drop-shadow(0 6px 0 var(--m-base));
+    transition: translate 0.06s, filter 0.06s;
+}
+.rb-paro-gran .icon { width: 44%; height: 44%; stroke-width: 2.4; fill: currentColor; }
+.rb-paro-gran:active, .rb-paro-gran.is-down { translate: 0 4px; filter: drop-shadow(0 1px 0 var(--m-base)) brightness(1.15); }
+.rb-vel { display: flex; align-items: center; gap: 8px; width: min(100%, 220px); color: oklch(0.78 0.03 160); }
+.rb-vel .icon { flex: none; width: 22px; height: 22px; }
+.rb-vel output { flex: none; min-width: 2.6ch; text-align: right; font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--m-texto); font-variant-numeric: tabular-nums; }
+.rb-vel input[type="range"] { flex: 1; min-width: 0; height: 36px; margin: 0; background: transparent; accent-color: var(--m-verde); }
+
+/* Botones de acción: cuatro de colores en rombo */
+.rb-caras { display: grid; grid-template-columns: repeat(2, var(--tc)); grid-template-rows: repeat(2, var(--tc)); gap: 10px 12px; margin-right: 1vw; }
+.rb-cara { width: 100%; height: 100%; border-radius: 50%; color: var(--m-base); }
+.rb-cara .icon { width: 46%; height: 46%; }
+.rb-cara--claxon { background: var(--m-verde); grid-area: 1 / 1; translate: 0 18%; }
+.rb-cara--musica { background: var(--m-azul); grid-area: 1 / 2; translate: 0 -18%; }
+.rb-cara--luces { background: var(--m-ambar); grid-area: 2 / 2; translate: 0 -18%; }
+.rb-cara--incl { background: var(--m-lila); grid-area: 2 / 1; translate: 0 18%; }
+.rb-cara--claxon.is-down, .rb-cara--claxon:active { background: var(--m-verde); translate: 0 calc(18% + 4px); filter: brightness(1.2); }
+.rb-cara--musica.is-down, .rb-cara--musica:active, .rb-cara--musica[aria-expanded="true"] { background: var(--m-azul); translate: 0 calc(-18% + 4px); filter: brightness(1.2); }
+.rb-cara--luces.is-down, .rb-cara--luces:active, .rb-cara--luces[aria-expanded="true"] { background: var(--m-ambar); translate: 0 calc(-18% + 4px); filter: brightness(1.2); }
+.rb-cara--incl[aria-pressed="false"] { background: var(--m-lila); color: var(--m-base); }
+.rb-cara--incl[aria-pressed="true"] { background: oklch(0.92 0.08 305); outline: 3px solid var(--m-lila); outline-offset: 2px; }
+.rb-cara--incl.is-down, .rb-cara--incl:active { translate: 0 calc(18% + 4px); filter: brightness(1.2); }
+
+/* Bandejas de notas y luces: una tira bajo la barra */
+.rb-bandeja {
+    position: absolute; top: calc(var(--inset-top) + 60px); left: 50%; translate: -50% 0; z-index: 3;
+    display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 22px;
+    background: oklch(0.15 0.02 160 / 0.96); box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1), 0 14px 30px -8px #000;
+    animation: rb-sube 0.16s var(--ease-out);
+}
+.rb-bandeja[hidden] { display: none; }
+@keyframes rb-sube { from { opacity: 0; translate: -50% 8px; } }
+.rb-nota {
+    width: 40px; height: calc(30px + var(--n) * 10px); align-self: flex-end; border: 0; padding: 0; cursor: pointer; touch-action: none;
+    border-radius: 12px; background: var(--m-azul); box-shadow: 0 3px 0 var(--m-base); transition: translate 0.06s;
+    filter: hue-rotate(calc(var(--n) * -18deg));
+}
+.rb-nota:active, .rb-nota.is-down { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); filter: hue-rotate(calc(var(--n) * -18deg)) brightness(1.25); }
+.rb-sw {
+    --c: #888; width: 40px; height: 40px; border: 3px solid oklch(1 0 0 / 0.18); padding: 0; cursor: pointer; touch-action: none;
+    border-radius: 50%; background: var(--c); box-shadow: 0 3px 0 var(--m-base); transition: translate 0.06s;
+}
+.rb-sw:active, .rb-sw.is-down { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); border-color: #fff; }
+.rb-sw--arco { background: conic-gradient(#ff2a2a, #ffd400, #22d05a, #19c9ff, #7a3dff, #ff2a2a); }
+.rb-sw--pulso { background: radial-gradient(circle, #fff 0 18%, oklch(0.8 0.1 90) 19% 55%, oklch(0.3 0.04 90) 56%); animation: rb-latido 1.6s ease-in-out infinite; }
+.rb-sw--puntos { background: radial-gradient(circle at 25% 50%, #fff 0 12%, transparent 13%), radial-gradient(circle at 50% 50%, #fff 0 12%, transparent 13%) , radial-gradient(circle at 75% 50%, #fff 0 12%, transparent 13%), oklch(0.32 0.03 250); }
+.rb-sw--apagar { background: oklch(0.2 0.02 160); position: relative; }
+.rb-sw--apagar::after { content: ""; position: absolute; inset: 9px 20px; background: oklch(0.7 0.02 160); border-radius: 2px; rotate: 45deg; }
+
+/* Inclinar el celular: sustituye a la cruz */
+.rb-incl { display: none; flex-direction: column; align-items: center; gap: 10px; width: calc(var(--t) * 3 + 12px); }
+.rb-mando.es-incl .rb-cruz { display: none; }
+.rb-mando.es-incl .rb-incl { display: flex; }
+.rb-incl__aro {
+    display: grid; place-items: center; width: calc(var(--t) * 2); height: calc(var(--t) * 2); max-height: 62dvh; aspect-ratio: 1; border-radius: 50%; padding: 0; border: 0; cursor: pointer; touch-action: none;
+    background: var(--m-tapa); color: var(--m-lila); box-shadow: 0 6px 0 var(--m-base), inset 0 0 0 4px oklch(0.74 0.12 305 / 0.35);
+    transition: translate 0.06s, background 0.12s;
+}
+.rb-incl__aro .icon { width: 42%; height: 42%; stroke-width: 1.8; }
+.rb-incl__aro.is-down { translate: 0 4px; background: var(--m-lila); color: var(--m-base); box-shadow: 0 2px 0 var(--m-base); }
+.rb-incl__ajustes { display: flex; gap: 10px; }
+.rb-incl__txt { min-height: 1em; font-size: var(--fs-cap); color: oklch(0.78 0.03 160); text-align: center; }
+.rb-incl__txt:empty { display: none; }
+
+/* Sin enlace: la cruz y las acciones se ven apagadas; el paro siempre queda vivo */
+.is-sin-enlace .rb-cruz, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl, .is-sin-enlace .rb-modos { opacity: 0.35; }
+
+/* Vertical: pide girar el teléfono */
+.rb-mando__gira { display: none; }
+@media (orientation: portrait) {
+    .rb-control.is-pantalla .rb-mando__cuerpo, .rb-control.is-pantalla .rb-bandeja { display: none; }
+    .rb-control.is-pantalla .rb-mando__gira { display: grid; flex: 1; place-items: center; color: var(--m-verde); }
+    .rb-mando__gira .icon { width: 96px; height: 96px; stroke-width: 1.4; animation: rb-gira 2.4s ease-in-out infinite; }
+}
+@keyframes rb-gira { 0%, 20% { rotate: 0deg; } 60%, 100% { rotate: -90deg; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .rb-mando__gira .icon, .rb-bandeja, .is-conectando .rb-estado__punto, .rb-sw--pulso { animation: none; }
+    .rb-btn, .rb-paro-gran, .rb-abrir__btn { transition: none; }
+}
+
+.rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
