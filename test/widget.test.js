@@ -56,9 +56,28 @@ const res = 'android/app/src/main/res/';
 {
     const js = leer('js/avisos-nativos.js');
     assert(/plugin\('WidgetHorario'\)/.test(js) && /@CapacitorPlugin\(name = "WidgetHorario"\)/.test(leer(java + 'WidgetHorarioPlugin.java')));
-    assert(/guardar\(\{ grupo, horario, apiBase/.test(js));
+    assert(/guardar\(\{ grupo, horario, cambios, apiBase/.test(js));
     for (const campo of ['grupo', 'horario', 'apiBase']) assert(leer(java + 'WidgetHorarioPlugin.java').includes(`getString("${campo}"`), 'el plugin lee ' + campo);
     assert(/horario-actualizado[^\n]*actualizarWidget/.test(js) && /grupo-cambiado[^\n]*actualizarWidget/.test(js), 'se actualiza con el horario y el grupo');
+}
+
+// 4) Cambios del día: los textos de Java son los de app.js, el trabajo de fondo está acotado y el plugin guarda lo que el JS manda
+{
+    const app = leer('app.js'), j = leer(java + 'Horario.java'), w = leer(java + 'ActualizaHorarioWorker.java');
+    const textosApp = /TEXTO_CAMBIO = \{ cancelada: '([^']+)', ausente: '([^']+)' \}/.exec(app);
+    assert(textosApp, 'TEXTO_CAMBIO en app.js');
+    assert(j.includes(`"${textosApp[1]}"`) && j.includes(`"${textosApp[2]}"`), 'Horario.textoCambio = TEXTO_CAMBIO de app.js');
+    assert(/PeriodicWorkRequest\.Builder\(ActualizaHorarioWorker\.class, 15, TimeUnit\.MINUTES\)/.test(leer(java + 'HorarioWidget.java')), 'cada 15 min');
+    assert(/enHorarioDeRevision\(/.test(w) && /return Result\.success\(\);/.test(w), 'sale pronto fuera del horario escolar');
+    assert(w.includes('/api/changes') && w.includes('/api/schedule'), 'baja cambios y horario');
+    const plugin = leer(java + 'WidgetHorarioPlugin.java'), js = leer('js/avisos-nativos.js');
+    assert(plugin.includes('getString("cambios"') && /guardar\(\{ grupo, horario, cambios/.test(js), 'el JS manda los cambios y el plugin los lee');
+    assert(/cambios-actualizados[^\n]*actualizarWidget/.test(js), 'se actualiza cuando cambian los cambios');
+    // las claves de los cambios son las que devuelve api/changes.js
+    const api = leer('api/changes.js');
+    for (const k of ['id', 'group', 'date', 'time', 'tipo', 'nota']) {
+        assert(api.includes(k) && j.includes(`"${k}"`), 'clave ' + k);
+    }
 }
 
 console.log('widget.test.js: todo bien');

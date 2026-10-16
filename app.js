@@ -4,6 +4,7 @@
 // El horario ya no vive fijo aqui: se carga del servidor (/api/schedule)
 // para que todos los que abran la pagina vean lo mismo.
 let scheduleDatabase = [];
+let cambiosDia = [];   // cambios del día (clase cancelada / maestro ausente), de /api/changes
 
 // Lista de grupos que existen (se administra desde el panel de admin, vive en /api/groups)
 let groupsList = [];
@@ -45,6 +46,7 @@ function slotHtml(match, isNow) {
     return `<div class="slot${isNow ? ' is-now' : ''}">
         <span class="slot__subject">${esc(match.subject)}</span>
         ${match.teacher ? `<span class="slot__teacher">${icon('user')}<span>${esc(match.teacher)}</span></span>` : ''}
+        ${etiquetaCambio(match)}
     </div>`;
 }
 
@@ -132,8 +134,9 @@ function updateCurrentClassCard() {
         setState('recess', 'Receso');
     } else if (currentClass) {
         titleEl.innerText = currentClass.subject;
-        teacherEl.innerHTML = currentClass.teacher ? teacherLine('user', currentClass.teacher) : '';
-        setState('class', 'En curso');
+        teacherEl.innerHTML = (currentClass.teacher ? teacherLine('user', currentClass.teacher) : '') + etiquetaCambio(currentClass);
+        const cambio = cambioDe(currentClass.group, currentClass.time);
+        setState('class', cambio ? (TEXTO_CAMBIO[cambio.tipo] || 'En curso') : 'En curso');
     } else {
         titleEl.innerText = 'Hora libre';
         teacherEl.innerHTML = '';
@@ -210,7 +213,7 @@ function renderTodayAgenda() {
         else if (!match) cls += ' is-free';
 
         const subject = slot.receso ? 'Receso'
-            : match ? `${esc(match.subject)}${match.teacher ? `<small>${esc(match.teacher)}</small>` : ''}`
+            : match ? `${esc(match.subject)}${match.teacher ? `<small>${esc(match.teacher)}</small>` : ''}${etiquetaCambio(match)}`
             : 'Hora libre';
         return `<li class="${cls}"><span class="agenda__time">${start}</span><span class="agenda__subject">${subject}</span><span class="agenda__tag">${tag}</span></li>`;
     }).join('');
@@ -658,19 +661,28 @@ function renderAdminTable(filterQuery = '') {
         return;
     }
 
-    tbody.innerHTML = filtered.map(item => `
+    const hoyDia = getCurrentDaySpanish();
+    tbody.innerHTML = filtered.map(item => {
+        // Solo las clases de hoy pueden marcarse como cancelada / maestro ausente (el aviso vence a la medianoche)
+        const cambio = item.day === hoyDia ? cambioDe(item.group, item.time) : null;
+        const botonesCambio = item.day !== hoyDia ? ''
+            : cambio ? `<button type="button" class="btn btn--secondary btn--sm" onclick="quitarCambio('${esc(cambio.id)}')">Quitar aviso</button>`
+            : `<button type="button" class="btn btn--secondary btn--sm" onclick="marcarCambio(${item.id}, 'cancelada')">Cancelar hoy</button>
+               <button type="button" class="btn btn--secondary btn--sm" onclick="marcarCambio(${item.id}, 'ausente')">Maestro ausente</button>`;
+        return `
         <tr>
             <td class="cell-group">${esc(item.group)}</td>
             <td class="cell-day">${esc(item.day)}</td>
             <td class="cell-time num">${esc(item.time)}</td>
-            <td class="cell-subject">${esc(item.subject)}</td>
+            <td class="cell-subject">${esc(item.subject)}${cambio ? etiquetaCambio(item) : ''}</td>
             <td class="cell-teacher">${esc(item.teacher) || '—'}</td>
             <td class="cell-actions">
+                ${botonesCambio ? `<div class="cambio-acciones">${botonesCambio}</div>` : ''}
                 <button type="button" onclick="editScheduleItem(${item.id})" class="icon-btn" title="Editar" aria-label="Editar ${esc(item.subject)}">${icon('pencil')}</button>
                 <button type="button" onclick="deleteScheduleItem(${item.id})" class="icon-btn icon-btn--danger" title="Eliminar" aria-label="Eliminar ${esc(item.subject)}">${icon('trash')}</button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function filterAdminTable(query) {
@@ -825,6 +837,110 @@ function getCurrentSlot() {
 
 function findClass(group, day, slotKey) {
     return scheduleDatabase.find(i => i.group === group && i.day === day && i.time === slotKey);
+}
+
+// ==================== Cambios del día (clase cancelada / maestro ausente) ====================
+// El admin los marca en la tabla del horario; vencen solos a la medianoche. Con la app abierta se avisan con un
+// toast; con la app cerrada, el APK los avisa con una notificación (ActualizaHorarioWorker.java).
+const TEXTO_CAMBIO = { cancelada: 'Cancelada hoy', ausente: 'Maestro ausente' };
+const CLAVE_CAMBIOS_VISTOS = 'cecyte_cambios_vistos';
+
+// Fecha de hoy en este dispositivo (AAAA-MM-DD); el servidor guarda las fechas en hora de México
+function hoyLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function cambioDe(grupo, slotKey) {
+    const hoy = hoyLocal();
+    return cambiosDia.find(c => c.group === grupo && c.date === hoy && c.time === slotKey) || null;
+}
+
+// Etiqueta para una materia de HOY que tiene un cambio (vacía si no)
+function etiquetaCambio(match) {
+    if (!match || match.day !== getCurrentDaySpanish()) return '';
+    const c = cambioDe(match.group, match.time);
+    if (!c) return '';
+    return `<span class="cambio cambio--${esc(c.tipo)}">${esc(TEXTO_CAMBIO[c.tipo] || 'Cambio')}${c.nota ? ' · ' + esc(c.nota) : ''}</span>`;
+}
+
+async function loadChanges() {
+    try {
+        const res = await API.fetch('/api/changes', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const nuevos = await res.json();
+        if (!Array.isArray(nuevos)) return;
+        cachear('changes', nuevos);
+        aplicarCambios(nuevos);
+    } catch (err) {
+        console.error('No se pudieron cargar los cambios del día:', err);
+        const copia = leerCache('changes');
+        if (copia && !cambiosDia.length) aplicarCambios(copia.datos, false);   // sin conexión: lo último que se vio
+    }
+}
+
+function aplicarCambios(nuevos, avisar = true) {
+    if (JSON.stringify(nuevos) === JSON.stringify(cambiosDia)) return;
+    cambiosDia = nuevos;
+    if (avisar) avisarCambiosNuevos();
+    lastRenderedNowKey = null;                 // fuerza repintar la tarjeta de "ahora"
+    renderStudentSchedule();
+    if (isAdminLoggedIn) renderAdminTable();
+    document.dispatchEvent(new CustomEvent('cambios-actualizados'));
+}
+
+// Con la app abierta: un aviso en pantalla por cada cambio nuevo de mi grupo (no se repite al recargar)
+function avisarCambiosNuevos() {
+    let vistos = [];
+    try { vistos = JSON.parse(localStorage.getItem(CLAVE_CAMBIOS_VISTOS)) || []; } catch (e) { vistos = []; }
+    const hoy = hoyLocal();
+    for (const c of cambiosDia) {
+        if (c.group !== currentStudentGroup || c.date !== hoy || vistos.includes(c.id)) continue;
+        const clase = scheduleDatabase.find(i => i.group === c.group && i.time === c.time && i.day === getCurrentDaySpanish());
+        showNotificationToast('Cambio de hoy', `${clase ? clase.subject + ': ' : ''}${(TEXTO_CAMBIO[c.tipo] || '').toLowerCase()}${c.nota ? '. ' + c.nota : ''}`, 'warning');
+        vistos.push(c.id);
+    }
+    try { localStorage.setItem(CLAVE_CAMBIOS_VISTOS, JSON.stringify(vistos.filter(id => cambiosDia.some(c => c.id === id)))); } catch (e) { /* sin almacenamiento */ }
+}
+
+// Admin: marca o quita un cambio de una clase de hoy (siempre es para hoy)
+async function marcarCambio(id, tipo) {
+    const item = scheduleDatabase.find(i => i.id === id);
+    if (!item) return;
+    const nota = window.prompt(`${TEXTO_CAMBIO[tipo]}: ${item.subject} (${item.group}).\nNota para los alumnos (opcional):`, '');
+    if (nota === null) return;   // canceló
+    await mandarCambio({ action: 'add', group: item.group, time: item.time, tipo, nota }, `${item.subject} (${item.group}): ${TEXTO_CAMBIO[tipo].toLowerCase()}.`);
+}
+
+async function quitarCambio(id) {
+    await mandarCambio({ action: 'remove', id }, 'Se quitó el aviso.');
+}
+
+async function mandarCambio(cuerpo, mensajeOk) {
+    try {
+        const res = await API.fetch('/api/changes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(cuerpo)
+        });
+        const data = await res.json();
+        if (res.status === 401) {
+            isAdminLoggedIn = false;
+            showAdminLogin();
+            showNotificationToast('Sesión Expirada', 'Vuelve a iniciar sesión para guardar cambios.', 'warning');
+            return;
+        }
+        if (!res.ok) {
+            showNotificationToast('No se pudo guardar', data.error || 'Intenta de nuevo.', 'warning');
+            return;
+        }
+        cachear('changes', data.changes);
+        aplicarCambios(data.changes, false);
+        showNotificationToast(cuerpo.action === 'add' ? 'Aviso publicado' : 'Aviso quitado', mensajeOk, 'success');
+    } catch (err) {
+        showNotificationToast('Error', 'No se pudo conectar con el servidor.', 'warning');
+    }
 }
 
 // Se ejecuta cada 20 segundos: detecta si cambiamos de bloque y, si aplica, dispara la alerta.
@@ -1351,6 +1467,8 @@ window.onload = async function() {
     setInterval(checkScheduleAndNotify, 20000); // revisa cambio de clase cada 20 segundos
     setInterval(loadSchedule, 15000); // refresca el horario cada 15 segundos por si otro admin hizo cambios
     setInterval(loadGroups, 15000); // refresca la lista de grupos por si se agrego/borro alguno
+    loadChanges();
+    setInterval(loadChanges, 15000); // cambios del dia (clase cancelada / maestro ausente)
     setInterval(() => loadBell(true), 15000); // refresca el estado "ESP32 en linea" del timbre
 }
 

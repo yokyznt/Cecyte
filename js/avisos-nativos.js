@@ -128,10 +128,11 @@
         if (!W) return;
         const grupo = currentStudentGroup || '';
         const horario = JSON.stringify(scheduleDatabase);
-        const firma = grupo + '|' + horario;
+        const cambios = JSON.stringify(cambiosDia);   // cambios del día (app.js); los que ya se ven aquí no se repiten como notificación
+        const firma = grupo + '|' + horario + '|' + cambios;
         if (firma === ultimoWidget) return;   // el horario se vuelve a traer cada 15 s: solo se manda si cambió
         try {
-            await W.guardar({ grupo, horario, apiBase: (raiz.APP_CONFIG && raiz.APP_CONFIG.apiBase) || '' });
+            await W.guardar({ grupo, horario, cambios, apiBase: (raiz.APP_CONFIG && raiz.APP_CONFIG.apiBase) || '' });
             ultimoWidget = firma;
         } catch (e) {
             console.error('No se pudo actualizar el widget:', e);
@@ -189,6 +190,7 @@
     if (raiz.Plataforma && raiz.Plataforma.nativo) {
         document.addEventListener('horario-actualizado', () => { reprogramar(); actualizarWidget(); });
         document.addEventListener('grupo-cambiado', () => { reprogramar(); actualizarWidget(); });
+        document.addEventListener('cambios-actualizados', () => actualizarWidget());
         raiz.addEventListener('app-reanudada', () => reprogramar());
     }
 })(window);
