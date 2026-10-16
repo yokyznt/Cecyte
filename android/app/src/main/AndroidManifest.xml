@@ -24,6 +24,21 @@
 
         </activity>
 
+        <!-- Widgets del horario (ahora / sigue). La acción propia la manda la alarma de cambio de bloque -->
+        <receiver android:name=".HorarioWidget4x2" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.yokyznt.cecyte.ACTUALIZAR_WIDGET" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_4x2_info" />
+        </receiver>
+        <receiver android:name=".HorarioWidget2x1" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_2x1_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

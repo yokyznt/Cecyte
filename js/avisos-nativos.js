@@ -121,6 +121,23 @@
         }
     }
 
+    // Widget de Android: se le pasa el grupo y el horario que ve el alumno; el widget y su trabajo de fondo lo leen de ahí
+    let ultimoWidget = '';
+    async function actualizarWidget() {
+        const W = raiz.Plataforma && raiz.Plataforma.plugin('WidgetHorario');
+        if (!W) return;
+        const grupo = currentStudentGroup || '';
+        const horario = JSON.stringify(scheduleDatabase);
+        const firma = grupo + '|' + horario;
+        if (firma === ultimoWidget) return;   // el horario se vuelve a traer cada 15 s: solo se manda si cambió
+        try {
+            await W.guardar({ grupo, horario, apiBase: (raiz.APP_CONFIG && raiz.APP_CONFIG.apiBase) || '' });
+            ultimoWidget = firma;
+        } catch (e) {
+            console.error('No se pudo actualizar el widget:', e);
+        }
+    }
+
     const AvisosNativos = {
         // Pide permiso de notificaciones y, si se puede, alarmas exactas; luego agenda.
         async activar() {
@@ -170,8 +187,8 @@
     raiz.AvisosNativos = AvisosNativos;
 
     if (raiz.Plataforma && raiz.Plataforma.nativo) {
-        document.addEventListener('horario-actualizado', () => reprogramar());
-        document.addEventListener('grupo-cambiado', () => reprogramar());
+        document.addEventListener('horario-actualizado', () => { reprogramar(); actualizarWidget(); });
+        document.addEventListener('grupo-cambiado', () => { reprogramar(); actualizarWidget(); });
         raiz.addEventListener('app-reanudada', () => reprogramar());
     }
 })(window);

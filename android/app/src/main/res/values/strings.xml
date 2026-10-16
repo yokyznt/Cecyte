@@ -4,4 +4,8 @@
     <string name="title_activity_main">CECyTE 18</string>
     <string name="package_name">com.yokyznt.cecyte</string>
     <string name="custom_url_scheme">com.yokyznt.cecyte</string>
+    <string name="widget_ahora">AHORA</string>
+    <string name="widget_sigue">SIGUE</string>
+    <string name="widget_desc_4x2">Tu clase de ahora y la que sigue</string>
+    <string name="widget_desc_2x1">Tu clase de ahora</string>
 </resources>

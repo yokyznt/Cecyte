@@ -1,6 +1,6 @@
 {
-    "version": "1.1.0",
-    "versionCode": 2,
+    "version": "1.1.1",
+    "versionCode": 3,
     "url": "https://github.com/yokyznt/Cecyte/releases/latest",
-    "notas": "Control del robot por Bluetooth, con joystick en tiempo real."
+    "notas": "Widget del horario en la pantalla de inicio (ahora y sigue)."
 }
