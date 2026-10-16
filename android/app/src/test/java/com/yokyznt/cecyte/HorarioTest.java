@@ -69,6 +69,55 @@ public class HorarioTest {
         assertEquals("Elige tu grupo", Horario.calcular(CLASES, null, Calendar.MONDAY, 600).ahora);
     }
 
+    private static final List<Horario.Cambio> CAMBIOS = Arrays.asList(
+        new Horario.Cambio("a", "3A", "2026-10-12", "08:00 - 08:45", "cancelada", ""),
+        new Horario.Cambio("b", "3A", "2026-10-12", "10:00 - 11:00", "ausente", "Incapacidad"),
+        new Horario.Cambio("c", "3B", "2026-10-12", "07:00 - 08:00", "cancelada", ""),   // otro grupo
+        new Horario.Cambio("d", "3A", "2026-10-13", "07:00 - 08:00", "cancelada", "")    // otro día
+    );
+
+    private static Horario.Estado lunesConCambios(int h, int m) {
+        return Horario.calcular(CLASES, CAMBIOS, "2026-10-12", "3A", Calendar.MONDAY, h * 60 + m);
+    }
+
+    @Test public void elCambioDeHoySeVeEnAhoraYEnSigue() {
+        Horario.Estado e = lunesConCambios(7, 30);          // ahora Matemáticas (sin cambio), sigue Física (cancelada)
+        assertEquals("Ana · 07:00 - 08:00", e.ahoraDetalle);
+        assertEquals("Física", e.sigue);
+        assertEquals("Cancelada hoy", e.sigueDetalle);
+        e = lunesConCambios(8, 10);                         // ahora Física cancelada
+        assertEquals("Física", e.ahora);
+        assertEquals("Cancelada hoy", e.ahoraDetalle);
+        e = lunesConCambios(9, 30);                         // sigue Inglés con maestro ausente y nota
+        assertEquals("Inglés", e.sigue);
+        assertEquals("Maestro ausente · Incapacidad", e.sigueDetalle);
+    }
+
+    @Test public void losCambiosDeOtroGrupoODiaNoCuentan() {
+        assertEquals("Ana · 07:00 - 08:00", lunesConCambios(7, 30).ahoraDetalle);          // el de 3B y el de mañana no se ven
+        assertEquals("Maestro ausente", Horario.textoCambio("ausente"));
+        assertEquals("Cancelada hoy", Horario.textoCambio("cancelada"));
+    }
+
+    @Test public void soloSeRevisaEnHorarioEscolar() {
+        assertEquals(true, Horario.enHorarioDeRevision(Calendar.MONDAY, 6 * 60));
+        assertEquals(false, Horario.enHorarioDeRevision(Calendar.MONDAY, 6 * 60 - 1));
+        assertEquals(true, Horario.enHorarioDeRevision(Calendar.FRIDAY, 15 * 60 + 29));
+        assertEquals(false, Horario.enHorarioDeRevision(Calendar.FRIDAY, 15 * 60 + 30));
+        assertEquals(false, Horario.enHorarioDeRevision(Calendar.SATURDAY, 9 * 60));
+        assertEquals(false, Horario.enHorarioDeRevision(Calendar.SUNDAY, 9 * 60));
+    }
+
+    @Test public void fechaYDiaDelHorario() {
+        Calendar c = Calendar.getInstance();
+        c.clear();
+        c.set(2026, Calendar.OCTOBER, 5, 8, 0, 0);
+        assertEquals("2026-10-05", Horario.fechaHoy(c));
+        assertEquals("Lunes", Horario.nombreDia(Calendar.MONDAY));
+        assertEquals("Viernes", Horario.nombreDia(Calendar.FRIDAY));
+        assertEquals(null, Horario.nombreDia(Calendar.SUNDAY));
+    }
+
     @Test public void soloCuentaElGrupoElegido() {
         assertEquals("Otra", Horario.calcular(CLASES, "3B", Calendar.MONDAY, 7 * 60 + 30).ahora);
     }

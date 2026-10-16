@@ -1,6 +1,6 @@
 {
-    "version": "1.1.1",
-    "versionCode": 3,
+    "version": "1.1.2",
+    "versionCode": 4,
     "url": "https://github.com/yokyznt/Cecyte/releases/latest",
-    "notas": "Widget del horario en la pantalla de inicio (ahora y sigue)."
+    "notas": "Avisos de cambios del dia (clase cancelada o maestro ausente)."
 }

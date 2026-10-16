@@ -38,12 +38,15 @@ public abstract class HorarioWidget extends AppWidgetProvider {
         if (ACCION.equals(i.getAction())) refrescar(c);
     }
 
-    /** Baja el horario cada 6 h con red; si no hay red se queda lo último (no hace falta reintentar: cada ciclo vuelve a intentar). */
+    /**
+     * Trabajo de fondo cada 15 min con red (ver ActualizaHorarioWorker: solo actúa en horario escolar).
+     * UPDATE: si ya había uno programado con otro intervalo (la versión 1.1.1 lo hacía cada 6 h), lo reemplaza.
+     */
     static void programarTrabajo(Context c) {
-        PeriodicWorkRequest r = new PeriodicWorkRequest.Builder(ActualizaHorarioWorker.class, 6, TimeUnit.HOURS)
+        PeriodicWorkRequest r = new PeriodicWorkRequest.Builder(ActualizaHorarioWorker.class, 15, TimeUnit.MINUTES)
             .setConstraints(new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build();
-        WorkManager.getInstance(c).enqueueUniquePeriodicWork("horario-widget", ExistingPeriodicWorkPolicy.KEEP, r);
+        WorkManager.getInstance(c).enqueueUniquePeriodicWork("horario-widget", ExistingPeriodicWorkPolicy.UPDATE, r);
     }
 
     static void refrescar(Context c) {

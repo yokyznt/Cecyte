@@ -546,6 +546,12 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .toast__accion:hover { background: var(--green-100); }
 .toast__accion:focus-visible { outline: 3px solid var(--green-600); outline-offset: 2px; }
 
+/* Cambios del día: etiqueta sobre la materia (alumno y admin) y botones por clase (admin) */
+.cambio { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-cap); font-weight: 700; line-height: 1.4; color: var(--rose-700); background: var(--rose-50, #fff1f2); border: 1px solid var(--rose-700); }
+.cell-subject .cambio { display: block; width: max-content; max-width: 100%; }
+.cambio--ausente { color: oklch(0.45 0.12 60); background: oklch(0.97 0.04 85); border-color: oklch(0.55 0.13 60); }
+.cambio-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; justify-content: flex-end; }
+
 /* Aviso fijo en el panel de admin (por ejemplo: el timbre no se reporta) */
 .banner { margin: 0 0 12px; padding: 12px 16px; border-radius: var(--r-md, 10px); font-size: var(--fs-sm); font-weight: 600; }
 .banner[hidden] { display: none; }

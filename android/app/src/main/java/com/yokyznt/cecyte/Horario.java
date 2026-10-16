@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Datos del widget y cálculo de qué clase es «ahora» y cuál «sigue». El cálculo (calcular, proximoCambio) no toca
@@ -28,6 +29,15 @@ public final class Horario {
 
         Clase(String grupo, String dia, String hora, String materia, String maestro) {
             this.grupo = grupo; this.dia = dia; this.hora = hora; this.materia = materia; this.maestro = maestro;
+        }
+    }
+
+    /** Cambio del día que marca el admin (clase cancelada / maestro ausente); es lo que devuelve /api/changes. */
+    public static final class Cambio {
+        final String id, grupo, fecha, hora, tipo, nota;
+
+        Cambio(String id, String grupo, String fecha, String hora, String tipo, String nota) {
+            this.id = id; this.grupo = grupo; this.fecha = fecha; this.hora = hora; this.tipo = tipo; this.nota = nota;
         }
     }
 
@@ -59,10 +69,22 @@ public final class Horario {
         return r;
     }
 
+    static List<Cambio> leerCambios(String json) {
+        List<Cambio> r = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(json);
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                r.add(new Cambio(o.optString("id"), o.optString("group"), o.optString("date"), o.optString("time"), o.optString("tipo"), o.optString("nota")));
+            }
+        } catch (Exception e) { /* datos rotos: sin cambios */ }
+        return r;
+    }
+
     static Estado estadoAhora(Context c) {
         SharedPreferences p = prefs(c);
         Calendar ahora = Calendar.getInstance();
-        return calcular(leer(p.getString("horario", "[]")), p.getString("grupo", ""),
+        return calcular(leer(p.getString("horario", "[]")), leerCambios(p.getString("cambios", "[]")), fechaHoy(ahora), p.getString("grupo", ""),
             ahora.get(Calendar.DAY_OF_WEEK), ahora.get(Calendar.HOUR_OF_DAY) * 60 + ahora.get(Calendar.MINUTE));
     }
 
@@ -84,8 +106,42 @@ public final class Horario {
         return c.maestro.isEmpty() ? bloque : c.maestro + " · " + bloque;
     }
 
-    /** diaSemana es Calendar.DAY_OF_WEEK; minuto es el minuto del día (0-1439). */
+    // Mismos textos que TEXTO_CAMBIO de app.js
+    static String textoCambio(String tipo) {
+        return "ausente".equals(tipo) ? "Maestro ausente" : "Cancelada hoy";
+    }
+
+    private static String detalleCambio(Cambio x) {
+        return x.nota.isEmpty() ? textoCambio(x.tipo) : textoCambio(x.tipo) + " · " + x.nota;
+    }
+
+    static Cambio buscarCambio(List<Cambio> cs, String fecha, String grupo, String hora) {
+        for (Cambio x : cs) if (x.fecha.equals(fecha) && x.grupo.equals(grupo) && x.hora.equals(hora)) return x;
+        return null;
+    }
+
+    static String fechaHoy(Calendar c) {
+        return String.format(Locale.US, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /** Nombre del día como lo guarda el horario ("Lunes"...), o null en fin de semana. diaSemana es Calendar.DAY_OF_WEEK. */
+    static String nombreDia(int diaSemana) {
+        int d = diaSemana - Calendar.MONDAY;
+        return d >= 0 && d < DIAS.length ? DIAS[d] : null;
+    }
+
+    /** ¿Toca revisar cambios del día? Solo lunes a viernes de 06:00 a 15:30: fuera de ahí el trabajo de fondo no gasta red ni batería. */
+    static boolean enHorarioDeRevision(int diaSemana, int minuto) {
+        return nombreDia(diaSemana) != null && minuto >= 6 * 60 && minuto < 15 * 60 + 30;
+    }
+
+    /** Sin cambios del día: igual que antes. */
     public static Estado calcular(List<Clase> clases, String grupo, int diaSemana, int minuto) {
+        return calcular(clases, new ArrayList<Cambio>(), "", grupo, diaSemana, minuto);
+    }
+
+    /** diaSemana es Calendar.DAY_OF_WEEK; minuto es el minuto del día (0-1439); fechaHoy es AAAA-MM-DD. */
+    public static Estado calcular(List<Clase> clases, List<Cambio> cambios, String fechaHoy, String grupo, int diaSemana, int minuto) {
         if (grupo == null || grupo.isEmpty()) return new Estado("Elige tu grupo", "Abre la app", "", "");
         int d = diaSemana - Calendar.MONDAY;
         if (d < 0 || d >= DIAS.length) return new Estado("Sin clases hoy", "Fin de semana", "", "");
@@ -101,8 +157,9 @@ public final class Horario {
             ahora = "Receso"; ahoraDet = RECESO;
         } else {
             Clase c = buscar(clases, grupo, dia, BLOQUES[actual]);
+            Cambio x = c != null ? buscarCambio(cambios, fechaHoy, grupo, BLOQUES[actual]) : null;
             ahora = c != null ? c.materia : "Sin clase";
-            ahoraDet = c != null ? detalle(c, BLOQUES[actual]) : BLOQUES[actual];
+            ahoraDet = x != null ? detalleCambio(x) : c != null ? detalle(c, BLOQUES[actual]) : BLOQUES[actual];
         }
 
         String sigue = "No hay más clases por hoy", sigueDet = "";
@@ -110,7 +167,12 @@ public final class Horario {
         for (int i = desde; i < BLOQUES.length; i++) {
             if (BLOQUES[i].equals(RECESO)) { sigue = "Receso"; sigueDet = RECESO; break; }
             Clase c = buscar(clases, grupo, dia, BLOQUES[i]);
-            if (c != null) { sigue = c.materia; sigueDet = detalle(c, BLOQUES[i]); break; }
+            if (c != null) {
+                Cambio x = buscarCambio(cambios, fechaHoy, grupo, BLOQUES[i]);
+                sigue = c.materia;
+                sigueDet = x != null ? detalleCambio(x) : detalle(c, BLOQUES[i]);
+                break;
+            }
         }
         return new Estado(ahora, ahoraDet, sigue, sigueDet);
     }
