@@ -676,6 +676,29 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.RECORRIDO_MAX, 10);
 }
 
+// 34) Freno por obstáculo: solo hacia adelante, con las dos últimas lecturas cerca y frescas (15 cm; 35 en turbo)
+{
+    const F = R.frenoPorDistancia;
+    assert.deepStrictEqual(F(100, 100, [10, 12], 100, false), { izq: 0, der: 0, cerca: true, bloqueado: true }, 'adelante y a 10 cm: frena');
+    assert.strictEqual(F(100, 100, [10, 30], 100, false).bloqueado, false, 'una sola lectura cerca no frena (eco falso)');
+    assert.strictEqual(F(100, 100, [20, 20], 100, false).bloqueado, false, 'a 20 cm todavía avanza');
+    assert.strictEqual(F(100, 100, [20, 20], 100, true).bloqueado, true, 'en turbo frena desde 35 cm');
+    assert.strictEqual(F(-100, -100, [5, 5], 100, false).bloqueado, false, 'atrás siempre se puede');
+    assert.deepStrictEqual(F(80, -80, [5, 5], 100, false), { izq: 80, der: -80, cerca: true, bloqueado: false }, 'girar en el sitio se puede');
+    assert.strictEqual(F(100, 40, [5, 5], 100, false).bloqueado, true, 'una curva hacia adelante también se bloquea');
+    assert.strictEqual(F(100, 100, [5, 5], 5000, false).bloqueado, false, 'lectura vieja: no se sabe, no frena');
+    assert.strictEqual(F(100, 100, [400, 400], 100, true).bloqueado, false, '400 = sin eco');
+    assert.strictEqual(F(100, 100, [0, 0], 100, false).bloqueado, false, '0 no es una lectura');
+    assert.strictEqual(F(100, 100, [5], 100, false).bloqueado, false, 'con una sola lectura todavía no frena');
+    assert.strictEqual(F(100, 100, undefined, 0, false).bloqueado, false);
+    // el firmware responde a DIST, avisa DIST=1 en INFO y la página sabe leerlo
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/!strcmp\(cmd, "DIST"\)/.test(ino) && /Serial\.print\(F\("DIST "\)\)/.test(ino), 'DIST en el firmware');
+    assert(/F\(" DIST=1"\)/.test(ino), 'INFO avisa DIST=1');
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/\^DIST /.test(js) && /kv\.DIST === 1/.test(js), 'la página lee DIST y DIST=1');
+}
+
 console.log('robot.test.js: todo bien');
 
 // 32) Turbo: con tope VEL_TURBO la palanca al frente pide más que con el tope normal, nunca más que VEL_TURBO

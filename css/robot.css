@@ -283,6 +283,12 @@
 .rb-cancion--mia span::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--m-naranja); vertical-align: middle; }
 .rb-cancion[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
 .rb-cancion[aria-pressed="true"] .icon { background: var(--m-base); color: var(--m-verde); }
+/* Distancia al obstáculo y freno automático (botón de la barra) */
+.rb-freno { min-width: 76px; height: 44px; padding: 0 12px; border-radius: 14px; font: inherit; font-size: var(--fs-sm); font-weight: 700; box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-freno[hidden] { display: none; }
+.rb-freno[aria-pressed="false"] { opacity: 0.55; text-decoration: line-through; }
+.rb-freno.is-cerca[aria-pressed="true"] { background: var(--m-rojo); color: #fff; }
+
 /* Recorridos: grabar (el botón de la barra late en rojo) y repetir */
 .rb-ruta { display: flex; gap: 6px; }
 .rb-ruta .rb-cancion { flex: 1 1 auto; min-width: 0; }

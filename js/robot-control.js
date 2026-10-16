@@ -22,6 +22,7 @@
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
         turbo: false, vmaxPrev: 60, luzPrev: null, carga: 0, enfriaHasta: 0, ultimaRev: 0,
+        freno: true,                      // freno automático ante obstáculos (necesita el firmware con DIST)
         grab: null,                       // grabando un recorrido: { t0, pasos }
         repro: null,                      // repitiendo uno: { r, t0, ult, envio, timer }
     };
@@ -61,6 +62,12 @@
         const m = raiz.Robot.mezclaJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         // Repitiendo un recorrido: si se toca la palanca, el teclado o el teléfono, el mando recupera el control
         if (C.repro) { if (m.izq || m.der) pararRepro(false); else return; }
+        // Freno por obstáculo: hacia adelante no pasa de 15 cm (35 en turbo); atrás y girar en el sitio siguen libres
+        if (C.freno && enlace().distancias) {
+            const d = enlace().distancias();
+            const f = raiz.Robot.frenoPorDistancia(m.izq, m.der, d.lecturas, ahora - d.t, turbo);
+            m.izq = f.izq; m.der = f.der;
+        }
         const clave = m.izq + ',' + m.der;
         if (C.turbo) guardaCalor(m, ahora);
         if (m.izq === 0 && m.der === 0) {
@@ -385,7 +392,24 @@
         }));
     }
 
+    // Distancia al obstáculo (cm) en la barra; se pone roja cuando está dentro del umbral de frenado
+    function pintarDistancia() {
+        const b = $('rb-freno');
+        const e = enlace();
+        b.hidden = !(e && e.soportaDistancia && e.soportaDistancia());
+        const d = e && e.distancias ? e.distancias() : null;
+        const cm = d && d.lecturas.length ? d.lecturas[d.lecturas.length - 1] : null;
+        $('rb-dist').textContent = cm === null || cm >= 400 ? '-- cm' : cm + ' cm';
+        b.classList.toggle('is-cerca', !!d && raiz.Robot.frenoPorDistancia(1, 1, d.lecturas, Date.now() - d.t, C.turbo).cerca);
+    }
+
     function iniciarBotones() {
+        $('rb-freno').addEventListener('click', () => {
+            C.freno = !C.freno;
+            $('rb-freno').setAttribute('aria-pressed', String(C.freno));
+            $('rb-freno').setAttribute('aria-label', 'Freno automático ante obstáculos: ' + (C.freno ? 'activado' : 'apagado'));
+            vibrar(12);
+        });
         $('rb-ctl-paro').addEventListener('pointerdown', e => { e.preventDefault(); frenar(true); vibrar([60, 40, 60]); });
         $('rb-ctl-paro').addEventListener('click', e => { if (e.detail === 0) frenar(true); });     // teclado / lector de pantalla
         $('rb-ctl-vmax').addEventListener('input', e => {
@@ -618,6 +642,7 @@
         const sec = $('sec-robot-control');
         for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
         sec.classList.toggle('is-sin-enlace', e !== 'listo');
+        pintarDistancia();
         if (e !== 'listo') { pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
     }
 
@@ -633,6 +658,9 @@
         $('rb-ctl-salir').addEventListener('click', cerrarMando);
         pintarEstado();
         setInterval(revisar, MS_REVISION);
+        // ~3 veces por segundo, con el mando abierto, se pregunta la distancia (el enlace no pregunta si la cola está ocupada)
+        setInterval(() => { if (C.activa && abierto() && listo() && enlace().soportaDistancia()) enlace().pedirDistancia(); }, 330);
+        document.addEventListener('robot-distancia', pintarDistancia);
 
         document.addEventListener('robot-estado', pintarEstado);
         document.addEventListener('seccion-admin', e => {
