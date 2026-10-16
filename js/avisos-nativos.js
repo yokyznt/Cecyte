@@ -1,6 +1,6 @@
 // Avisos de cambio de clase en el APK: notificaciones locales agendadas en el teléfono.
 // Reemplaza a Web Push (que el WebView de Android no ofrece). Qué avisa y con qué texto es lo mismo que
-// el cron del servidor: en cada cambio de bloque, "La clase actual está por terminar" + la que sigue.
+// el cron del servidor: en cada cambio de bloque, la materia y el maestro de la clase que sigue.
 //  - agenda los próximos DIAS_ADELANTE días del grupo elegido (lunes a viernes)
 //  - se renueva al abrir la app, al traer un horario nuevo, al cambiar de grupo y al reanudar
 //  - usa alarmas exactas si el usuario las concede; si no, Android las entrega aproximadas
