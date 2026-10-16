@@ -280,7 +280,7 @@
 .rb-cancion:active { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); }
 .rb-cancion .icon { flex: none; width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--m-menta); color: var(--m-base); stroke-width: 2.6; fill: currentColor; }
 .rb-cancion span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rb-cancion--mia { box-shadow: 0 3px 0 var(--m-base), inset 3px 0 0 var(--m-naranja); }
+.rb-cancion--mia span::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--m-naranja); vertical-align: middle; }
 .rb-cancion[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
 .rb-cancion[aria-pressed="true"] .icon { background: var(--m-base); color: var(--m-verde); }
 .rb-menu__vacio { padding: 14px; color: var(--m-tenue); font-size: var(--fs-sm); }
