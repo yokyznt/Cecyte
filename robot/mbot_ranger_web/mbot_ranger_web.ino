@@ -32,6 +32,7 @@
     FSAVE m [1]      guarda la función m (1 esquivar, 2 seguir la mano); con 1 arranca sola 2,5 s después de
                      encender. FCLR la borra
     BAT              responde "BAT 7.42" (voltaje de la batería)
+    DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
     DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
                      frena los motores y borra lo pendiente. Responde ABORTED.
@@ -826,6 +827,9 @@ void ejecuta(char *s) {
     Serial.print(F("BAT "));
     imprimeDec(bateriaCv(), 2);
     Serial.println();
+  } else if (!strcmp(cmd, "DIST")) {
+    Serial.print(F("DIST "));
+    Serial.println(distanciaCm());
   } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
     for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
     ok();
@@ -949,6 +953,7 @@ void setup() {
   imprimeDec(bateriaCv(), 2);
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
+  Serial.print(F(" DIST=1"));                  // este programa entiende la orden DIST
   Serial.println();
   Serial.println(F("mBot Ranger web v1 listo"));
 }

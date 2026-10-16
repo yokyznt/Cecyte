@@ -1007,7 +1007,22 @@ function pasoEn(r, t) {
     return paso;
 }
 
+// ---------- Freno por obstáculo del mando ----------
+// Si va hacia adelante y las dos últimas lecturas de DIST están más cerca que el umbral (15 cm; 35 en turbo, que frena peor),
+// no avanza. Retroceder y girar en el sitio siguen permitidos. Una lectura vieja (el robot dejó de contestar) no frena:
+// no se puede saber, y el firmware ya frena solo a los 3 s sin órdenes. Las lecturas de 400 son «sin eco».
+const DIST_FRENO = 15, DIST_FRENO_TURBO = 35, DIST_VIEJA_MS = 1500;
+
+function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
+    const umbral = turbo ? DIST_FRENO_TURBO : DIST_FRENO;
+    const cerca = Array.isArray(lecturas) && lecturas.length >= 2 && edadMs <= DIST_VIEJA_MS
+        && lecturas.slice(-2).every(cm => cm > 0 && cm < umbral);
+    if (!cerca || izq + der <= 0) return { izq, der, cerca, bloqueado: false };
+    return { izq: 0, der: 0, cerca, bloqueado: true };
+}
+
 const lib = {
+    DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
@@ -1051,6 +1066,8 @@ const S = {
     musicaIds: [],            // temporizadores de la música que la página manda nota a nota en las funciones autónomas
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
+    fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
+    distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
 const MAX_GUARDADAS = 40;
@@ -1148,12 +1165,23 @@ function alLinea(l) {
     } else if (/^BAT /.test(l)) {
         S.cola.ack();                      // BAT contesta con su propia línea, sin OK
         bateriaLeida(parseFloat(l.slice(4)));
+    } else if (/^DIST /.test(l)) {
+        S.cola.ack();                      // igual: DIST contesta con su propia línea
+        const cm = parseInt(l.slice(5), 10);
+        if (Number.isFinite(cm)) {
+            S.distancias.push(cm);
+            if (S.distancias.length > 2) S.distancias.shift();
+            S.distanciaT = Date.now();
+            document.dispatchEvent(new CustomEvent('robot-distancia'));
+        }
     } else if (/^INFO /.test(l)) {
         // "INFO BOOT=2 BTN=0 RUN=3 MIN=5.4 BAT=7.42" al encender: lo que el robot anotó solo desde que
         // se borró el aviso. BOOT cuenta cada arranque, y conectarlo por USB también reinicia la placa
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
         S.fwNuevo = true;                  // este programa ya entiende la orden BAT
+        S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
+        document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
         const cosas = [];
@@ -2554,6 +2582,10 @@ function iniciar() {
         listo: () => S.estado === 'listo',
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
         paro: pararTodo,
+        // Distancia al obstáculo de enfrente (firmware con DIST): el mando pregunta ~3 veces por segundo, nunca con la cola ocupada
+        soportaDistancia: () => S.estado === 'listo' && S.fwDist,
+        pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
+        distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
         luzAhora: () => ({ efecto: S.efecto, leds: S.leds.slice() }),
         ponerLuz(o) {
