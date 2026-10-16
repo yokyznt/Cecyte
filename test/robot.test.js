@@ -650,6 +650,32 @@ for (const c of R.CANCIONES) {
     assert.deepStrictEqual(e2, ['M 10 10', 'M 20 20'], 'una M perdida no traba el control');
 }
 
+// 33) Recorridos grabados: el tiempo arranca en la primera orden, siempre termina frenado y lo roto se descarta
+{
+    const g = R.compactarRecorrido([{ t: 1000, izq: 60, der: 60 }, { t: 1500, izq: 60, der: 60 }, { t: 2000, izq: 30, der: 90 }], 3500, 'Prueba');
+    assert.deepStrictEqual(g.pasos, [{ t: 0, izq: 60, der: 60 }, { t: 1000, izq: 30, der: 90 }, { t: 2500, izq: 0, der: 0 }], 'sin repetidas y cerrado con frenado');
+    assert.strictEqual(g.ms, 2500);
+    const f = R.compactarRecorrido([{ t: 100, izq: 50, der: 50 }, { t: 600, izq: 0, der: 0 }], 5000, 'Frenado');
+    assert.strictEqual(f.ms, 500, 'si ya terminó frenado, el silencio final se recorta');
+    assert.strictEqual(R.compactarRecorrido([{ t: 0, izq: 0, der: 0 }], 500, 'x'), null, 'sin movimiento no se guarda');
+    assert.strictEqual(R.compactarRecorrido([], 500, 'x'), null);
+    assert.strictEqual(R.pasoEn(g, 0).izq, 60);
+    assert.strictEqual(R.pasoEn(g, 999).izq, 60, 'antes del siguiente paso sigue el anterior');
+    assert.strictEqual(R.pasoEn(g, 1000).izq, 30);
+    assert.strictEqual(R.pasoEn(g, 9999).izq, 0);
+    // lo que viene de localStorage puede estar roto o ser malicioso
+    assert.strictEqual(R.validarRecorrido(null), null);
+    assert.strictEqual(R.validarRecorrido({ pasos: 'x' }), null);
+    const v = R.validarRecorrido({ nombre: 'a'.repeat(99), ms: 'x', pasos: [{ t: 0, izq: 999, der: -999 }, { t: -5, izq: 1, der: 1 }, { t: 'a', izq: 1, der: 1 }, { t: 500, izq: 0, der: 0 }] });
+    assert.strictEqual(v.nombre.length, 30);
+    assert.deepStrictEqual(v.pasos, [{ t: 0, izq: R.VEL_TURBO, der: -R.VEL_TURBO }, { t: 500, izq: 0, der: 0 }], 'recorta la velocidad y descarta pasos inválidos');
+    assert(v.ms >= 500 && v.ms <= R.RECORRIDO_MS);
+    const largo = R.validarRecorrido({ ms: 1e9, pasos: [{ t: 0, izq: 50, der: 50 }, { t: 1e9, izq: 0, der: 0 }] });
+    assert.strictEqual(largo.pasos.length, 1, 'un paso fuera del tope de duración se descarta');
+    assert.strictEqual(largo.ms, R.RECORRIDO_MS);
+    assert.strictEqual(R.RECORRIDO_MAX, 10);
+}
+
 console.log('robot.test.js: todo bien');
 
 // 32) Turbo: con tope VEL_TURBO la palanca al frente pide más que con el tope normal, nunca más que VEL_TURBO
