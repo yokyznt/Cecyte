@@ -2,7 +2,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { construirICS } = require('../calendario.js');
+const { construirICS, filasAHorario } = require('../calendario.js');
 
 const raiz = path.join(__dirname, '..');
 const miercoles = new Date(2026, 9, 14, 12, 0, 0);          // miércoles 14 de octubre de 2026
@@ -45,5 +45,31 @@ assert(sw.includes("API_GUARDABLE = ['/api/schedule', '/api/groups']"));
 assert(/req\.method !== 'GET'/.test(sw) && /url\.origin !== self\.location\.origin/.test(sw));
 ['/', '/index.html', '/app.js', '/css/tokens.css', '/css/components.css', '/calendario.js'].forEach(u => assert(sw.includes(`'${u}'`), 'precache ' + u));
 assert(/addEventListener\('push'/.test(sw) && /addEventListener\('notificationclick'/.test(sw), 'sigue dando los avisos push');
+
+// Pegar el horario desde Excel: tabuladores, encabezado, comillas, días sin acento, horas sueltas y errores por fila
+{
+    const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+    const bloques = ['07:00 - 08:00', '08:00 - 08:45', '09:15 - 10:00', '10:00 - 11:00'];
+    const txt = [
+        'Grupo\tDía\tHora\tMateria\tMaestro',
+        '501 Programación\tlunes\t7:00-8:00\tCálculo\tIng. Gómez',
+        '',
+        '501 Programación\tMIERCOLES\t08:00 a 08:45\t"Física ""II"""\t',
+        '502 Contabilidad\tViernes\t10:00 - 11:00\tContabilidad I',
+    ].join('\r\n');
+    let r = filasAHorario(txt, dias, bloques);
+    assert.deepStrictEqual(r.errores, []);
+    assert.deepStrictEqual(r.items, [
+        { group: '501 Programación', day: 'Lunes', time: '07:00 - 08:00', subject: 'Cálculo', teacher: 'Ing. Gómez' },
+        { group: '501 Programación', day: 'Miércoles', time: '08:00 - 08:45', subject: 'Física "II"', teacher: '' },
+        { group: '502 Contabilidad', day: 'Viernes', time: '10:00 - 11:00', subject: 'Contabilidad I', teacher: '' },
+    ]);
+    // punto y coma (CSV de Excel en español) y errores con su número de fila
+    r = filasAHorario('A;Lunes;07:00 - 08:00;Mate;Ana\nA;Sabado;07:00 - 08:00;X;Y\nA;Lunes;07:30 - 08:00;X;Y\nA;Lunes;07:00 - 08:00', dias, bloques);
+    assert.strictEqual(r.items.length, 1);
+    assert.deepStrictEqual(r.errores.map(e => e.slice(0, 7)), ['Fila 2:', 'Fila 3:', 'Fila 4:']);
+    assert(/día "Sabado"/.test(r.errores[0]) && /hora "07:30 - 08:00"/.test(r.errores[1]) && /faltan datos/.test(r.errores[2]));
+    assert.deepStrictEqual(filasAHorario('   \n\n', dias, bloques), { items: [], errores: [] });
+}
 
 console.log('calendario.test.js: todo bien');

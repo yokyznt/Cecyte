@@ -74,7 +74,37 @@
         return { texto: todo.join('\r\n') + '\r\n', eventos };
     }
 
-    const lib = { construirICS };
+    // ---------- Pegar el horario desde Excel ----------
+    // Convierte filas copiadas de una hoja de cálculo (columnas separadas por tabulador o ;) en materias:
+    // grupo, día, hora, materia y maestro (el maestro puede ir vacío). Tolera encabezado, líneas vacías, comillas de
+    // Excel, días sin acento o en mayúsculas y horas como "7:00-8:00". dias y bloques son los de app.js (daysOfWeek y los timeSlots sin receso).
+    const sinAcentos = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+    function celda(c) {
+        c = String(c).trim();
+        if (c.length >= 2 && c[0] === '"' && c[c.length - 1] === '"') c = c.slice(1, -1).replace(/""/g, '"').trim();
+        return c;
+    }
+
+    function filasAHorario(texto, dias, bloques) {
+        const items = [], errores = [];
+        String(texto).split(/\r?\n/).forEach((linea, i) => {
+            if (!linea.trim()) return;
+            const c = linea.split(linea.includes('\t') ? '\t' : ';').map(celda);
+            if (i === 0 && sinAcentos(c[0]) === 'grupo') return;                      // encabezado
+            const n = i + 1;
+            if (c.length < 4 || !c[0] || !c[3]) { errores.push(`Fila ${n}: faltan datos (grupo, día, hora y materia son obligatorios; el maestro puede ir vacío).`); return; }
+            const dia = dias.find(d => sinAcentos(d) === sinAcentos(c[1]));
+            if (!dia) { errores.push(`Fila ${n}: el día "${c[1]}" no es válido.`); return; }
+            const h = /^(\d{1,2}):(\d{2})\s*(?:-|a|–)\s*(\d{1,2}):(\d{2})$/i.exec(c[2]);
+            const hora = h ? `${h[1].padStart(2, '0')}:${h[2]} - ${h[3].padStart(2, '0')}:${h[4]}` : '';
+            if (!bloques.includes(hora)) { errores.push(`Fila ${n}: la hora "${c[2]}" no coincide con ningún bloque del horario.`); return; }
+            items.push({ group: c[0], day: dia, time: hora, subject: c[3], teacher: c[4] || '' });
+        });
+        return { items, errores };
+    }
+
+    const lib = { construirICS, filasAHorario };
     if (typeof module !== 'undefined' && module.exports) module.exports = lib;
     else raiz.Calendario = lib;
 })(typeof window !== 'undefined' ? window : globalThis);

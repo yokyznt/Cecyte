@@ -1191,22 +1191,35 @@ async function importSchedule() {
     statusEl.className = 'msg';
     statusEl.innerText = '';
 
-    let parsed;
-    try {
-        parsed = JSON.parse(textarea.value);
-    } catch (err) {
-        statusEl.className = 'msg msg--err';
-        statusEl.innerText = 'Eso no es un código válido — revisa que sea JSON correcto (llaves, comillas, comas).';
-        return;
-    }
-
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-        statusEl.className = 'msg msg--err';
-        statusEl.innerText = 'El código debe ser una lista de materias entre corchetes [ ].';
-        return;
-    }
-
     const validTimeKeys = timeSlots.filter(s => !s.receso).map(s => s.key);
+    const texto = textarea.value.trim();
+
+    let parsed;
+    if (texto && texto[0] !== '[') {
+        // Filas copiadas de Excel: grupo, día, hora, materia, maestro (separadas por tabulador o ;)
+        const fila = Calendario.filasAHorario(texto, daysOfWeek, validTimeKeys);
+        if (fila.errores.length > 0 || fila.items.length === 0) {
+            statusEl.className = 'msg msg--err';
+            statusEl.innerHTML = fila.errores.length
+                ? fila.errores.slice(0, 6).map(esc).join('<br>')
+                : 'No encontré filas. Copia las columnas grupo, día, hora, materia y maestro desde Excel y pégalas aquí.';
+            return;
+        }
+        parsed = fila.items;
+    } else {
+        try {
+            parsed = JSON.parse(textarea.value);
+        } catch (err) {
+            statusEl.className = 'msg msg--err';
+            statusEl.innerText = 'Eso no es un código válido — pega filas de Excel o un JSON correcto (llaves, comillas, comas).';
+            return;
+        }
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+            statusEl.className = 'msg msg--err';
+            statusEl.innerText = 'El código debe ser una lista de materias entre corchetes [ ].';
+            return;
+        }
+    }
     const errors = [];
     parsed.forEach((item, i) => {
         if (!item.group || !item.day || !item.time || !item.subject) {
