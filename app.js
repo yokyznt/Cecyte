@@ -800,20 +800,13 @@ function checkScheduleAndNotify() {
     }
 }
 
-// Mensaje que le llega al alumno: NO dice que materia termina, solo avisa que va a terminar
-// y dice con detalle la materia que sigue y su profesor. Lo usan el aviso en pantalla y las
-// notificaciones locales del APK (js/avisos-nativos.js); el cron del servidor arma el mismo texto.
+// Mensaje que le llega al alumno: solo la materia que sigue y su maestro (o «Receso» / «No hay más clases por hoy»).
+// Lo usan el aviso en pantalla y las notificaciones locales del APK (js/avisos-nativos.js);
+// el cron del servidor arma el mismo texto (buildMessage en api/cron/check-schedule.js).
 function textoAviso(prevClass, nextSlot, nextClass) {
-    const lineas = [];
-    if (prevClass) lineas.push('La clase actual está por terminar.');
-    if (nextSlot && nextSlot.receso) {
-        lineas.push('Sigue: Receso.');
-    } else if (nextClass) {
-        lineas.push(`Comienza: ${nextClass.subject}, con el/la profesor(a) ${nextClass.teacher}.`);
-    } else if (!prevClass) {
-        lineas.push('No hay más clases por el momento.');
-    }
-    return lineas.join('\n');
+    if (nextSlot && nextSlot.receso) return 'Receso';
+    if (nextClass) return nextClass.teacher ? `${nextClass.subject}, ${nextClass.teacher}` : nextClass.subject;
+    return 'No hay más clases por hoy';
 }
 
 function fireClassChangeAlert(prevClass, nextSlot, nextClass) {

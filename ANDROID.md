@@ -1,7 +1,7 @@
 # App de Android (CECyTE 18)
 
-La app es la misma web empaquetada con **Capacitor 8**: un solo código para el sitio y el APK. El robot no entra
-al APK (queda solo en la web de escritorio).
+La app es la misma web empaquetada con **Capacitor 8**: un solo código para el sitio y el APK. El robot entra al APK desde la 1.1.0 y se
+conecta por Bluetooth LE; en la web de escritorio sigue por USB.
 
 ## Qué cambia entre la web y el APK
 
@@ -12,7 +12,7 @@ al APK (queda solo en la web de escritorio).
 | Sesión de admin | cookie HttpOnly | token Bearer (`js/api.js`), solo en el APK |
 | Avisos | Web Push + service worker | notificaciones locales (`js/avisos-nativos.js`) |
 | Sin conexión | service worker | copia local del horario y de los grupos |
-| Robot | sí | no (se quita en el build) |
+| Robot | sí, por USB (Web Serial) | sí, por Bluetooth LE (`js/robot-bluetooth.js`) con mando en horizontal (`js/robot-control.js`) |
 
 ## Estructura
 
@@ -38,7 +38,7 @@ android/               proyecto Capacitor
 - **Un tema nuevo:** crea `css/themes/<nombre>.css` redefiniendo los tokens bajo `html[data-tema="<nombre>"]`,
   enlázalo en `index.html` y agrega el nombre a `MODOS` de `js/tema.js`.
 - **Lo que solo existe en la web:** marca la línea con `@web:line`; lo del robot, con `@robot:line` o entre
-  `@robot:start` y `@robot:end` (HTML o JS). El build las elimina del APK.
+  `@robot:start` y `@robot:end` (HTML o JS). El build las elimina del APK solo si `config/apk.json` trae `incluirRobot: false`.
 
 ## Compilar
 
@@ -47,7 +47,7 @@ Requisitos (los mismos de Fruit Spire): Node, JDK 17/21 en `~/.jdks`, Android SD
 
 ```
 npm install
-npm test                          # pruebas (incluye que www/ salga sin robot ni secretos)
+npm test                          # pruebas (incluye que www/ salga sin secretos y respete incluirRobot)
 npm run www                       # solo arma www/
 node scripts/build-apk.js --debug # APK de pruebas (firma debug)
 npm run android:apk               # APK de release firmado -> Desktop\CECyTE-APK\CECyTE-18-<versión>.apk
@@ -78,3 +78,12 @@ los avisos viejos hasta abrirla o reiniciarse (no hay push remoto en el APK).
   calendario compartido, sin conexión) y la instalación estructural del APK (firma v2, permisos, versión).
 - No probado en un dispositivo real: notificaciones del sistema, alarmas exactas, botón atrás, SystemBars y el menú
   de compartir. Pendiente de una prueba con el teléfono conectado (`adb install -r`).
+
+## Robot por Bluetooth
+
+- Es BLE (el módulo se anuncia como `Makeblock_LE…`); lo conecta la app, **no** Ajustes de Android. Solo un aparato a la vez:
+  cierra mBlock y otras apps del robot.
+- Permisos de Android 12+: `BLUETOOTH_SCAN` y `BLUETOOTH_CONNECT` (se piden al conectar).
+- El mando (Robot > Control) bloquea la pantalla en horizontal con `@capacitor/screen-orientation`.
+- Los servicios y características que ofrece el módulo se muestran en Robot > Conexión.
+- Subir el programa al robot sigue siendo por USB con el IDE de Arduino.

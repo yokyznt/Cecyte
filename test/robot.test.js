@@ -328,6 +328,7 @@ for (const c of R.CANCIONES) {
     assert(/botonFlanco\(\) && botonSostenido\(\)/.test(ino), 'el botón exige una pulsación sostenida');
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
+    assert(new RegExp(`VEL_TURBO = ${R.VEL_TURBO};`).test(ino), 'VEL_TURBO distinto entre página y firmware');
     assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
 }
 
@@ -595,4 +596,68 @@ for (const c of R.CANCIONES) {
     assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');
 }
 
+// 30) Joystick: zona muerta, avance, giro en el sitio, curvas, límite del círculo y velocidad máxima
+{
+    const J = R.mezclaJoystick;
+    assert.deepStrictEqual(J(0, 0, 60), { izq: 0, der: 0 });
+    assert.deepStrictEqual(J(0.05, -0.05, 100), { izq: 0, der: 0 }, 'zona muerta');
+    assert.deepStrictEqual(J(0, 1, 100), { izq: 180, der: 180 }, 'al frente, a toda velocidad');
+    assert.deepStrictEqual(J(0, -1, 100), { izq: -180, der: -180 }, 'hacia atrás');
+    assert.deepStrictEqual(J(0, 1, 60), { izq: 108, der: 108 }, '60 % de 180');
+    assert.deepStrictEqual(J(1, 0, 100), { izq: 180, der: -180 }, 'a la derecha gira en su sitio');
+    assert.deepStrictEqual(J(-1, 0, 100), { izq: -180, der: 180 }, 'a la izquierda gira en su sitio');
+    const c = J(0.7, 0.7, 100);
+    assert(c.izq > c.der && c.der >= 0 && c.izq <= 180, 'diagonal: avanza curvando a la derecha');
+    assert.deepStrictEqual(J(3, 3, 100), J(0.7071, 0.7071, 100), 'fuera del círculo se recorta');
+    const m = J(0.3, 0.6, 20);
+    assert(Math.abs(m.izq) <= 36 && Math.abs(m.der) <= 36, 'vmax 20 % = 36');
+    assert.deepStrictEqual(J(NaN, undefined, 60), { izq: 0, der: 0 }, 'valores raros no mueven');
+    // hacia atrás es un volante: el robot retrocede hacia donde empujas, así que la rueda de ese lado es la que va más lenta
+    const a = J(0.5, -0.9, 100);
+    assert(a.izq < a.der && a.der < 0, 'atrás-derecha: la izquierda retrocede más (la parte de atrás se va a la derecha)');
+    const b = J(-0.5, -0.9, 100);
+    assert(b.der < b.izq && b.izq < 0, 'atrás-izquierda: al revés');
+    const d = J(0.5, 0.9, 100);
+    assert(d.izq > d.der && d.der > 0, 'adelante-derecha: la izquierda avanza más (curva a la derecha)');
+    assert.deepStrictEqual(J(1, -0.1, 100).izq > 0, true, 'casi en el sitio, a la derecha: sigue girando a la derecha');
+}
+
+// 31) Cola «último gana» (control en vivo): una sola M en camino y la más reciente reemplaza a la pendiente
+{
+    const enviadas = [], crudos = [];
+    const cola = R.crearCola(l => enviadas.push(l), c => crudos.push(c));
+    cola.mover('M 100 100'); cola.mover('M 90 90'); cola.mover('M 80 80'); cola.mover('M 70 70');
+    assert.deepStrictEqual(enviadas, ['M 100 100'], 'solo la primera sale; las demás esperan');
+    cola.ack();
+    assert.deepStrictEqual(enviadas, ['M 100 100', 'M 70 70'], 'tras el OK sale solo la más reciente');
+    cola.ack();
+    cola.mover('M 0 0');
+    assert.strictEqual(enviadas[enviadas.length - 1], 'M 0 0', 'frenar sale al instante si no hay nada en camino');
+    // el paro no espera: aborta y borra lo pendiente
+    cola.mover('M 50 50'); cola.mover('M 40 40');
+    cola.abortar();
+    assert.deepStrictEqual(crudos, ['!']);
+    cola.abortado();
+    assert.strictEqual(cola.ocupado(), false);
+    // una M que no se confirma en 1,5 s no bloquea la siguiente
+    const e2 = [];
+    const c2 = R.crearCola(l => e2.push(l), () => {});
+    const ahora = Date.now;
+    c2.mover('M 10 10');
+    Date.now = () => ahora() + 2000;
+    c2.mover('M 20 20');
+    Date.now = ahora;
+    assert.deepStrictEqual(e2, ['M 10 10', 'M 20 20'], 'una M perdida no traba el control');
+}
+
 console.log('robot.test.js: todo bien');
+
+// 32) Turbo: con tope VEL_TURBO la palanca al frente pide más que con el tope normal, nunca más que VEL_TURBO
+{
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100).izq, R.VEL_MAX);
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100, R.VEL_TURBO).izq, R.VEL_TURBO);
+    assert(R.VEL_TURBO > R.VEL_MAX && R.VEL_TURBO <= 255);
+    assert.strictEqual(R.mezclaJoystick(0, 1, 100, 9999).izq, R.VEL_TURBO);
+    const g = R.mezclaJoystick(1, 0, 100, R.VEL_TURBO);
+    assert(g.izq === R.VEL_TURBO && g.der === -R.VEL_TURBO);
+}

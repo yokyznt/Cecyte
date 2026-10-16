@@ -10,6 +10,7 @@
 // Protegido con un "secret" en la URL para que no cualquiera lo pueda disparar.
 
 import { kv } from '@vercel/kv';
+import { buildMessage } from '../../lib/aviso.js';
 import { getWebPush } from '../../lib/webpush.js';
 
 const SCHEDULE_KEY = 'cecyte_schedule';
@@ -57,19 +58,6 @@ function getCurrentSlot(hour, minute) {
         if (nowMinutes >= timeToMinutes(s) && nowMinutes < timeToMinutes(e)) return slot;
     }
     return null;
-}
-
-function buildMessage(prevClass, slot, nextClass) {
-    const lineas = [];
-    if (prevClass) lineas.push('La clase actual está por terminar.');
-    if (slot && slot.receso) {
-        lineas.push('Sigue: Receso.');
-    } else if (nextClass) {
-        lineas.push(`Comienza: ${nextClass.subject}${nextClass.teacher ? `, con el/la profesor(a) ${nextClass.teacher}` : ''}.`);
-    } else if (!prevClass) {
-        lineas.push('No hay más clases por el momento.');
-    }
-    return lineas.join('\n');
 }
 
 export default async function handler(req, res) {

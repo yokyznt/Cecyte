@@ -75,4 +75,4 @@ table { border-collapse: collapse; width: 100%; }
     gap: 22px;
 }
 .stack { display: flex; flex-direction: column; gap: 22px; }
-.view { animation: view-in 240ms var(--ease-out) both; }
+.view { animation: view-in 240ms var(--ease-out) backwards; }

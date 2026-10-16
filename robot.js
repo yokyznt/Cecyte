@@ -11,6 +11,7 @@
 
 const BAUDIOS = 115200;
 const VEL_MAX = 180;          // lo mismo que VEL_MAX del firmware
+const VEL_TURBO = 235;        // tope de la orden M en modo turbo (VEL_TURBO del firmware); el firmware sube en rampa, sin tirón de corriente
 const ARTICULACION = 0.9;     // cuánto de cada nota suena; el resto es el silencio entre notas
 const MAX_NOTAS = 600;
 const LEDS = 12;
@@ -149,6 +150,27 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
     return { cmds, ms: total };
 }
 
+// ---------- Joystick: de (x, y) a las dos ruedas ----------
+// x a la derecha e y hacia arriba, entre -1 y 1; vmax es el % de la velocidad máxima (20 a 100).
+// Con la palanca al frente van las dos ruedas igual; hacia un lado, gira en su sitio; en diagonal, avanza curvando.
+function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
+    const ZONA = 0.08;                                     // zona muerta: un roce no mueve el robot
+    x = clamp(Number(x) || 0, -1, 1);
+    y = clamp(Number(y) || 0, -1, 1);
+    const mag = Math.hypot(x, y);
+    if (mag < ZONA) return { izq: 0, der: 0 };
+    const k = Math.min(1, (mag - ZONA) / (1 - ZONA)) / mag;   // reescala fuera de la zona muerta y limita al círculo
+    // Hacia atrás la palanca es un volante: el robot retrocede hacia donde empujas (la x se invierte). Entre
+    // y = -0.15 y y = -0.35 pasa de una a otra, para que girar en el sitio no tenga un salto.
+    const volante = y >= -0.15 ? 1 : y <= -0.35 ? -1 : 1 - 2 * (-0.15 - y) / 0.2;
+    const sx = x * k * volante, sy = y * k;
+    let izq = sy + sx, der = sy - sx;
+    const m = Math.max(1, Math.abs(izq), Math.abs(der));
+    izq /= m; der /= m;
+    const V = Math.round(clamp(Number(vmax) || 0, 0, 100) / 100 * clamp(Number(tope) || VEL_MAX, 0, VEL_TURBO));
+    return { izq: Math.round(izq * V), der: Math.round(der * V) };
+}
+
 // ---------- Cola con confirmaciones ----------
 // Cada orden se confirma con una línea OK/ERR. Se mandan varias seguidas (para que no haya huecos
 // entre notas) sin pasarse de VENTANA_BYTES. Las de LEDs van solas porque mientras el robot
@@ -163,9 +185,14 @@ function crearCola(escribir, crudo) {
             const c = pend[0], n = c.l.length + 1;
             const bytes = vuelo.reduce((s, x) => s + x.n, 0);
             if (vuelo.length && (c.ex || vuelo[vuelo.length - 1].ex)) break;
+            if (c.k) {                         // control en vivo: una sola orden de cada clave en camino; si tarda más de 1,5 s se da por perdida
+                const enVuelo = vuelo.find(x => x.c.k === c.k);
+                if (enVuelo && Date.now() - enVuelo.t < 1500) break;
+                if (enVuelo) vuelo.splice(vuelo.indexOf(enVuelo), 1);
+            }
             if (vuelo.length >= VENTANA_ORDENES || (vuelo.length && bytes + n > VENTANA_BYTES)) break;
             pend.shift();
-            vuelo.push({ n, ex: !!c.ex, c });
+            vuelo.push({ n, ex: !!c.ex, c, t: Date.now() });
             escribir(c.l);
         }
         if (!pend.length && !vuelo.length && alFinal) {
@@ -188,6 +215,15 @@ function crearCola(escribir, crudo) {
             if (!vuelo.length) ultimoMov = Date.now();
             bombear();
         },
+        // Control en vivo (joystick, claxon): «último gana». Solo hay una orden de cada clave en camino y, mientras espera
+        // su OK, cada una nueva reemplaza a la anterior pendiente: así por Bluetooth no se acumula retraso.
+        ultimo(k, l) {
+            if (abortando) return;
+            pend = pend.filter(c => c.k !== k);
+            pend.push({ l, k });
+            bombear();
+        },
+        mover(l) { this.ultimo('M', l); },
         // err = el robot contestó ERR. Una orden de luces o de ajuste que llegó rota se reintenta una
         // vez (el USB puede perder un byte mientras el robot dibuja el anillo); las que llevan
         // tiempo (T, W, M) no, porque repetirlas descuadraría la canción. Devuelve true si reintentó.
@@ -520,6 +556,30 @@ function melodiaATexto(midi, hopMs, op) {
     }, []);
 
     // al registro del buzzer: octavas enteras, así cada nota conserva su nombre
+    // notas repetidas (la misma altura varias veces seguidas): se parten donde el volumen cae, con un respiro de un cuadro
+    if (o.cortes && o.cortes.length) {
+        const cortes = o.cortes.slice().sort((a, b) => a - b);
+        const partido = [];
+        let f0 = 0, k = 0;
+        for (const t of tramos) {
+            if (Number.isNaN(t.m)) { partido.push(t); f0 += t.n; continue; }
+            while (k < cortes.length && cortes[k] < f0) k++;
+            let ini = f0;
+            const fin = f0 + t.n;
+            while (k < cortes.length && cortes[k] < fin) {
+                const c = cortes[k++];
+                if (c - ini >= minF && fin - c > minF) {
+                    partido.push({ m: t.m, n: c - ini });
+                    partido.push({ m: NaN, n: 1 });
+                    ini = c + 1;
+                }
+            }
+            partido.push({ m: t.m, n: fin - ini });
+            f0 = fin;
+        }
+        tramos = partido;
+    }
+
     const sonadas = tramos.filter(t => !Number.isNaN(t.m)).map(t => t.m).sort((a, b) => a - b);
     let desplazo = 0;
     if (o.subir && sonadas.length) {
@@ -547,18 +607,44 @@ function melodiaATexto(midi, hopMs, op) {
     };
 }
 
+// Corre un generador de progreso hasta el final y devuelve su resultado (la versión que no cede el hilo).
+function correrSync(gen) {
+    let r = gen.next();
+    while (!r.done) r = gen.next();
+    return r.value;
+}
+
+const VACIO = () => ({ texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' });
+
+// Dónde baja el volumen de la melodía en medio de una nota que sigue igual: ahí empieza otra sílaba o golpe.
+function cortesDe(midi, amp) {
+    const n = midi.length, cortes = [], V = 6;
+    for (let f = V; f < n - V; f++) {
+        if (Number.isNaN(midi[f]) || Number.isNaN(midi[f - 1]) || Number.isNaN(midi[f + 1])) continue;
+        if (Math.abs(midi[f - V] - midi[f]) > 0.8 || Math.abs(midi[f + V] - midi[f]) > 0.8) continue;      // solo dentro de una misma altura
+        if (amp[f] > amp[f - 1] || amp[f] > amp[f + 1]) continue;                                           // mínimo local
+        let izq = 0, der = 0;
+        for (let j = 1; j <= V; j++) { izq = Math.max(izq, amp[f - j]); der = Math.max(der, amp[f + j]); }
+        if (amp[f] < 0.6 * Math.min(izq, der) && (!cortes.length || f - cortes[cortes.length - 1] > 3)) cortes.push(f);
+    }
+    return cortes;
+}
+
 // x: muestras mono en [-1, 1]; sr: su frecuencia de muestreo.
-// op: fMin y fMax (Hz) del registro de la melodía, sens (0 a 100), minNotaMs, tonalidad, subir.
+// op: fMin y fMax (Hz) del registro de la melodía, sens (0 a 100), estacionario (0 a 1), minNotaMs, tonalidad, subir.
 //
 // Sigue la línea melódica dominante (la voz si la hay, o el instrumento principal):
 //  1. espectro por cuadro, comprimido y "blanqueado" (se queda con los picos, no con el ruido
 //     ni con la batería);
-//  2. para cada altura candidata (pasos de un tercio de semitono) se suman sus armónicos: la
+//  2. se resta lo que se queda quieto (acordes sostenidos, bajo, pad): la melodía cambia, ellos no;
+//  3. para cada altura candidata (pasos de un tercio de semitono) se suman sus armónicos: la
 //     voz y los instrumentos tienen muchos, un golpe de batería o un bajo suelto no;
-//  3. Viterbi: elige el camino de alturas que más suena y menos salta, con un estado "sin
+//  4. Viterbi: elige el camino de alturas que más suena y menos salta, con un estado "sin
 //     melodía" para los silencios y las partes sin línea clara.
-function melodiaDeAudio(x, sr, op = {}) {
-    const o = Object.assign({ fMin: 110, fMax: 1000, sens: 50 }, op);
+// Es un generador: va cediendo el progreso (0 a 1) para que la página pueda mostrarlo sin congelarse.
+// Devuelve { midi, amp, energia, hopMs, o } con un valor por cuadro (midi NaN = sin melodía) o null si no hay audio.
+function* rastrearMelodia(x, sr, op = {}) {
+    const o = Object.assign({ fMin: 110, fMax: 1000, sens: 50, estacionario: 0.7 }, op);
     const k = Math.max(1, Math.round(sr / 16000)), sr2 = sr / k;
     const n2 = Math.floor(x.length / k);
     const y = new Float32Array(n2);
@@ -566,7 +652,7 @@ function melodiaDeAudio(x, sr, op = {}) {
 
     const N = 2048, hop = 512, M = N / 2;
     const frames = Math.floor((n2 - N) / hop);
-    if (frames < 4) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    if (frames < 4) return null;
     const hopMs = hop / sr2 * 1000, binHz = sr2 / N;
     const fTop = Math.min(3500, sr2 / 2 - 200);
     const kTop = Math.floor(fTop / binHz);
@@ -574,7 +660,7 @@ function melodiaDeAudio(x, sr, op = {}) {
     const cand = [];
     for (let f = Math.max(40, o.fMin); f <= Math.min(o.fMax, fTop / 2); f *= Math.pow(2, 1 / 36)) cand.push(f);
     const nC = cand.length;
-    if (nC < 4) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    if (nC < 4) return null;
     const H = 10, peso = Array.from({ length: H + 1 }, (_, h) => Math.pow(0.84, Math.max(0, h - 1)));
     // preferencia suave por el registro de la voz (alrededor de 320 Hz); ayuda a no irse a octavas raras
     const previa = cand.map(f => { const z = Math.log2(f / 320) / 1.1; return 0.85 + 0.15 * Math.exp(-0.5 * z * z); });
@@ -591,24 +677,47 @@ function melodiaDeAudio(x, sr, op = {}) {
     }
 
     const re = new Float32Array(N), im = new Float32Array(N);
-    const lm = new Float32Array(M + 2), blanco = new Float32Array(M + 2), suma = new Float64Array(M + 3);
+    const nb = kTop + 3;
+    const lm = new Float32Array(frames * nb);
     const W = Math.max(8, Math.round(250 / binHz));
-    const sal = new Float32Array(frames * nC);
-    const maxFrame = new Float32Array(frames);
+    // 1) espectro (raíz: se oyen los picos débiles sin que el más fuerte aplaste) por cuadro
     for (let f = 0; f < frames; f++) {
+        if ((f & 63) === 0) yield 0.3 * f / frames;
         if (energia[f] < 0.03 * maxE) continue;
         for (let i = 0; i < N; i++) { re[i] = y[f * hop + i] * ventana[i]; im[i] = 0; }
         fftEnSitio(re, im);
         let mx = 1e-9;
-        for (let b = 2; b <= kTop + 2; b++) { const m = Math.hypot(re[b], im[b]); lm[b] = m; if (m > mx) mx = m; }
-        suma[0] = 0;
-        for (let b = 0; b <= kTop + 2; b++) {
-            lm[b] = b < 2 ? 0 : Math.sqrt(lm[b] / mx);          // raíz: se oyen los picos débiles sin que el más fuerte aplaste
-            suma[b + 1] = suma[b] + lm[b];
+        for (let b = 2; b <= kTop + 2; b++) { const m = Math.hypot(re[b], im[b]); lm[f * nb + b] = m; if (m > mx) mx = m; }
+        for (let b = 2; b <= kTop + 2; b++) lm[f * nb + b] = Math.sqrt(lm[f * nb + b] / mx);
+    }
+    // 2) lo que se queda quieto (acordes, bajo, pad) se resta: promedio móvil lento hacia adelante y hacia atrás, el menor de los dos
+    const kEst = clamp(Number(o.estacionario) || 0, 0, 1), alfa = 1 - Math.exp(-hopMs / 350);
+    if (kEst > 0) {
+        const fwd = new Float32Array(frames * nb), acc = new Float32Array(nb);
+        for (let f = 0; f < frames; f++) {
+            for (let b = 0; b < nb; b++) { acc[b] += (lm[f * nb + b] - acc[b]) * alfa; fwd[f * nb + b] = acc[b]; }
         }
+        acc.fill(0);
+        for (let f = frames - 1; f >= 0; f--) {
+            if ((f & 127) === 0) yield 0.3 + 0.05 * (1 - f / frames);
+            for (let b = 0; b < nb; b++) {
+                acc[b] += (lm[f * nb + b] - acc[b]) * alfa;
+                lm[f * nb + b] = Math.max(0, lm[f * nb + b] - kEst * Math.min(fwd[f * nb + b], acc[b]));
+            }
+        }
+    }
+    // 3) salida de armónicos por altura candidata
+    const blanco = new Float32Array(M + 2), suma = new Float64Array(M + 3);
+    const sal = new Float32Array(frames * nC);
+    const maxFrame = new Float32Array(frames);
+    for (let f = 0; f < frames; f++) {
+        if ((f & 63) === 0) yield 0.35 + 0.35 * f / frames;
+        if (energia[f] < 0.03 * maxE) continue;
+        suma[0] = 0;
+        for (let b = 0; b <= kTop + 2; b++) suma[b + 1] = suma[b] + lm[f * nb + b];
         for (let b = 2; b <= kTop + 2; b++) {
             const a = Math.max(0, b - W), c = Math.min(kTop + 3, b + W + 1);
-            blanco[b] = Math.max(0, lm[b] - (suma[c] - suma[a]) / (c - a));
+            blanco[b] = Math.max(0, lm[f * nb + b] - (suma[c] - suma[a]) / (c - a));
         }
         let mejor = 0;
         for (let c = 0; c < nC; c++) {
@@ -635,7 +744,7 @@ function melodiaDeAudio(x, sr, op = {}) {
 
     // referencia de "fuerte": el percentil 90 de lo mejor de cada cuadro con sonido
     const con = Array.from(maxFrame).filter(v => v > 0).sort((p, q) => p - q);
-    if (!con.length) return { texto: '', notas: 0, ms: 0, truncado: false, intervalos: [], tonalidad: '' };
+    if (!con.length) return null;
     const ref = con[Math.min(con.length - 1, Math.floor(con.length * 0.9))] || 1;
     const theta = 0.5 - 0.0035 * clamp(Number(o.sens) || 0, 0, 100);   // costo de "no hay melodía"
 
@@ -645,6 +754,7 @@ function melodiaDeAudio(x, sr, op = {}) {
     let prev = new Float32Array(nS), cur = new Float32Array(nS);
     const atras = new Int16Array(frames * nS);
     for (let f = 0; f < frames; f++) {
+        if ((f & 127) === 0) yield 0.7 + 0.25 * f / frames;
         let ip = 0;
         for (let s = 1; s < nS; s++) if (prev[s] > prev[ip]) ip = s;
         let ipVoz = 0;
@@ -670,8 +780,9 @@ function melodiaDeAudio(x, sr, op = {}) {
     let s = 0;
     for (let i = 1; i < nS; i++) if (prev[i] > prev[s]) s = i;
     const midi = new Float32Array(frames).fill(NaN);
+    const amp = new Float32Array(frames);
     for (let f = frames - 1; f >= 0; f--) {
-        if (s !== U) midi[f] = 69 + 12 * Math.log2(cand[s] / 440);
+        if (s !== U) { midi[f] = 69 + 12 * Math.log2(cand[s] / 440); amp[f] = Math.min(1.5, sal[f * nC + s] / ref); }
         s = atras[f * nS + s];
     }
 
@@ -684,7 +795,58 @@ function melodiaDeAudio(x, sr, op = {}) {
         v.sort((p, q) => p - q);
         liso[f] = v[v.length >> 1];
     }
-    return melodiaATexto(liso, hopMs, o);
+    const en = Float32Array.from(energia, v => (maxE ? v / maxE : 0));
+    yield 1;
+    return { midi: liso, amp, energia: en, hopMs, o };
+}
+
+// Pedazo [ini, ini + dur] en ms ya rastreado -> texto de notas
+function textoDeRastro(r, f0, f1) {
+    const midi = r.midi.slice(f0, f1), amp = r.amp.slice(f0, f1);
+    return melodiaATexto(midi, r.hopMs, Object.assign({}, r.o, { cortes: cortesDe(midi, amp) }));
+}
+
+function* melodiaDeAudioGen(x, sr, op = {}) {
+    const r = yield* rastrearMelodia(x, sr, op);
+    return r ? textoDeRastro(r, 0, r.midi.length) : VACIO();
+}
+
+function melodiaDeAudio(x, sr, op = {}) {
+    return correrSync(melodiaDeAudioGen(x, sr, op));
+}
+
+// Modo automático: rastrea TODA la canción con un registro amplio y se queda con el pedazo de durSeg segundos donde la
+// melodía suena más clara, más fuerte y menos fragmentada (así se salta intros y partes sin melodía).
+// Devuelve lo mismo que melodiaDeAudio más ini y dur (en segundos) del pedazo elegido y voz (0 a 1, qué tanta melodía clara hay).
+function* melodiaAutoGen(x, sr, op = {}) {
+    const o = Object.assign({ fMin: 110, fMax: 1400, sens: 50, durSeg: 30 }, op);
+    const r = yield* rastrearMelodia(x, sr, o);
+    if (!r) return Object.assign(VACIO(), { ini: 0, dur: 0, voz: 0 });
+    const n = r.midi.length, hopMs = r.hopMs;
+    const L = Math.min(n, Math.max(8, Math.round(o.durSeg * 1000 / hopMs)));
+    const cuentaVoz = new Float32Array(n + 1), cuentaAmp = new Float32Array(n + 1), cuentaEn = new Float32Array(n + 1);
+    for (let f = 0; f < n; f++) {
+        const v = !Number.isNaN(r.midi[f]);
+        cuentaVoz[f + 1] = cuentaVoz[f] + (v ? 1 : 0);
+        cuentaAmp[f + 1] = cuentaAmp[f] + (v ? r.amp[f] : 0);
+        cuentaEn[f + 1] = cuentaEn[f] + r.energia[f];
+    }
+    const paso = Math.max(1, Math.round(500 / hopMs));
+    let mejor = -1, mejorF = 0, mejorVoz = 0;
+    for (let f0 = 0; f0 + L <= n; f0 += paso) {
+        const voz = (cuentaVoz[f0 + L] - cuentaVoz[f0]) / L;
+        const conf = voz ? (cuentaAmp[f0 + L] - cuentaAmp[f0]) / (cuentaVoz[f0 + L] - cuentaVoz[f0]) : 0;
+        const fuerza = (cuentaEn[f0 + L] - cuentaEn[f0]) / L;
+        const intro = f0 * hopMs < 8000 ? 0.85 : 1;                  // los primeros segundos suelen ser intro
+        const puntos = voz * Math.min(1, conf) * (0.6 + 0.4 * Math.min(1, fuerza * 2)) * intro;
+        if (puntos > mejor) { mejor = puntos; mejorF = f0; mejorVoz = voz; }
+    }
+    const t = textoDeRastro(r, mejorF, mejorF + L);
+    return Object.assign(t, { ini: mejorF * hopMs / 1000, dur: L * hopMs / 1000, voz: mejorVoz });
+}
+
+function melodiaAuto(x, sr, op = {}) {
+    return correrSync(melodiaAutoGen(x, sr, op));
 }
 
 // notas: [{ s, e, p }] en ms y p = número MIDI. Si suenan varias a la vez, se queda la más aguda.
@@ -803,11 +965,11 @@ function formatoDuracion(min) {
 }
 
 const lib = {
-    BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
+    BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
-    melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
+    melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
 };
 
@@ -824,7 +986,7 @@ const VID_CH340 = 0x1A86;
 
 const S = {
     estado: 'desconectado',   // desconectado | conectando | listo | sinprograma
-    puerto: null, escritor: null, lector: null, vioArranque: false,
+    transporte: null, juntar: null, vioArranque: false,
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
@@ -912,23 +1074,27 @@ const TEXTO_ESTADO = {
 
 function ponEstado(est) {
     S.estado = est;
+    document.dispatchEvent(new CustomEvent('robot-estado', { detail: { estado: est } }));
     const [txt, clase] = TEXTO_ESTADO[est];
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
-        $('rb-instalar').open = true;
+        if ($('rb-instalar')) $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
     }
 }
 
-// ---------- Puerto serie ----------
+// ---------- Transporte: USB (Web Serial) o Bluetooth (BLE) ----------
+// Un transporte es { tipo: 'serial' | 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
+// entra por entregar(texto), que junta los trozos en líneas y las manda a alLinea.
 
 function crudo(texto) {
-    if (S.escritor) S.escritor.write(new TextEncoder().encode(texto)).catch(() => { /* se cerró */ });
+    if (S.transporte) S.transporte.escribir(texto).catch(() => { /* se cerró */ });
 }
 const escribirLinea = l => crudo(l + '\n');
+const entregar = texto => { if (S.juntar) S.juntar(texto); };
 
 function alLinea(l) {
     if (/^(OK|ERR)\b/.test(l)) {
@@ -1031,47 +1197,65 @@ function alListo() {
     S.sucio = true;
 }
 
-async function abrir(puerto) {
+// Empieza a hablar con el robot: saluda con PING hasta que contesta PONG.
+// Por USB la placa se reinicia al abrir el puerto (hay que esperar); por Bluetooth no se reinicia.
+function iniciarSesion(t) {
+    S.transporte = t;
+    S.juntar = crearLector(alLinea);
+    S.vioArranque = false;
+    S.cola.reiniciar();
+    ponEstado('conectando');
+    const ble = t.tipo === 'ble';
+    mensaje(ble ? 'Conectando por Bluetooth…' : 'Conectando… (la placa se reinicia y suena una vez)');
+    let intentos = 0;
+    const espera = ble ? 0 : 2, tope = ble ? 12 : 14;
+    S.saludo = setInterval(() => {
+        if (S.estado !== 'conectando') return clearInterval(S.saludo);
+        if (++intentos > tope) {
+            clearInterval(S.saludo);
+            ponEstado('sinprograma');
+            mensaje(ble
+                ? 'Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.'
+                : S.vioArranque
+                    ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
+                    : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
+        } else if (intentos > espera) {
+            crudo('PING\n');
+        }
+    }, 400);
+}
+
+async function abrirSerie(puerto) {
     try {
         await puerto.open({ baudRate: BAUDIOS });
     } catch (e) {
         mensaje('No pude abrir el puerto. Si el IDE de Arduino o mBlock lo tienen abierto, ciérralos y vuelve a intentar.', 'err');
         return;
     }
-    S.puerto = puerto;
-    S.escritor = puerto.writable.getWriter();
-    S.lector = puerto.readable.getReader();
-    S.vioArranque = false;
-    S.cola.reiniciar();
-    ponEstado('conectando');
-    mensaje('Conectando… (la placa se reinicia y suena una vez)');
-    leerBucle();
-    let intentos = 0;
-    S.saludo = setInterval(() => {
-        if (S.estado !== 'conectando') return clearInterval(S.saludo);
-        if (++intentos > 14) {
-            clearInterval(S.saludo);
-            ponEstado('sinprograma');
-            mensaje(S.vioArranque
-                ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
-                : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
-        } else if (intentos > 2) {
-            crudo('PING\n');
-        }
-    }, 400);
-}
-
-async function leerBucle() {
-    const dec = new TextDecoder();
-    const juntar = crearLector(alLinea);
-    try {
-        for (;;) {
-            const { value, done } = await S.lector.read();
-            if (done) break;
-            juntar(dec.decode(value, { stream: true }));
-        }
-    } catch (e) { /* se desenchufó */ }
-    cerrar();
+    const escritor = puerto.writable.getWriter();
+    const lector = puerto.readable.getReader();
+    const t = {
+        tipo: 'serial',
+        escribir: txt => escritor.write(new TextEncoder().encode(txt)),
+        async cerrar() {
+            try { await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
+            try { lector.releaseLock(); } catch (e) { /* idem */ }
+            try { escritor.releaseLock(); } catch (e) { /* idem */ }
+            try { await puerto.close(); } catch (e) { /* idem */ }
+        },
+    };
+    iniciarSesion(t);
+    (async () => {
+        const dec = new TextDecoder();
+        try {
+            for (;;) {
+                const { value, done } = await lector.read();
+                if (done) break;
+                entregar(dec.decode(value, { stream: true }));
+            }
+        } catch (e) { /* se desenchufó */ }
+        if (S.transporte === t) cerrar();
+    })();
 }
 
 async function cerrar() {
@@ -1084,18 +1268,39 @@ async function cerrar() {
     S.cola.reiniciar();
     S.actuando = false;
     detenerAudio();
-    const { lector, escritor, puerto } = S;
-    S.puerto = S.escritor = S.lector = null;
-    try { if (lector) await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
-    try { if (lector) lector.releaseLock(); } catch (e) { /* idem */ }
-    try { if (escritor) escritor.releaseLock(); } catch (e) { /* idem */ }
-    try { if (puerto) await puerto.close(); } catch (e) { /* idem */ }
+    const t = S.transporte;
+    S.transporte = null;
+    S.juntar = null;
+    if (t) { try { await t.cerrar(); } catch (e) { /* ya estaba cerrado */ } }
     ponEstado('desconectado');
     progreso(0);
-    if (era === 'listo') mensaje('El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+    if (era === 'listo') mensaje(t && t.tipo === 'ble'
+        ? 'Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.'
+        : 'El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+}
+
+const hayBluetooth = () => !!(raiz.RobotBluetooth && raiz.RobotBluetooth.disponible());
+
+async function conectarBluetooth(recordado) {
+    if (S.estado !== 'desconectado') { await cerrar(); return; }
+    try {
+        const BT = raiz.RobotBluetooth;
+        let t = null;
+        const dispositivo = recordado ? BT.recordado() : await BT.elegir();
+        if (!dispositivo) return;
+        mensaje('Conectando con ' + (dispositivo.name || 'el robot') + '…');
+        t = await BT.conectar(dispositivo, {
+            alDatos: entregar,
+            alCerrar: () => { if (S.transporte === t) cerrar(); },
+        });
+        iniciarSesion(t);
+    } catch (e) {
+        if (!recordado) mensaje('No se pudo conectar por Bluetooth: ' + (e && e.message ? e.message : e), 'err');
+    }
 }
 
 async function conectar(todos) {
+    if (hayBluetooth()) return conectarBluetooth(false);
     if (!('serial' in navigator)) {
         mensaje('Este navegador no puede hablar con el robot. Abre la página en Chrome o Edge desde una computadora.', 'err');
         return;
@@ -1103,18 +1308,23 @@ async function conectar(todos) {
     if (S.estado !== 'desconectado') { await cerrar(); return; }
     try {
         const filtros = todos ? [] : [{ usbVendorId: VID_CH340 }];
-        await abrir(await navigator.serial.requestPort({ filters: filtros }));
+        await abrirSerie(await navigator.serial.requestPort({ filters: filtros }));
     } catch (e) {
         if (e && e.name !== 'NotFoundError') mensaje('No se pudo conectar: ' + e.message, 'err');
     }
 }
 
-// Si ya diste permiso antes, se conecta solo al abrir la pestaña o al enchufar el cable
+// Si ya diste permiso antes, se conecta solo al abrir la pestaña (USB: también al enchufar el cable)
 async function conectarSolo() {
-    if (!('serial' in navigator) || S.estado !== 'desconectado' || $('sec-robot').hidden) return;
+    if (S.estado !== 'desconectado' || $('sec-robot').hidden) return;
+    if (hayBluetooth()) {
+        if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
+        return;
+    }
+    if (!('serial' in navigator)) return;
     try {
         const p = (await navigator.serial.getPorts()).find(x => (x.getInfo().usbVendorId || 0) === VID_CH340);
-        if (p) await abrir(p);
+        if (p) await abrirSerie(p);
     } catch (e) { /* sin permiso todavía: espera al botón */ }
 }
 
@@ -1677,6 +1887,122 @@ function convertirAudio() {
     infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
 }
 
+// Corre un generador cediendo el hilo entre pasos, para mostrar el avance sin congelar la página
+async function correrAsync(gen, alAvance) {
+    let r = gen.next();
+    while (!r.done) {
+        if (alAvance) alAvance(r.value);
+        await new Promise(ok => setTimeout(ok, 0));
+        r = gen.next();
+    }
+    return r.value;
+}
+
+// «Mi canción (Official Video) [HD].mp3» -> «Mi canción»
+function nombreDeArchivo(archivo, n) {
+    let t = archivo.slice(0, archivo.lastIndexOf('.') > 0 ? archivo.lastIndexOf('.') : archivo.length);
+    for (const [a, b] of [['(', ')'], ['[', ']']]) {
+        for (let i = t.indexOf(a); i >= 0; i = t.indexOf(a)) {
+            const j = t.indexOf(b, i);
+            t = t.slice(0, i) + (j > i ? t.slice(j + 1) : '');
+        }
+    }
+    t = t.split('_').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 40).trim();
+    return t || 'Canción ' + n;
+}
+
+// Un archivo -> { texto, bpm, notas, seg, ritmo } o null si no se pudo sacar nada
+async function convertirArchivoAuto(f, durSeg, alAvance) {
+    const m = await leerArchivoMusica(f);
+    let r, ritmo = false, intervalos = [];
+    const dur = clamp(durSeg, 10, 60);
+    if (m.tipo === 'midi') {
+        const utiles = m.notas.filter(n => n.c !== 9 && n.p !== undefined);
+        const desde = utiles.length ? Math.min(...utiles.map(n => n.s)) : 0, hasta = desde + dur * 1000;
+        r = melodiaDeMidi(utiles.filter(n => n.e > desde && n.s < hasta).map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p })), {});
+        intervalos = r.intervalos;
+    } else {
+        const { x, sr } = monoVentana(m.buffer, 0, Math.min(m.dur, 600));
+        r = await correrAsync(melodiaAutoGen(x, sr, { durSeg: dur, sens: Number($('rb-aud-sens').value) || 50 }), alAvance);
+        intervalos = r.intervalos;
+        if (!r.texto || r.voz < 0.15) {                        // sin melodía clara: se queda el ritmo del mejor pedazo
+            const w = monoVentana(m.buffer, r.ini || 0, dur);
+            const rit = audioARitmo(w.x, w.sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
+            const texto = ritmoATexto(rit.intervalos, TONOS_RITMO.alterna);
+            if (texto) { r = { texto, notas: rit.intervalos.length, ms: 0, intervalos: rit.intervalos }; ritmo = true; intervalos = rit.intervalos; }
+        }
+    }
+    if (!r || !r.texto) return null;
+    const n = leerNotas(r.texto).notas;
+    const ms = n.reduce((suma, q) => suma + (q.ms || 0), 0);
+    return { texto: r.texto, bpm: estimarBpm(intervalos) || 110, notas: n.filter(q => q.hz > 0).length, seg: ms / 1000, ritmo };
+}
+
+function guardarConNombre(nombre, texto, bpm) {
+    let g = S.guardadas.find(x => x.nombre.toLowerCase() === nombre.toLowerCase());
+    if (g) { g.texto = texto; g.bpm = bpm; }
+    else {
+        if (S.guardadas.length >= MAX_GUARDADAS) return null;
+        g = { id: Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), nombre, texto, bpm };
+        S.guardadas.push(g);
+    }
+    return g;
+}
+
+let agregando = false;
+async function agregarAutomatico(archivos) {
+    if (agregando) return;
+    agregando = true;
+    const lista = $('rb-aud-lista'), barra = $('rb-aud-prog');
+    lista.textContent = '';
+    infoAudio('');
+    barra.hidden = false;
+    let ultimo = null, bien = 0;
+    const durSeg = Number($('rb-aud-dur').value) || 30;
+    try {
+        for (let i = 0; i < archivos.length; i++) {
+            const f = archivos[i];
+            const li = document.createElement('li');
+            li.className = 'rb-aud-item';
+            const nom = document.createElement('b');
+            nom.textContent = nombreDeArchivo(f.name, S.guardadas.length + 1);
+            const est = document.createElement('span');
+            est.textContent = 'Analizando…';
+            li.append(nom, est);
+            lista.appendChild(li);
+            barra.value = i / archivos.length;
+            try {
+                const r = await convertirArchivoAuto(f, durSeg, p => { barra.value = (i + p) / archivos.length; });
+                if (!r) { li.className += ' is-error'; est.textContent = 'No encontré una melodía'; continue; }
+                const g = guardarConNombre(nom.textContent, r.texto, r.bpm);
+                if (!g) { li.className += ' is-error'; est.textContent = 'Ya tienes ' + MAX_GUARDADAS + ' guardadas'; continue; }
+                li.className += ' is-ok';
+                est.textContent = (r.ritmo ? 'Solo ritmo · ' : '') + r.notas + ' notas · ' + Math.round(r.seg) + ' s';
+                ultimo = g;
+                bien++;
+            } catch (err) {
+                li.className += ' is-error';
+                est.textContent = 'No pude leer el archivo';
+            }
+        }
+    } finally {
+        barra.hidden = true;
+        agregando = false;
+    }
+    if (ultimo) {
+        S.cancion = 'g:' + ultimo.id;
+        S.notas = ultimo.texto;
+        S.bpm = ultimo.bpm;
+        $('rb-nombre').value = ultimo.nombre;
+        pintarCanciones();
+        pintarTodo();
+        guardar();
+        infoAudio(bien === 1 ? 'Guardada. Ya sale en la lista de canciones.' : bien + ' canciones guardadas.', 'ok');
+    } else {
+        infoAudio('No se pudo agregar ninguna canción.', 'err');
+    }
+}
+
 function guardarCancion() {
     const texto = S.notas.trim();
     if (!leerNotas(texto).notas.length) return mensaje('No hay notas que guardar.', 'err');
@@ -1930,6 +2256,7 @@ const QUE_REPRODUCE = {
     'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-funciones': 'la función elegida',
     'robot-luces': 'las luces',
     'robot-instalar': 'nada en esta sección',
+    'robot-control': 'nada en esta sección',
 };
 
 function seccionRobotActual() {
@@ -1940,7 +2267,7 @@ function seccionRobotActual() {
 function pintarBarra() {
     const sec = seccionRobotActual();
     $('rb-barra-que').textContent = QUE_REPRODUCE[sec] || 'nada';
-    $('rb-barra-play').disabled = sec === 'robot-instalar';
+    $('rb-barra-play').disabled = sec === 'robot-instalar' || sec === 'robot-control';
 }
 
 // Con el robot conectado se reproduce en el robot; si no, la música suena en la página
@@ -2020,7 +2347,7 @@ function iniciar() {
     ponEstado('desconectado');
 
     $('rb-conectar').addEventListener('click', () => conectar(false));
-    $('rb-todos').addEventListener('click', () => conectar(true));
+    if ($('rb-todos')) $('rb-todos').addEventListener('click', () => conectar(true));
     $('rb-paro').addEventListener('click', paro);
     $('rb-diag-borrar').addEventListener('click', () => { S.cola.enviar(['DIAG0']); $('rb-diag').hidden = true; });
     $('rb-tocar').addEventListener('click', () => actuar(true, false));
@@ -2050,18 +2377,14 @@ function iniciar() {
     $('rb-guardar').addEventListener('click', guardarCancion);
     $('rb-borrar').addEventListener('click', borrarCancion);
 
+    // Elegir archivos los convierte y los guarda solos; el último queda en la pantalla y también cargado para los ajustes manuales
     $('rb-audio').addEventListener('change', async e => {
-        const f = e.target.files[0];
+        const archivos = Array.from(e.target.files || []).slice(0, 12);
         musicaCargada = null;
-        if (!f) return infoAudio('');
-        infoAudio('Leyendo el archivo…');
-        try {
-            musicaCargada = await leerArchivoMusica(f);
-            $('rb-aud-ini').value = 0;
-            infoAudio(`${f.name}: dura ${musicaCargada.dur.toFixed(1)} s. Elige desde dónde y pulsa Convertir en ritmo.`);
-        } catch (err) {
-            infoAudio('No pude leer ese archivo (' + (err && err.message ? err.message : 'formato no válido') + ').', 'err');
-        }
+        if (!archivos.length) return infoAudio('');
+        try { musicaCargada = await leerArchivoMusica(archivos[archivos.length - 1]); $('rb-aud-ini').value = 0; } catch (err) { /* lo dirá el automático */ }
+        await agregarAutomatico(archivos);
+        e.target.value = '';
     });
     $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
     $('rb-aud-convertir').addEventListener('click', convertirAudio);
@@ -2171,13 +2494,86 @@ function iniciar() {
 
     // Conectarse solo al abrir la pestaña y al enchufar el cable
     new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
-    if ('serial' in navigator) {
+    if (hayBluetooth()) {
+        mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
+    } else if ('serial' in navigator) {
         navigator.serial.addEventListener('connect', conectarSolo);
         navigator.serial.addEventListener('disconnect', () => { if (S.estado !== 'desconectado') cerrar(); });
     } else {
         mensaje('Para controlar el robot abre esta página en Chrome o Edge desde una computadora.', 'err');
     }
     window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+
+    // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
+    raiz.RobotEnlace = {
+        estado: () => S.estado,
+        listo: () => S.estado === 'listo',
+        mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
+        paro: pararTodo,
+        // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
+        luzAhora: () => ({ efecto: S.efecto, leds: S.leds.slice() }),
+        ponerLuz(o) {
+            if (S.estado !== 'listo' || !o) return;
+            S.efecto = o.efecto;
+            S.leds = o.leds.slice();
+            $('rb-efecto').value = o.efecto;
+            pintarAnillo();
+            S.sucio = true;
+        },
+        nota(hz, ms) { if (S.estado === 'listo') S.cola.ultimo('T', 'T ' + hz + ' ' + ms); },     // claxon: se repite mientras se mantiene
+        enviar(cmds) { if (S.estado === 'listo') S.cola.enviar(cmds); },
+        canciones() {
+            return CANCIONES.map(c => ({ id: c.id, nombre: c.nombre, mia: false }))
+                .concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre, mia: true })));
+        },
+        // La que suena ahora (id) o '' si no suena ninguna
+        sonando: () => (S.actuando && S.actuando.conCancion && !S.actuando.conBaile ? S.cancion : ''),
+        tocarCancion(id) {
+            if (S.estado !== 'listo') return false;
+            const c = CANCIONES.find(x => x.id === id) || S.guardadas.find(x => 'g:' + x.id === id);
+            if (!c) return false;
+            const sonaba = !!S.actuando;
+            S.cancion = id;
+            S.notas = c.texto;
+            S.bpm = c.bpm;
+            S.actuando = false;
+            S.corriendoFuncion = false;
+            S.autonomo = 0;
+            pintarTodo();
+            guardar();
+            if (sonaba) S.cola.abortar();
+            esperarYTocar({ conCancion: true, conBaile: false });
+            return true;
+        },
+        detenerCancion() {
+            if (!S.actuando) return;
+            S.actuando = false;
+            S.cola.abortar();
+            progreso(0);
+        },
+        luces(efecto, color) {
+            if (S.estado !== 'listo') return;
+            S.efecto = efecto;
+            if (color) S.leds = S.leds.map(() => color);
+            $('rb-efecto').value = efecto;
+            pintarAnillo();
+            S.sucio = true;
+        },
+        modo(n) {                                   // 1 esquivar, 2 seguir la mano: lo hace el robot solo con su sensor
+            if (S.estado !== 'listo') return;
+            S.actuando = false;
+            S.corriendoFuncion = true;
+            S.autonomo = n;
+            S.ultimaActividad = Date.now();
+            S.cola.enviar(['SPD ' + velAuto(), { l: 'MODE ' + n, ex: true }]);
+        },
+        manual() {                                  // vuelve al control de la página (MODE 4) y frena
+            if (S.estado !== 'listo') return;
+            if (S.autonomo) { S.autonomo = 0; S.salirModo = true; }
+            S.corriendoFuncion = false;
+            S.cola.abortar();
+        },
+    };
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);

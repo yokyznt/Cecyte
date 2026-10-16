@@ -130,3 +130,235 @@
 .rb-card > .panel__sub { font-size: var(--fs-md); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .rb-card .rb-leds { margin-top: 2px; }
 .rb-apartado > .rb-conexion { margin-bottom: 18px; }
+
+/* ==================== Control del robot: un mando en horizontal ==================== */
+/* Fuera del mando solo hay un botón grande; al abrirlo ocupa toda la pantalla (en el APK se fuerza horizontal).
+   Paleta: verde-negro de fondo, verde institucional para lo activo, naranja del logo solo para el claxon,
+   menta para las acciones y rojo solo para el paro. */
+.rb-control {
+    --m-fondo: oklch(0.19 0.02 160);
+    --m-tapa: oklch(0.31 0.025 160);
+    --m-tapa-2: oklch(0.38 0.03 160);
+    --m-base: oklch(0.12 0.02 160);
+    --m-texto: oklch(0.94 0.02 150);
+    --m-tenue: oklch(0.74 0.03 160);
+    --m-verde: oklch(0.78 0.17 150);
+    --m-menta: oklch(0.9 0.07 152);
+    --m-naranja: oklch(0.76 0.17 52);
+    --m-rojo: oklch(0.58 0.23 27);
+}
+
+/* ---- Cerrado: un solo botón ---- */
+.rb-abrir { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 16px; }
+.rb-abrir__btn {
+    display: grid; place-items: center; width: 132px; height: 132px; border: 0; border-radius: 34px; cursor: pointer;
+    background: var(--m-fondo, var(--black)); color: var(--m-verde, var(--green-400));
+    box-shadow: 0 8px 0 var(--m-base, #000), 0 14px 24px -8px oklch(0.2 0.04 160 / 0.5);
+    transition: translate 0.08s, box-shadow 0.08s;
+}
+.rb-abrir__btn:active { translate: 0 6px; box-shadow: 0 2px 0 var(--m-base, #000); }
+.rb-abrir__btn .icon { width: 64px; height: 64px; stroke-width: 1.6; }
+.rb-abrir__btn:focus-visible { outline: 3px solid var(--green-600); outline-offset: 4px; }
+.rb-mando { display: none; background: var(--m-fondo); color: var(--m-texto); }
+
+/* ---- Abierto ---- */
+.rb-pantalla-completa { overflow: hidden; }
+.rb-control.is-pantalla {
+    position: fixed; inset: 0; z-index: 90; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+    background: var(--m-fondo); color: var(--m-texto);
+}
+.rb-control.is-pantalla .rb-abrir { display: none; }
+.rb-control.is-pantalla .rb-mando {
+    --t: clamp(56px, min(calc((100dvh - 120px) / 3 - 6px), 21vw), 112px);   /* lado de referencia: la palanca mide 3 t */
+    --tc: calc(var(--t) * 0.98);                                              /* lado de un botón de acción */
+    display: flex; flex-direction: column; height: 100%; position: relative; user-select: none; -webkit-user-select: none;
+    padding: var(--inset-top) var(--inset-right) var(--inset-bottom) var(--inset-left);
+    background:
+        radial-gradient(120% 90% at 50% 0%, oklch(0.25 0.035 160), transparent 70%),
+        var(--m-fondo);
+}
+
+/* Teclas con relieve: se hunden al apretarlas */
+.rb-btn {
+    display: grid; place-items: center; margin: 0; padding: 0; border: 0; cursor: pointer; touch-action: none;
+    border-radius: 20px; background: var(--m-tapa); color: var(--m-texto);
+    box-shadow: 0 5px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14);
+    transition: translate 0.06s, box-shadow 0.06s, background 0.12s, filter 0.12s;
+    -webkit-tap-highlight-color: transparent;
+}
+.rb-btn .icon { width: 44%; height: 44%; stroke-width: 2.2; pointer-events: none; }
+.rb-btn.is-down, .rb-btn:active { translate: 0 4px; box-shadow: 0 1px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.08); background: var(--m-tapa-2); }
+.rb-btn:focus-visible, .rb-paro-gran:focus-visible, .rb-sw:focus-visible, .rb-cancion:focus-visible { outline: 3px solid var(--m-verde); outline-offset: 3px; }
+.rb-btn--chico { width: 44px; height: 44px; border-radius: 14px; box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-btn--chico .icon { width: 22px; height: 22px; stroke-width: 2.2; }
+.rb-btn--chico.is-down, .rb-btn--chico:active { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); }
+.rb-btn[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
+.rb-btn[hidden] { display: none; }
+
+/* Barra de arriba */
+.rb-mando__barra { display: flex; align-items: center; gap: 12px; padding: 10px 14px 8px; }
+.rb-estado { display: grid; place-items: center; width: 24px; height: 44px; }
+.rb-estado__punto { width: 12px; height: 12px; border-radius: 50%; background: oklch(0.5 0.02 160); transition: background 0.2s, box-shadow 0.2s; }
+.is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25); }
+.is-conectando .rb-estado__punto { background: var(--m-naranja); animation: rb-latido 0.9s ease-in-out infinite; }
+.is-sinprograma .rb-estado__punto { background: var(--m-rojo); }
+.is-listo #rb-ctl-bt, .is-conectando #rb-ctl-bt { display: none; }
+@keyframes rb-latido { 50% { opacity: 0.3; } }
+
+/* Cuerpo: palanca (o inclinar) · paro y velocidad · botones de acción */
+.rb-mando__cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2vw; padding: 0 3vw 10px; }
+.rb-joy, .rb-incl { grid-column: 1; grid-row: 1; }
+
+/* Palanca */
+.rb-joy {
+    position: relative; display: grid; place-items: center; touch-action: none; cursor: grab;
+    width: calc(var(--t) * 2.9); aspect-ratio: 1; border-radius: 50%;
+}
+.rb-joy.is-activo { cursor: grabbing; }
+.rb-joy__aro {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, oklch(0.2 0.02 160), oklch(0.26 0.025 160) 70%);
+    box-shadow: 0 5px 0 var(--m-base), inset 0 0 0 3px var(--m-tapa), inset 0 6px 16px oklch(0 0 0 / 0.55);
+}
+.rb-joy__aro::before, .rb-joy__aro::after { content: ""; position: absolute; border-radius: 3px; background: oklch(0.5 0.04 160); opacity: 0.55; }
+.rb-joy__aro::before { left: 50%; top: 9%; bottom: 9%; width: 2px; translate: -50% 0; }
+.rb-joy__aro::after { top: 50%; left: 9%; right: 9%; height: 2px; translate: 0 -50%; }
+.rb-joy__mando {
+    position: relative; width: 42%; aspect-ratio: 1; border-radius: 50%; will-change: transform;
+    background: radial-gradient(circle at 38% 32%, oklch(0.86 0.15 150), var(--m-verde) 45%, oklch(0.6 0.16 152));
+    box-shadow: 0 6px 0 oklch(0.4 0.1 152), 0 10px 18px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35);
+}
+.rb-joy.is-activo .rb-joy__mando { box-shadow: 0 2px 0 oklch(0.4 0.1 152), 0 4px 10px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35); }
+
+/* Paro (la pieza más grande del centro) y velocidad */
+.rb-centro { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.rb-paro-gran {
+    --p: clamp(84px, min(30dvh, 26vw), 132px);
+    display: grid; place-items: center; width: var(--p); height: var(--p); border: 0; padding: 0; cursor: pointer; touch-action: none;
+    background: var(--m-rojo); color: #fff;
+    clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+    filter: drop-shadow(0 6px 0 var(--m-base));
+    transition: translate 0.06s, filter 0.06s;
+}
+.rb-paro-gran .icon { width: 44%; height: 44%; stroke-width: 2.4; fill: currentColor; }
+.rb-paro-gran:active, .rb-paro-gran.is-down { translate: 0 4px; filter: drop-shadow(0 1px 0 var(--m-base)) brightness(1.15); }
+.rb-vel { display: flex; align-items: center; gap: 8px; width: min(100%, 220px); color: var(--m-tenue); }
+.rb-vel .icon { flex: none; width: 22px; height: 22px; }
+.rb-vel output { flex: none; min-width: 2.6ch; text-align: right; font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--m-texto); font-variant-numeric: tabular-nums; }
+.rb-vel input[type="range"] { flex: 1; min-width: 0; height: 36px; margin: 0; background: transparent; accent-color: var(--m-verde); }
+
+/* Botones de acción: cuatro en rombo. Naranja = claxon (la acción a propósito); menta = lo demás */
+.rb-caras { display: grid; grid-template-columns: repeat(2, var(--tc)); grid-template-rows: repeat(2, var(--tc)); gap: 10px 12px; margin-right: 1vw; }
+.rb-cara { width: 100%; height: 100%; border-radius: 50%; background: var(--m-menta); color: var(--m-base); }
+.rb-cara .icon { width: 46%; height: 46%; }
+.rb-cara--claxon { background: var(--m-naranja); grid-area: 1 / 1; translate: 0 18%; }
+.rb-cara--musica { grid-area: 1 / 2; translate: 0 -18%; }
+.rb-cara--luces { grid-area: 2 / 2; translate: 0 -18%; }
+.rb-cara--incl { grid-area: 2 / 1; translate: 0 18%; }
+.rb-cara--claxon.is-down, .rb-cara--claxon:active { background: var(--m-naranja); translate: 0 calc(18% + 4px); filter: brightness(1.18); }
+.rb-cara--musica.is-down, .rb-cara--musica:active, .rb-cara--luces.is-down, .rb-cara--luces:active { background: var(--m-menta); translate: 0 calc(-18% + 4px); filter: brightness(1.1); }
+.rb-cara--musica[aria-expanded="true"], .rb-cara--luces[aria-expanded="true"] { background: var(--m-verde); }
+.rb-cara--incl.is-down, .rb-cara--incl:active { background: var(--m-menta); translate: 0 calc(18% + 4px); }
+.rb-cara--incl[aria-pressed="true"] { background: var(--m-verde); box-shadow: 0 5px 0 var(--m-base), 0 0 0 3px var(--m-verde); }
+
+/* Menús chicos de canciones y luces: tarjeta sobre el lado de la palanca (el paro nunca se tapa) */
+.rb-menu {
+    position: absolute; z-index: 3; left: calc(var(--inset-left) + 3vw); top: calc(var(--inset-top) + 62px);
+    width: min(320px, 40vw); max-height: calc(100dvh - var(--inset-top) - var(--inset-bottom) - 80px);
+    display: flex; flex-direction: column; padding: 8px; border-radius: 20px;
+    background: oklch(0.15 0.02 160 / 0.97); box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1), 0 16px 34px -8px #000;
+    animation: rb-sube 0.16s var(--ease-out);
+}
+.rb-menu[hidden] { display: none; }
+@keyframes rb-sube { from { opacity: 0; translate: 0 8px; } }
+.rb-menu__lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.rb-cancion {
+    display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 14px 6px 10px; border: 0; border-radius: 14px; cursor: pointer; text-align: left;
+    background: var(--m-tapa); color: var(--m-texto); font: inherit; font-weight: 600; font-size: var(--fs-sm);
+    box-shadow: 0 3px 0 var(--m-base); transition: translate 0.06s, box-shadow 0.06s, background 0.12s;
+}
+.rb-cancion:active { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); }
+.rb-cancion .icon { flex: none; width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--m-menta); color: var(--m-base); stroke-width: 2.6; fill: currentColor; }
+.rb-cancion span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rb-cancion--mia span::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--m-naranja); vertical-align: middle; }
+.rb-cancion[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
+.rb-cancion[aria-pressed="true"] .icon { background: var(--m-base); color: var(--m-verde); }
+.rb-menu__vacio { padding: 14px; color: var(--m-tenue); font-size: var(--fs-sm); }
+.rb-menu--luces { width: auto; }
+.rb-menu__rejilla { display: grid; grid-template-columns: repeat(4, 44px); gap: 10px; padding: 6px; }
+.rb-sw {
+    --c: #888; width: 44px; height: 44px; border: 3px solid oklch(1 0 0 / 0.18); padding: 0; cursor: pointer; touch-action: manipulation;
+    border-radius: 50%; background: var(--c); box-shadow: 0 3px 0 var(--m-base); transition: translate 0.06s;
+}
+.rb-sw:active { translate: 0 2px; box-shadow: 0 1px 0 var(--m-base); border-color: #fff; }
+.rb-sw--arco { background: conic-gradient(#ff2a2a, #ffd400, #22d05a, #19c9ff, #7a3dff, #ff2a2a); }
+.rb-sw--pulso { background: radial-gradient(circle, #fff 0 18%, oklch(0.8 0.1 90) 19% 55%, oklch(0.3 0.04 90) 56%); animation: rb-latido 1.6s ease-in-out infinite; }
+.rb-sw--puntos { background: radial-gradient(circle at 25% 50%, #fff 0 12%, transparent 13%), radial-gradient(circle at 50% 50%, #fff 0 12%, transparent 13%), radial-gradient(circle at 75% 50%, #fff 0 12%, transparent 13%), oklch(0.32 0.03 250); }
+.rb-sw--apagar { background: oklch(0.2 0.02 160); position: relative; }
+.rb-sw--apagar::after { content: ""; position: absolute; inset: 9px 20px; background: oklch(0.7 0.02 160); border-radius: 2px; rotate: 45deg; }
+
+/* Inclinar el celular: sustituye a la palanca. El punto muestra hacia dónde va el robot */
+.rb-incl { display: none; flex-direction: column; align-items: center; gap: 10px; width: calc(var(--t) * 2.9); }
+.rb-mando.es-incl .rb-joy { display: none; }
+.rb-mando.es-incl .rb-incl { display: flex; }
+.rb-nivel {
+    position: relative; width: calc(var(--t) * 2); max-width: 62dvh; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, oklch(0.2 0.02 160), oklch(0.26 0.025 160) 70%);
+    box-shadow: 0 5px 0 var(--m-base), inset 0 0 0 3px var(--m-tapa), inset 0 6px 16px oklch(0 0 0 / 0.55);
+}
+.rb-nivel::before, .rb-nivel::after { content: ""; position: absolute; background: oklch(0.5 0.04 160); opacity: 0.55; }
+.rb-nivel::before { left: 50%; top: 10%; bottom: 10%; width: 2px; translate: -50% 0; }
+.rb-nivel::after { top: 50%; left: 10%; right: 10%; height: 2px; translate: 0 -50%; }
+.rb-nivel__punto {
+    position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; margin: -11% 0 0 -11%; border-radius: 50%;
+    background: var(--m-tenue); box-shadow: 0 3px 10px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35); will-change: transform;
+}
+.rb-nivel.is-armado .rb-nivel__punto { background: var(--m-verde); }
+.rb-incl__ajustes { display: flex; gap: 10px; }
+.rb-incl__txt { min-height: 1em; font-size: var(--fs-cap); color: var(--m-tenue); text-align: center; }
+.rb-incl__txt:empty { display: none; }
+
+/* Turbo: botón en la barra y el mando cambia de color; lo demás queda apagado */
+.rb-turbo { width: 64px; height: 44px; margin-left: auto; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-turbo .icon { width: 24px; height: 24px; fill: currentColor; stroke-width: 1.6; }
+.rb-btn.rb-turbo[aria-pressed="true"] { background: var(--m-naranja); color: var(--m-base); }
+.rb-turbo.is-enfriando { animation: rb-latido 0.6s ease-in-out infinite; }
+.es-turbo .rb-caras, .es-turbo .rb-vel input { opacity: 0.3; pointer-events: none; }
+.es-turbo .rb-joy__mando { background: radial-gradient(circle at 38% 32%, oklch(0.9 0.12 70), var(--m-naranja) 45%, oklch(0.62 0.17 48)); box-shadow: 0 6px 0 oklch(0.42 0.1 48), 0 10px 18px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35); }
+
+/* Sin enlace: lo que depende del robot se ve apagado; el paro siempre queda vivo */
+.is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl { opacity: 0.35; }
+
+/* Vertical: pide girar el teléfono */
+.rb-mando__gira { display: none; }
+@media (orientation: portrait) {
+    .rb-control.is-pantalla .rb-mando__cuerpo, .rb-control.is-pantalla .rb-menu { display: none; }
+    .rb-control.is-pantalla .rb-mando__gira { display: grid; flex: 1; place-items: center; color: var(--m-verde); }
+    .rb-mando__gira .icon { width: 96px; height: 96px; stroke-width: 1.4; animation: rb-gira 2.4s ease-in-out infinite; }
+}
+@keyframes rb-gira { 0%, 20% { rotate: 0deg; } 60%, 100% { rotate: -90deg; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .rb-mando__gira .icon, .rb-menu, .is-conectando .rb-estado__punto, .rb-sw--pulso { animation: none; }
+    .rb-btn, .rb-paro-gran, .rb-abrir__btn, .rb-cancion { transition: none; }
+}
+
+.rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
+
+/* Agregar canciones: un solo botón grande y la lista de lo que salió */
+.rb-soltar {
+    display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 96px; padding: 16px; border-radius: var(--r-lg); cursor: pointer;
+    border: 2px dashed var(--green-300); background: var(--green-50); color: var(--green-800); font-weight: 700; font-size: var(--fs-md);
+    transition: background 0.15s, border-color 0.15s;
+}
+.rb-soltar:hover, input:focus-visible + .rb-soltar { background: var(--green-100); border-color: var(--green-600); }
+.rb-soltar .icon { width: 28px; height: 28px; }
+.rb-aud-prog { width: 100%; height: 8px; accent-color: var(--green-600); }
+.rb-aud-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rb-aud-item { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
+.rb-aud-item b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rb-aud-item span { flex: none; font-size: var(--fs-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.rb-aud-item.is-ok { border-color: var(--green-300); background: var(--green-50); }
+.rb-aud-item.is-error span { color: var(--rose-700); }
+.rb-avanzado > summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
+.rb-avanzado[open] > summary { margin-bottom: 8px; }
