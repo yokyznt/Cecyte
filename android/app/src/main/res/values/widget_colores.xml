@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colores del widget en claro; values-night/widget_colores.xml los cambia en modo oscuro del sistema -->
+<resources>
+    <color name="widget_fondo">#FFFFFF</color>
+    <color name="widget_texto">#14261B</color>
+    <color name="widget_tenue">#5A6B60</color>
+    <color name="widget_acento">#0B5A2E</color>
+</resources>
