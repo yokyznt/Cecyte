@@ -45,6 +45,8 @@
         <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h5a3.5 3.5 0 0 0 0-7h-2a3.5 3.5 0 0 1 0-7h5"/></symbol>
         <symbol id="i-robot" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
         <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+        <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></symbol>
+        <symbol id="i-ruta" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></symbol>
         <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
         <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
@@ -702,6 +704,7 @@
                                     <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                                     <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
                                     <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
+                                    <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
                                     <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
                                 </header>
 
@@ -740,6 +743,11 @@
 
                                 <div class="rb-menu" id="rb-menu-musica" role="dialog" aria-label="Canciones" hidden>
                                     <div class="rb-menu__lista" id="rb-canciones"></div>
+                                </div>
+                                <div class="rb-menu" id="rb-menu-recorridos" role="dialog" aria-label="Recorridos" hidden>
+                                    <button type="button" id="rb-ruta-grabar" class="rb-cancion rb-cancion--grabar"><svg class="icon" aria-hidden="true"><use href="#i-rec"/></svg><span>Grabar un recorrido</span></button>
+                                    <p class="rb-menu__msg" id="rb-ruta-msg" role="status"></p>
+                                    <div class="rb-menu__lista" id="rb-recorridos"></div>
                                 </div>
                                 <div class="rb-menu rb-menu--luces" id="rb-menu-luces" role="dialog" aria-label="Luces" hidden>
                                     <div class="rb-menu__rejilla">

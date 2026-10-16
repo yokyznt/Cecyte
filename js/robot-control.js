@@ -22,6 +22,8 @@
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
         turbo: false, vmaxPrev: 60, luzPrev: null, carga: 0, enfriaHasta: 0, ultimaRev: 0,
+        grab: null,                       // grabando un recorrido: { t0, pasos }
+        repro: null,                      // repitiendo uno: { r, t0, ult, envio, timer }
     };
 
     const vibrar = patron => { try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) { /* sin vibración */ } };
@@ -30,6 +32,12 @@
     const abierto = () => $('sec-robot-control').classList.contains('is-pantalla');
     const apretado = id => $(id).getAttribute('aria-pressed') === 'true';
     const k1 = v => Math.max(-1, Math.min(1, v));
+
+    // Toda orden de movimiento del mando pasa por aquí: así lo que se graba es lo que de verdad salió hacia el robot
+    function mandar(izq, der) {
+        enlace().mover(izq, der);
+        if (C.grab) anotar(izq, der);
+    }
 
     // ---------- Qué se manda ----------
 
@@ -51,11 +59,13 @@
         const ahora = Date.now();
         const turbo = C.turbo && ahora >= C.enfriaHasta;
         const m = raiz.Robot.mezclaJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
+        // Repitiendo un recorrido: si se toca la palanca, el teclado o el teléfono, el mando recupera el control
+        if (C.repro) { if (m.izq || m.der) pararRepro(false); else return; }
         const clave = m.izq + ',' + m.der;
         if (C.turbo) guardaCalor(m, ahora);
         if (m.izq === 0 && m.der === 0) {
             if (C.movido) {                        // se soltó: una sola orden de frenado
-                enlace().mover(0, 0);
+                mandar(0, 0);
                 C.movido = false;
                 C.ultimo = '';
                 C.ultimoEnvio = ahora;
@@ -64,7 +74,7 @@
         }
         C.movido = true;
         if (clave !== C.ultimo || ahora - C.ultimoEnvio >= MS_LATIDO) {
-            enlace().mover(m.izq, m.der);
+            mandar(m.izq, m.der);
             C.ultimo = clave;
             C.ultimoEnvio = ahora;
         }
@@ -90,9 +100,10 @@
         pintarNivel();
         $('rb-joy').classList.remove('is-activo');
         soltarClaxon();
+        pararRepro(!conParo);                  // si repetía un recorrido, también se frena (con paro ya va el «!»)
         if (!listo()) return;
         if (conParo) enlace().paro();
-        else if (C.movido) enlace().mover(0, 0);
+        else if (C.movido) mandar(0, 0);
         C.movido = false;
         C.ultimo = '';
     }
@@ -353,6 +364,7 @@
                 pintarCanciones();
                 C.vigila = setInterval(marcarSonando, 600);
             }
+            if (abrir && menu.id === 'rb-menu-recorridos') { mensajeRuta(''); pintarRutas(); }
         }));
         // Tocar fuera de un menú lo cierra
         document.addEventListener('pointerdown', e => {
@@ -384,6 +396,166 @@
         $('rb-turbo').addEventListener('click', () => ponerTurbo(!C.turbo));
     }
 
+    // ---------- Recorridos: grabar lo que mandas con el mando y repetirlo ----------
+    // Se graba cada orden M que sale del mando (con su hora) y se repite igual, reenviando la última cada MS_LATIDO
+    // porque el firmware frena a los 3 s sin órdenes. Repetirlo en el piso nunca queda idéntico (rampa, pilas, piso).
+    // La lógica pura (recortar, validar, qué orden toca) vive en robot.js; aquí solo el tiempo, la pantalla y localStorage.
+    const CLAVE_RUTAS = 'cecyte_robot_recorridos';
+    const segundos = ms => Math.max(1, Math.round(ms / 1000)) + ' s';
+    const mensajeRuta = t => { $('rb-ruta-msg').textContent = t || ''; };
+
+    function leerRutas() {
+        try {
+            const a = JSON.parse(localStorage.getItem(CLAVE_RUTAS));
+            return Array.isArray(a) ? a.map(raiz.Robot.validarRecorrido).filter(Boolean).slice(0, raiz.Robot.RECORRIDO_MAX) : [];
+        } catch (e) { return []; }
+    }
+
+    function guardarRutas(lista) {
+        try { localStorage.setItem(CLAVE_RUTAS, JSON.stringify(lista)); return true; } catch (e) { return false; }
+    }
+
+    function pintarRutaBtn() {
+        const b = $('rb-ctl-ruta');
+        b.classList.toggle('is-grab', !!C.grab);
+        b.classList.toggle('is-repro', !!C.repro);
+        b.querySelector('use').setAttribute('href', C.grab || C.repro ? '#i-stop' : '#i-ruta');
+        b.setAttribute('aria-label', C.grab ? 'Parar y guardar la grabación' : C.repro ? 'Parar el recorrido' : 'Recorridos: grabar y repetir');
+    }
+
+    function pintarRutas() {
+        const cont = $('rb-recorridos');
+        cont.textContent = '';
+        const lista = leerRutas();
+        if (!lista.length) {
+            const v = document.createElement('p');
+            v.className = 'rb-menu__vacio';
+            v.textContent = 'No hay recorridos guardados.';
+            cont.appendChild(v);
+            return;
+        }
+        lista.forEach((r, i) => {
+            const fila = document.createElement('div');
+            fila.className = 'rb-ruta';
+            const jugar = document.createElement('button');
+            jugar.type = 'button';
+            jugar.className = 'rb-cancion';
+            jugar.dataset.i = i;
+            jugar.innerHTML = icono('play');
+            const t = document.createElement('span');
+            t.textContent = `${r.nombre} · ${segundos(r.ms)}`;
+            jugar.appendChild(t);
+            const borrar = document.createElement('button');
+            borrar.type = 'button';
+            borrar.className = 'rb-ruta__borrar';
+            borrar.dataset.i = i;
+            borrar.setAttribute('aria-label', 'Borrar ' + r.nombre);
+            borrar.innerHTML = icono('trash');
+            fila.append(jugar, borrar);
+            cont.appendChild(fila);
+        });
+    }
+
+    // Anota una orden (la repetida por el latido no se graba dos veces). Al llegar al tope, guarda y para.
+    function anotar(izq, der) {
+        const g = C.grab;
+        const ult = g.pasos[g.pasos.length - 1];
+        if (ult && ult.izq === izq && ult.der === der) return;
+        g.pasos.push({ t: Date.now() - g.t0, izq, der });
+        if (g.pasos.length >= 2900 || g.pasos[g.pasos.length - 1].t - g.pasos[0].t >= raiz.Robot.RECORRIDO_MS - 500) pararGrabacion(true);
+    }
+
+    function empezarGrabacion() {
+        if (C.grab || C.repro) return;
+        if (!listo()) { mensajeRuta('Conecta el robot primero.'); return; }
+        if (leerRutas().length >= raiz.Robot.RECORRIDO_MAX) { mensajeRuta(`Ya hay ${raiz.Robot.RECORRIDO_MAX}: borra uno para grabar otro.`); return; }
+        C.grab = { t0: Date.now(), pasos: [] };
+        cerrarMenus(null);
+        pintarRutaBtn();
+        vibrar(25);
+    }
+
+    function pararGrabacion(guardar) {
+        const g = C.grab;
+        if (!g) return;
+        C.grab = null;
+        pintarRutaBtn();
+        if (!guardar) return;
+        const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        const r = raiz.Robot.compactarRecorrido(g.pasos, Date.now() - g.t0, 'Recorrido ' + hora);
+        const lista = leerRutas();
+        if (!r) mensajeRuta('El robot no se movió: no se guardó.');
+        else if (lista.length >= raiz.Robot.RECORRIDO_MAX) mensajeRuta('No cabe: borra un recorrido.');
+        else {
+            lista.push(r);
+            mensajeRuta(guardarRutas(lista) ? `Guardado (${segundos(r.ms)}).` : 'No se pudo guardar en este teléfono.');
+            vibrar([30, 40, 30]);
+        }
+        pintarRutas();
+    }
+
+    function reproducir(r) {
+        if (C.grab || C.repro) return;
+        if (!listo()) { mensajeRuta('Conecta el robot primero.'); return; }
+        cerrarMenus(null);
+        C.repro = { r, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoRepro, 50) };
+        pintarRutaBtn();
+        vibrar(25);
+        pasoRepro();
+    }
+
+    function pasoRepro() {
+        const P = C.repro;
+        if (!P) return;
+        if (!listo()) { pararRepro(false); return; }
+        const ahora = Date.now(), t = ahora - P.t0;
+        if (t >= P.r.ms) { pararRepro(true); return; }
+        const p = raiz.Robot.pasoEn(P.r, t);
+        if (!p) return;
+        const clave = p.izq + ',' + p.der;
+        if (clave !== P.ult || ahora - P.envio >= MS_LATIDO) {
+            enlace().mover(p.izq, p.der);
+            P.ult = clave;
+            P.envio = ahora;
+        }
+    }
+
+    // alto = mandar «M 0 0» al terminar (si el robot sigue en marcha por su cuenta no hace falta)
+    function pararRepro(alto) {
+        const P = C.repro;
+        if (!P) return;
+        clearInterval(P.timer);
+        C.repro = null;
+        pintarRutaBtn();
+        if (alto && listo()) enlace().mover(0, 0);
+    }
+
+    function iniciarRutas() {
+        // Va antes que el manejador genérico de menús: mientras graba o repite, este botón solo para (no abre el menú)
+        $('rb-ctl-ruta').addEventListener('click', e => {
+            if (C.grab) { e.stopImmediatePropagation(); pararGrabacion(true); }
+            else if (C.repro) { e.stopImmediatePropagation(); pararRepro(true); }
+        });
+        $('rb-ruta-grabar').addEventListener('click', empezarGrabacion);
+        $('rb-recorridos').addEventListener('click', e => {
+            const borrar = e.target.closest('.rb-ruta__borrar'), jugar = e.target.closest('.rb-cancion');
+            const lista = leerRutas();
+            if (borrar) {
+                if (!borrar.dataset.seguro) {          // primer toque: pide confirmar; si no, vuelve a como estaba
+                    borrar.dataset.seguro = '1';
+                    borrar.textContent = '¿Borrar?';
+                    setTimeout(pintarRutas, 3000);
+                    return;
+                }
+                lista.splice(Number(borrar.dataset.i), 1);
+                guardarRutas(lista);
+                pintarRutas();
+            } else if (jugar && lista[Number(jugar.dataset.i)]) {
+                reproducir(lista[Number(jugar.dataset.i)]);
+            }
+        });
+    }
+
     // ---------- Abrir y cerrar el mando ----------
 
     const orientacion = () => raiz.Plataforma && raiz.Plataforma.plugin('ScreenOrientation');
@@ -407,6 +579,7 @@
 
     function cerrarMando() {
         ponerTurbo(false);
+        pararGrabacion(true);
         frenar(false);
         if (C.inclinar) ponerInclinar(false);
         abrirMando(false);
@@ -445,7 +618,7 @@
         const sec = $('sec-robot-control');
         for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
         sec.classList.toggle('is-sin-enlace', e !== 'listo');
-        if (e !== 'listo') { C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
+        if (e !== 'listo') { pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
     }
 
     function iniciar() {
@@ -453,6 +626,7 @@
         iniciarPalanca();
         iniciarInclinar();
         iniciarClaxon();
+        iniciarRutas();
         iniciarMenus();
         iniciarBotones();
         $('rb-ctl-full').addEventListener('click', () => abrirMando(true));

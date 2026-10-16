@@ -964,7 +964,51 @@ function formatoDuracion(min) {
     return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+// ---------- Recorridos grabados del mando ----------
+// Un recorrido es la lista de órdenes M que salieron del mando: { t: ms desde la primera, izq, der }, más la duración total.
+const RECORRIDO_MAX = 10, RECORRIDO_MS = 120000, RECORRIDO_PASOS = 3000;
+
+// Limpia y recorta lo grabado (o lo leído de localStorage, que puede venir roto). null si no hay movimiento.
+function validarRecorrido(r) {
+    if (!r || !Array.isArray(r.pasos)) return null;
+    const pasos = [];
+    let ant = null;
+    for (const p of r.pasos) {
+        if (!p || !Number.isFinite(p.t) || !Number.isFinite(p.izq) || !Number.isFinite(p.der)) continue;
+        const t = Math.round(p.t);
+        if (t < 0 || t > RECORRIDO_MS) continue;
+        const izq = Math.round(clamp(p.izq, -VEL_TURBO, VEL_TURBO)), der = Math.round(clamp(p.der, -VEL_TURBO, VEL_TURBO));
+        if (ant && (t < ant.t || (izq === ant.izq && der === ant.der))) continue;   // fuera de orden o repetida
+        ant = { t, izq, der };
+        pasos.push(ant);
+        if (pasos.length >= RECORRIDO_PASOS) break;
+    }
+    if (!pasos.some(p => p.izq || p.der)) return null;
+    const ms = clamp(Math.round(Number(r.ms)) || 0, ant.t, RECORRIDO_MS);
+    return { nombre: String(r.nombre || 'Recorrido').slice(0, 30), ms, pasos };
+}
+
+// Cierra una grabación: el tiempo empieza en la primera orden y siempre termina frenado
+function compactarRecorrido(pasos, msTotal, nombre) {
+    if (!Array.isArray(pasos) || !pasos.length) return null;
+    const t0 = pasos[0].t;
+    const rel = pasos.map(p => ({ t: p.t - t0, izq: p.izq, der: p.der }));
+    let ms = Math.min(RECORRIDO_MS, Math.max(0, msTotal - t0));
+    const ult = rel[rel.length - 1];
+    if (ult.izq || ult.der) rel.push({ t: ms, izq: 0, der: 0 });
+    else ms = ult.t;                                  // ya terminó frenado: el silencio de después no se repite
+    return validarRecorrido({ nombre, ms, pasos: rel });
+}
+
+// La orden que toca en el instante t (ms desde que arrancó): la última cuyo t ya pasó
+function pasoEn(r, t) {
+    let paso = null;
+    for (const p of r.pasos) { if (p.t <= t) paso = p; else break; }
+    return paso;
+}
+
 const lib = {
+    RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick,

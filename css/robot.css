@@ -283,6 +283,19 @@
 .rb-cancion--mia span::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--m-naranja); vertical-align: middle; }
 .rb-cancion[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
 .rb-cancion[aria-pressed="true"] .icon { background: var(--m-base); color: var(--m-verde); }
+/* Recorridos: grabar (el botón de la barra late en rojo) y repetir */
+.rb-ruta { display: flex; gap: 6px; }
+.rb-ruta .rb-cancion { flex: 1 1 auto; min-width: 0; }
+.rb-ruta__borrar { flex: none; width: 48px; border: 0; border-radius: 14px; cursor: pointer; background: var(--m-tapa); color: var(--m-texto); font: inherit; font-size: var(--fs-sm); font-weight: 700; box-shadow: 0 3px 0 var(--m-base); }
+.rb-ruta__borrar .icon { width: 20px; height: 20px; }
+.rb-ruta__borrar[data-seguro] { background: var(--m-rojo); width: 78px; }
+.rb-ruta__borrar:focus-visible { outline: 3px solid var(--m-verde); outline-offset: 3px; }
+.rb-cancion--grabar .icon { background: var(--m-rojo); color: #fff; }
+.rb-menu__msg { margin: 6px 4px 2px; font-size: var(--fs-sm); color: var(--m-tenue); }
+.rb-menu__msg:empty { display: none; }
+#rb-ctl-ruta.is-grab { background: var(--m-rojo); color: #fff; animation: rb-late 1s ease-in-out infinite; }
+#rb-ctl-ruta.is-repro { background: var(--m-verde); color: var(--m-base); }
+@keyframes rb-late { 50% { opacity: 0.55; } }
 .rb-menu__vacio { padding: 14px; color: var(--m-tenue); font-size: var(--fs-sm); }
 .rb-menu--luces { width: auto; }
 .rb-menu__rejilla { display: grid; grid-template-columns: repeat(4, 44px); gap: 10px; padding: 6px; }
@@ -339,7 +352,7 @@
 @keyframes rb-gira { 0%, 20% { rotate: 0deg; } 60%, 100% { rotate: -90deg; } }
 
 @media (prefers-reduced-motion: reduce) {
-    .rb-mando__gira .icon, .rb-menu, .is-conectando .rb-estado__punto, .rb-sw--pulso { animation: none; }
+    .rb-mando__gira .icon, .rb-menu, .is-conectando .rb-estado__punto, .rb-sw--pulso, #rb-ctl-ruta.is-grab { animation: none; }
     .rb-btn, .rb-paro-gran, .rb-abrir__btn, .rb-cancion { transition: none; }
 }
 
