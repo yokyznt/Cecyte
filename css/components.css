@@ -542,6 +542,14 @@ input[type="checkbox"] { accent-color: var(--green-700); }
     transition: opacity 300ms, transform 300ms;
 }
 .toast.is-leaving { opacity: 0; transform: translateY(10px); }
+.toast__accion { margin-top: 8px; min-height: 36px; padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: var(--r-md, 10px); background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
+.toast__accion:hover { background: var(--green-100); }
+.toast__accion:focus-visible { outline: 3px solid var(--green-600); outline-offset: 2px; }
+
+/* Aviso fijo en el panel de admin (por ejemplo: el timbre no se reporta) */
+.banner { margin: 0 0 12px; padding: 12px 16px; border-radius: var(--r-md, 10px); font-size: var(--fs-sm); font-weight: 600; }
+.banner[hidden] { display: none; }
+.banner--err { color: var(--rose-700); background: var(--rose-50, #fff1f2); border: 1px solid var(--rose-700); }
 .toast__icon { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 11px; background: var(--green-700); color: #fff; font-size: 1.05rem; }
 .toast--success .toast__icon { background: var(--green-700); color: #fff; }
 .toast--info .toast__icon { background: var(--black); color: var(--green-400); }

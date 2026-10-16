@@ -21,6 +21,21 @@ assert(enorme.reduce((a, b) => a + b, 0) <= 30000);
 // 3) Toques grabados: apretado 200, suelto 300, apretado 150
 assert.deepStrictEqual(T.toquesARitmo([{ down: 1000, up: 1200 }, { down: 1500, up: 1650 }]), [200, 300, 150]);
 
+// 3b) Alerta de ESP32 sin señal: solo en horario escolar (lun-vie 07:00-15:00) y tras 15 min callado
+{
+    const lun = (h, m) => new Date(2026, 9, 12, h, m).getTime();      // lunes 12-oct-2026, hora local
+    assert.strictEqual(T.esp32SinSenal(lun(9, 0) - 5 * 60000, lun(9, 0)), false, 'hace 5 min: bien');
+    assert.strictEqual(T.esp32SinSenal(lun(9, 0) - 16 * 60000, lun(9, 0)), true, 'hace 16 min: alerta');
+    assert.strictEqual(T.esp32SinSenal(null, lun(9, 0)), true, 'nunca visto en horario escolar: alerta');
+    assert.strictEqual(T.esp32SinSenal(null, lun(6, 59)), false, 'antes de las 7 no se alerta');
+    assert.strictEqual(T.esp32SinSenal(null, lun(7, 0)), true, 'a las 7 ya cuenta');
+    assert.strictEqual(T.esp32SinSenal(null, lun(14, 59)), true);
+    assert.strictEqual(T.esp32SinSenal(null, lun(15, 0)), false, 'a las 15:00 ya no');
+    assert.strictEqual(T.esp32SinSenal(null, new Date(2026, 9, 17, 9, 0).getTime()), false, 'sábado');
+    assert.strictEqual(T.esp32SinSenal(null, new Date(2026, 9, 18, 9, 0).getTime()), false, 'domingo');
+    assert.strictEqual(T.esp32SinSenal(lun(9, 0) - 10 * 60000, lun(9, 0), 5), true, 'umbral configurable');
+}
+
 // 4) Audio sintético: 8 clics cada 500 ms a 8 kHz -> 8 golpes
 const sr = 8000, x = new Float32Array(sr * 4);
 for (let c = 0; c < 8; c++) for (let i = 0; i < 240; i++) x[c * 4000 + 800 + i] = Math.sin(i * 0.9) * Math.exp(-i / 60);
