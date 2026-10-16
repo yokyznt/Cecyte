@@ -130,3 +130,52 @@
 .rb-card > .panel__sub { font-size: var(--fs-md); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .rb-card .rb-leds { margin-top: 2px; }
 .rb-apartado > .rb-conexion { margin-bottom: 18px; }
+
+/* ==================== Control en tiempo real (joystick) ==================== */
+.rb-ctl { display: grid; gap: 22px; align-items: start; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 700px), (orientation: landscape) { .rb-ctl { grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr); } }
+.rb-ctl__mando { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.rb-ctl__botones { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.rb-ctl__grupo { display: flex; flex-direction: column; gap: 8px; }
+.rb-ctl__fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rb-ctl__paro { min-height: 64px; font-size: var(--fs-lg); font-weight: 800; border: 3px solid var(--rose-600, #c0392b); }
+.is-sin-enlace .rb-ctl__botones .btn:not(.rb-ctl__paro), .is-sin-enlace .rb-joy { opacity: 0.45; }
+
+.rb-joy {
+    position: relative; touch-action: none; user-select: none; -webkit-user-select: none;
+    width: min(76vmin, 320px); aspect-ratio: 1; border-radius: 50%;
+    display: grid; place-items: center; cursor: grab;
+}
+.rb-joy.is-activo { cursor: grabbing; }
+.rb-joy.is-apagado { opacity: 0.35; pointer-events: none; }
+.rb-joy__aro {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 3px solid var(--green-600); background: var(--green-50);
+    box-shadow: inset 0 0 0 18px color-mix(in oklch, var(--green-200) 40%, transparent);
+}
+.rb-joy__aro::before, .rb-joy__aro::after { content: ""; position: absolute; background: var(--green-300); opacity: 0.6; }
+.rb-joy__aro::before { left: 50%; top: 12%; bottom: 12%; width: 2px; translate: -50% 0; }
+.rb-joy__aro::after { top: 50%; left: 12%; right: 12%; height: 2px; translate: 0 -50%; }
+.rb-joy__mando {
+    position: relative; width: 36%; aspect-ratio: 1; border-radius: 50%;
+    background: var(--green-700); border: 3px solid var(--green-900, var(--green-800));
+    will-change: transform;
+}
+.rb-joy.is-activo .rb-joy__mando { background: var(--green-600); }
+.rb-joy__txt { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink-2); text-align: center; }
+.rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
+@media (orientation: landscape) and (max-height: 520px) {
+    .rb-joy { width: min(64vh, 280px); }
+}
+
+/* Pantalla completa del control: ocupa todo y deja la palanca y los botones a mano */
+.rb-pantalla-completa { overflow: hidden; }
+#sec-robot-control.is-pantalla {
+    position: fixed; inset: 0; z-index: 90; margin: 0; border-radius: 0; overflow-y: auto;
+    background: var(--surface);
+    padding: var(--inset-top, 0px) var(--inset-right, 0px) var(--inset-bottom, 0px) var(--inset-left, 0px);
+}
+#sec-robot-control.is-pantalla .panel__head { padding-block: 8px; }
+#sec-robot-control.is-pantalla .rb-ctl { padding-block: 8px; align-items: center; min-height: calc(100dvh - 64px); }
+#sec-robot-control.is-pantalla .rb-joy { width: min(64vh, 62vw, 340px); }
+#sec-robot-control.is-pantalla .rb-ctl__mando > .hint { display: none; }

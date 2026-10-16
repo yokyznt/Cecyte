@@ -8,11 +8,11 @@
 const APARTADOS = {
     horario: ['horarios', 'grupos', 'alertas'],
     timbre: ['timbre', 'ritmo', 'esp32'],
-    robot: ['robot-musica', 'robot-baile', 'robot-funciones', 'robot-luces', 'robot-instalar'], // @robot:line
+    robot: ['robot-control', 'robot-musica', 'robot-baile', 'robot-funciones', 'robot-luces', 'robot-instalar'], // @robot:line
 };
 const ADMIN_SECCIONES = Object.values(APARTADOS).flat();
 const ALIAS_SECCION = {
-    robot: 'robot-musica',   // @robot:line
+    robot: 'robot-control',  // @robot:line
 };                           // enlaces viejos
 const PRIMERA_SECCION = 'horarios';
 const apartadoDe = id => Object.keys(APARTADOS).find(a => APARTADOS[a].includes(id));

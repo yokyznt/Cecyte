@@ -17,6 +17,8 @@
     }
 
     function iniciar() {
+        // Lo que solo existe en una plataforma (data-solo="web" | "android")
+        document.querySelectorAll('[data-solo]').forEach(el => { el.hidden = el.dataset.solo !== (nativo ? 'android' : 'web'); });
         if (!nativo) return;
         raiz.addEventListener('tema-cambiado', ajustarBarra);
         ajustarBarra();
@@ -24,6 +26,7 @@
         if (App && App.addListener) {
             // Atrás: cierra un modal abierto, vuelve a la vista del alumno o sale de la app
             App.addListener('backButton', () => {
+                if (raiz.RobotControl && raiz.RobotControl.salirPantalla()) return;
                 const dialogo = document.querySelector('dialog[open]');
                 if (dialogo) { dialogo.close(); return; }
                 const admin = document.getElementById('view-admin');

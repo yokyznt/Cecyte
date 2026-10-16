@@ -281,6 +281,9 @@
                     </div>
 <!-- @robot:start -->
                     <div class="subsections" data-apartado-sub="robot" role="tablist" aria-label="Robot" hidden>
+                        <button type="button" role="tab" id="tab-robot-control" data-section-tab="robot-control" aria-controls="sec-robot-control" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Control</span>
+                        </button>
                         <button type="button" role="tab" id="tab-robot-musica" data-section-tab="robot-musica" aria-controls="sec-robot-musica" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Música</span>
                         </button>
@@ -294,7 +297,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-instalar" data-section-tab="robot-instalar" aria-controls="sec-robot-instalar" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span>Instalar</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Conexión</span>
                         </button>
                     </div>
 <!-- @robot:end -->
@@ -669,6 +672,73 @@
                             </div>
                         </section>
 
+                        <!-- Control en tiempo real: joystick, claxon, luces y modos -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-control" data-section="robot-control" role="tabpanel" aria-label="Control en tiempo real del robot" hidden>
+                            <div class="panel__head">
+                                <h3 class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Control en tiempo real</h3>
+                                <span id="rb-ctl-estado" class="badge badge--idle"><span class="dot"></span> <span id="rb-ctl-estado-txt">Sin conectar</span></span>
+                                <button type="button" id="rb-ctl-full" class="btn btn--secondary btn--sm" aria-pressed="false">Pantalla completa</button>
+                            </div>
+                            <div class="panel__body rb-ctl">
+                                <div class="rb-ctl__mando">
+                                    <div id="rb-joy" class="rb-joy" role="application" aria-label="Joystick: arrastra para mover el robot">
+                                        <span class="rb-joy__aro" aria-hidden="true"></span>
+                                        <span id="rb-joy-mando" class="rb-joy__mando" aria-hidden="true"></span>
+                                    </div>
+                                    <p id="rb-joy-txt" class="rb-joy__txt">Izquierda 0 · Derecha 0</p>
+                                    <p class="hint">Arrastra para moverlo; al soltar se frena. Empieza al 60 % de velocidad.</p>
+                                </div>
+                                <div class="rb-ctl__botones">
+                                    <button type="button" id="rb-ctl-paro" class="btn btn--secondary rb-paro rb-ctl__paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> PARO</button>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-ctl-vmax">Velocidad máxima: <span id="rb-ctl-vmax-v">60 %</span></label>
+                                        <input type="range" id="rb-ctl-vmax" min="20" max="100" step="5" value="60">
+                                    </div>
+                                    <div class="rb-ctl__grupo">
+                                        <h4 class="panel__sub">Sonido</h4>
+                                        <div class="rb-ctl__fila">
+                                            <button type="button" class="btn btn--secondary btn--sm" data-nota="523,160">Do</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-nota="659,160">Mi</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-nota="784,160">Sol</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-nota="1047,200">Do ↑</button>
+                                            <button type="button" class="btn btn--primary btn--sm" data-nota="440,450">Claxon</button>
+                                        </div>
+                                    </div>
+                                    <div class="rb-ctl__grupo">
+                                        <h4 class="panel__sub">Luces</h4>
+                                        <div class="rb-ctl__fila">
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="arcoiris">Arcoíris</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="respirar">Respirar</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="persecucion">Persecución</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="fijo" data-color="#ff0000">Rojo</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="fijo" data-color="#00ff00">Verde</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="fijo" data-color="#0000ff">Azul</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-luz="fijo" data-color="#000000">Apagar</button>
+                                        </div>
+                                    </div>
+                                    <div class="rb-ctl__grupo">
+                                        <h4 class="panel__sub">Modo</h4>
+                                        <div class="rb-ctl__fila">
+                                            <button type="button" class="btn btn--secondary btn--sm" data-modo="manual" aria-pressed="true">Manual</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-modo="1" aria-pressed="false">Esquivar</button>
+                                            <button type="button" class="btn btn--secondary btn--sm" data-modo="2" aria-pressed="false">Seguir la mano</button>
+                                        </div>
+                                    </div>
+                                    <div class="rb-ctl__grupo">
+                                        <h4 class="panel__sub">Inclinar el celular</h4>
+                                        <label class="rb-check"><input type="checkbox" id="rb-incl-on"><span>Manejar inclinando el teléfono (en lugar del joystick)</span></label>
+                                        <div id="rb-incl-opciones" class="rb-ctl__fila" hidden>
+                                            <button type="button" id="rb-incl-cal" class="btn btn--secondary btn--sm">Calibrar</button>
+                                            <button type="button" id="rb-incl-mant" class="btn btn--primary btn--sm">Mantén para manejar</button>
+                                            <label class="rb-check"><input type="checkbox" id="rb-incl-inv-g"><span>Invertir giro</span></label>
+                                            <label class="rb-check"><input type="checkbox" id="rb-incl-inv-a"><span>Invertir avance</span></label>
+                                        </div>
+                                        <p id="rb-incl-estado" class="hint"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
                         <!-- Música: canción, teclado y melodía de un audio -->
                         <section class="panel admin-sec rb-panel" id="sec-robot-musica" data-section="robot-musica" role="tabpanel" aria-label="Música del robot" hidden>
                             <div class="panel__body">
@@ -935,16 +1005,23 @@
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Conexión</h4>
-                                    <p class="hint">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
+                                    <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (se llama «Makeblock_LE…»). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
+                                    <p class="hint" data-solo="web">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
                                     <div class="btn-row">
                                     <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
                                     <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
-                                    <p class="hint"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
+                                    <p class="hint" data-solo="web"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
                                 </div>
 
-                                <div class="rb-card rb-card--ancho">
+                                <div class="rb-card rb-card--ancho" data-solo="android">
+                                    <h4 class="panel__sub">Enlace Bluetooth</h4>
+                                    <p class="hint">Aquí aparece lo que el módulo Bluetooth del robot ofrece (servicio, escritura y avisos). Si algo no conecta, mándame este texto.</p>
+                                    <pre id="rb-bt-info" class="rb-bt-info">Sin conectar todavía.</pre>
+                                </div>
+
+                                <div class="rb-card rb-card--ancho" data-solo="web">
                                     <details id="rb-instalar" class="rb-instalar" open>
                                     <summary>Instalar el programa en el robot (una sola vez)</summary>
                                     <ol>
@@ -1075,6 +1152,8 @@
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
     <script src="robot.js"></script> <!-- @robot:line -->
+    <script src="js/robot-bluetooth.js"></script> <!-- @robot:line -->
+    <script src="js/robot-control.js"></script> <!-- @robot:line -->
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

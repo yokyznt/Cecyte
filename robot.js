@@ -149,6 +149,24 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
     return { cmds, ms: total };
 }
 
+// ---------- Joystick: de (x, y) a las dos ruedas ----------
+// x a la derecha e y hacia arriba, entre -1 y 1; vmax es el % de la velocidad máxima (20 a 100).
+// Con la palanca al frente van las dos ruedas igual; hacia un lado, gira en su sitio; en diagonal, avanza curvando.
+function mezclaJoystick(x, y, vmax) {
+    const ZONA = 0.08;                                     // zona muerta: un roce no mueve el robot
+    x = clamp(Number(x) || 0, -1, 1);
+    y = clamp(Number(y) || 0, -1, 1);
+    const mag = Math.hypot(x, y);
+    if (mag < ZONA) return { izq: 0, der: 0 };
+    const k = Math.min(1, (mag - ZONA) / (1 - ZONA)) / mag;   // reescala fuera de la zona muerta y limita al círculo
+    const sx = x * k, sy = y * k;
+    let izq = sy + sx, der = sy - sx;
+    const m = Math.max(1, Math.abs(izq), Math.abs(der));
+    izq /= m; der /= m;
+    const V = Math.round(clamp(Number(vmax) || 0, 0, 100) / 100 * VEL_MAX);
+    return { izq: Math.round(izq * V), der: Math.round(der * V) };
+}
+
 // ---------- Cola con confirmaciones ----------
 // Cada orden se confirma con una línea OK/ERR. Se mandan varias seguidas (para que no haya huecos
 // entre notas) sin pasarse de VENTANA_BYTES. Las de LEDs van solas porque mientras el robot
@@ -163,9 +181,14 @@ function crearCola(escribir, crudo) {
             const c = pend[0], n = c.l.length + 1;
             const bytes = vuelo.reduce((s, x) => s + x.n, 0);
             if (vuelo.length && (c.ex || vuelo[vuelo.length - 1].ex)) break;
+            if (c.mov) {                       // control en vivo: una sola «M» en camino; si tarda más de 1,5 s se da por perdida
+                const enVuelo = vuelo.find(x => x.c.mov);
+                if (enVuelo && Date.now() - enVuelo.t < 1500) break;
+                if (enVuelo) vuelo.splice(vuelo.indexOf(enVuelo), 1);
+            }
             if (vuelo.length >= VENTANA_ORDENES || (vuelo.length && bytes + n > VENTANA_BYTES)) break;
             pend.shift();
-            vuelo.push({ n, ex: !!c.ex, c });
+            vuelo.push({ n, ex: !!c.ex, c, t: Date.now() });
             escribir(c.l);
         }
         if (!pend.length && !vuelo.length && alFinal) {
@@ -186,6 +209,14 @@ function crearCola(escribir, crudo) {
             pend = pend.concat(cmds.map(c => (typeof c === 'string' ? { l: c } : c)));
             if (fin) alFinal = fin;
             if (!vuelo.length) ultimoMov = Date.now();
+            bombear();
+        },
+        // Control en vivo (joystick): «último gana». Solo hay una M en camino y, mientras espera su OK, cada M nueva
+        // reemplaza a la anterior pendiente: así por Bluetooth no se acumula retraso.
+        mover(l) {
+            if (abortando) return;
+            pend = pend.filter(c => !c.mov);
+            pend.push({ l, mov: 1 });
             bombear();
         },
         // err = el robot contestó ERR. Una orden de luces o de ajuste que llegó rota se reintenta una
@@ -805,7 +836,7 @@ function formatoDuracion(min) {
 const lib = {
     BAUDIOS, VEL_MAX, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
@@ -824,7 +855,7 @@ const VID_CH340 = 0x1A86;
 
 const S = {
     estado: 'desconectado',   // desconectado | conectando | listo | sinprograma
-    puerto: null, escritor: null, lector: null, vioArranque: false,
+    transporte: null, juntar: null, vioArranque: false,
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
@@ -912,23 +943,27 @@ const TEXTO_ESTADO = {
 
 function ponEstado(est) {
     S.estado = est;
+    document.dispatchEvent(new CustomEvent('robot-estado', { detail: { estado: est } }));
     const [txt, clase] = TEXTO_ESTADO[est];
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
-        $('rb-instalar').open = true;
+        if ($('rb-instalar')) $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
     }
 }
 
-// ---------- Puerto serie ----------
+// ---------- Transporte: USB (Web Serial) o Bluetooth (BLE) ----------
+// Un transporte es { tipo: 'serial' | 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
+// entra por entregar(texto), que junta los trozos en líneas y las manda a alLinea.
 
 function crudo(texto) {
-    if (S.escritor) S.escritor.write(new TextEncoder().encode(texto)).catch(() => { /* se cerró */ });
+    if (S.transporte) S.transporte.escribir(texto).catch(() => { /* se cerró */ });
 }
 const escribirLinea = l => crudo(l + '\n');
+const entregar = texto => { if (S.juntar) S.juntar(texto); };
 
 function alLinea(l) {
     if (/^(OK|ERR)\b/.test(l)) {
@@ -1031,47 +1066,65 @@ function alListo() {
     S.sucio = true;
 }
 
-async function abrir(puerto) {
+// Empieza a hablar con el robot: saluda con PING hasta que contesta PONG.
+// Por USB la placa se reinicia al abrir el puerto (hay que esperar); por Bluetooth no se reinicia.
+function iniciarSesion(t) {
+    S.transporte = t;
+    S.juntar = crearLector(alLinea);
+    S.vioArranque = false;
+    S.cola.reiniciar();
+    ponEstado('conectando');
+    const ble = t.tipo === 'ble';
+    mensaje(ble ? 'Conectando por Bluetooth…' : 'Conectando… (la placa se reinicia y suena una vez)');
+    let intentos = 0;
+    const espera = ble ? 0 : 2, tope = ble ? 12 : 14;
+    S.saludo = setInterval(() => {
+        if (S.estado !== 'conectando') return clearInterval(S.saludo);
+        if (++intentos > tope) {
+            clearInterval(S.saludo);
+            ponEstado('sinprograma');
+            mensaje(ble
+                ? 'Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.'
+                : S.vioArranque
+                    ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
+                    : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
+        } else if (intentos > espera) {
+            crudo('PING\n');
+        }
+    }, 400);
+}
+
+async function abrirSerie(puerto) {
     try {
         await puerto.open({ baudRate: BAUDIOS });
     } catch (e) {
         mensaje('No pude abrir el puerto. Si el IDE de Arduino o mBlock lo tienen abierto, ciérralos y vuelve a intentar.', 'err');
         return;
     }
-    S.puerto = puerto;
-    S.escritor = puerto.writable.getWriter();
-    S.lector = puerto.readable.getReader();
-    S.vioArranque = false;
-    S.cola.reiniciar();
-    ponEstado('conectando');
-    mensaje('Conectando… (la placa se reinicia y suena una vez)');
-    leerBucle();
-    let intentos = 0;
-    S.saludo = setInterval(() => {
-        if (S.estado !== 'conectando') return clearInterval(S.saludo);
-        if (++intentos > 14) {
-            clearInterval(S.saludo);
-            ponEstado('sinprograma');
-            mensaje(S.vioArranque
-                ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
-                : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
-        } else if (intentos > 2) {
-            crudo('PING\n');
-        }
-    }, 400);
-}
-
-async function leerBucle() {
-    const dec = new TextDecoder();
-    const juntar = crearLector(alLinea);
-    try {
-        for (;;) {
-            const { value, done } = await S.lector.read();
-            if (done) break;
-            juntar(dec.decode(value, { stream: true }));
-        }
-    } catch (e) { /* se desenchufó */ }
-    cerrar();
+    const escritor = puerto.writable.getWriter();
+    const lector = puerto.readable.getReader();
+    const t = {
+        tipo: 'serial',
+        escribir: txt => escritor.write(new TextEncoder().encode(txt)),
+        async cerrar() {
+            try { await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
+            try { lector.releaseLock(); } catch (e) { /* idem */ }
+            try { escritor.releaseLock(); } catch (e) { /* idem */ }
+            try { await puerto.close(); } catch (e) { /* idem */ }
+        },
+    };
+    iniciarSesion(t);
+    (async () => {
+        const dec = new TextDecoder();
+        try {
+            for (;;) {
+                const { value, done } = await lector.read();
+                if (done) break;
+                entregar(dec.decode(value, { stream: true }));
+            }
+        } catch (e) { /* se desenchufó */ }
+        if (S.transporte === t) cerrar();
+    })();
 }
 
 async function cerrar() {
@@ -1084,18 +1137,39 @@ async function cerrar() {
     S.cola.reiniciar();
     S.actuando = false;
     detenerAudio();
-    const { lector, escritor, puerto } = S;
-    S.puerto = S.escritor = S.lector = null;
-    try { if (lector) await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
-    try { if (lector) lector.releaseLock(); } catch (e) { /* idem */ }
-    try { if (escritor) escritor.releaseLock(); } catch (e) { /* idem */ }
-    try { if (puerto) await puerto.close(); } catch (e) { /* idem */ }
+    const t = S.transporte;
+    S.transporte = null;
+    S.juntar = null;
+    if (t) { try { await t.cerrar(); } catch (e) { /* ya estaba cerrado */ } }
     ponEstado('desconectado');
     progreso(0);
-    if (era === 'listo') mensaje('El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+    if (era === 'listo') mensaje(t && t.tipo === 'ble'
+        ? 'Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.'
+        : 'El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+}
+
+const hayBluetooth = () => !!(raiz.RobotBluetooth && raiz.RobotBluetooth.disponible());
+
+async function conectarBluetooth(recordado) {
+    if (S.estado !== 'desconectado') { await cerrar(); return; }
+    try {
+        const BT = raiz.RobotBluetooth;
+        let t = null;
+        const dispositivo = recordado ? BT.recordado() : await BT.elegir();
+        if (!dispositivo) return;
+        mensaje('Conectando con ' + (dispositivo.name || 'el robot') + '…');
+        t = await BT.conectar(dispositivo, {
+            alDatos: entregar,
+            alCerrar: () => { if (S.transporte === t) cerrar(); },
+        });
+        iniciarSesion(t);
+    } catch (e) {
+        if (!recordado) mensaje('No se pudo conectar por Bluetooth: ' + (e && e.message ? e.message : e), 'err');
+    }
 }
 
 async function conectar(todos) {
+    if (hayBluetooth()) return conectarBluetooth(false);
     if (!('serial' in navigator)) {
         mensaje('Este navegador no puede hablar con el robot. Abre la página en Chrome o Edge desde una computadora.', 'err');
         return;
@@ -1103,18 +1177,23 @@ async function conectar(todos) {
     if (S.estado !== 'desconectado') { await cerrar(); return; }
     try {
         const filtros = todos ? [] : [{ usbVendorId: VID_CH340 }];
-        await abrir(await navigator.serial.requestPort({ filters: filtros }));
+        await abrirSerie(await navigator.serial.requestPort({ filters: filtros }));
     } catch (e) {
         if (e && e.name !== 'NotFoundError') mensaje('No se pudo conectar: ' + e.message, 'err');
     }
 }
 
-// Si ya diste permiso antes, se conecta solo al abrir la pestaña o al enchufar el cable
+// Si ya diste permiso antes, se conecta solo al abrir la pestaña (USB: también al enchufar el cable)
 async function conectarSolo() {
-    if (!('serial' in navigator) || S.estado !== 'desconectado' || $('sec-robot').hidden) return;
+    if (S.estado !== 'desconectado' || $('sec-robot').hidden) return;
+    if (hayBluetooth()) {
+        if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
+        return;
+    }
+    if (!('serial' in navigator)) return;
     try {
         const p = (await navigator.serial.getPorts()).find(x => (x.getInfo().usbVendorId || 0) === VID_CH340);
-        if (p) await abrir(p);
+        if (p) await abrirSerie(p);
     } catch (e) { /* sin permiso todavía: espera al botón */ }
 }
 
@@ -1930,6 +2009,7 @@ const QUE_REPRODUCE = {
     'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-funciones': 'la función elegida',
     'robot-luces': 'las luces',
     'robot-instalar': 'nada en esta sección',
+    'robot-control': 'nada en esta sección',
 };
 
 function seccionRobotActual() {
@@ -1940,7 +2020,7 @@ function seccionRobotActual() {
 function pintarBarra() {
     const sec = seccionRobotActual();
     $('rb-barra-que').textContent = QUE_REPRODUCE[sec] || 'nada';
-    $('rb-barra-play').disabled = sec === 'robot-instalar';
+    $('rb-barra-play').disabled = sec === 'robot-instalar' || sec === 'robot-control';
 }
 
 // Con el robot conectado se reproduce en el robot; si no, la música suena en la página
@@ -2020,7 +2100,7 @@ function iniciar() {
     ponEstado('desconectado');
 
     $('rb-conectar').addEventListener('click', () => conectar(false));
-    $('rb-todos').addEventListener('click', () => conectar(true));
+    if ($('rb-todos')) $('rb-todos').addEventListener('click', () => conectar(true));
     $('rb-paro').addEventListener('click', paro);
     $('rb-diag-borrar').addEventListener('click', () => { S.cola.enviar(['DIAG0']); $('rb-diag').hidden = true; });
     $('rb-tocar').addEventListener('click', () => actuar(true, false));
@@ -2171,13 +2251,46 @@ function iniciar() {
 
     // Conectarse solo al abrir la pestaña y al enchufar el cable
     new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
-    if ('serial' in navigator) {
+    if (hayBluetooth()) {
+        mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
+    } else if ('serial' in navigator) {
         navigator.serial.addEventListener('connect', conectarSolo);
         navigator.serial.addEventListener('disconnect', () => { if (S.estado !== 'desconectado') cerrar(); });
     } else {
         mensaje('Para controlar el robot abre esta página en Chrome o Edge desde una computadora.', 'err');
     }
     window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+
+    // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
+    raiz.RobotEnlace = {
+        estado: () => S.estado,
+        listo: () => S.estado === 'listo',
+        mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
+        paro: pararTodo,
+        enviar(cmds) { if (S.estado === 'listo') S.cola.enviar(cmds); },
+        luces(efecto, color) {
+            if (S.estado !== 'listo') return;
+            S.efecto = efecto;
+            if (color) S.leds = S.leds.map(() => color);
+            $('rb-efecto').value = efecto;
+            pintarAnillo();
+            S.sucio = true;
+        },
+        modo(n) {                                   // 1 esquivar, 2 seguir la mano: lo hace el robot solo con su sensor
+            if (S.estado !== 'listo') return;
+            S.actuando = false;
+            S.corriendoFuncion = true;
+            S.autonomo = n;
+            S.ultimaActividad = Date.now();
+            S.cola.enviar(['SPD ' + velAuto(), { l: 'MODE ' + n, ex: true }]);
+        },
+        manual() {                                  // vuelve al control de la página (MODE 4) y frena
+            if (S.estado !== 'listo') return;
+            if (S.autonomo) { S.autonomo = 0; S.salirModo = true; }
+            S.corriendoFuncion = false;
+            S.cola.abortar();
+        },
+    };
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
