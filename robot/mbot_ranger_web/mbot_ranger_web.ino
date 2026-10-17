@@ -6,7 +6,7 @@
 
   Modos (botón de la placa):
     0 = Reposo (LEDs azules)         1 = Esquivar obstáculos (verde)
-    2 = Seguir objeto con la mano (amarillo)   3 = Test de motores (rojo)
+    2 = Seguir objeto con la mano (amarillo)
     4 = Página (la manda la web; el botón vuelve a 0)   5 = Baile o función guardados (sin la página)
 
   Órdenes por USB, 115200 baudios, una por línea. Cada una responde OK, ERR ... o PONG:
@@ -34,6 +34,9 @@
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
     LINEA clave valor ajustes del seguidor de línea (puerto 9): vel 40..150, giro 10..100, buscar ms, color 0/1
+    H0               modo dirección: pone el rumbo actual como cero (con el robot quieto); H1 lo apaga
+    H grados v       va hacia ese rumbo (-180..180, positivo = derecha del cero): gira hacia él y avanza con velocidad v; v = 0 frena
+    HG               responde "HG 90": el rumbo actual en grados
     G n              gira n grados (-360..360, positivo = derecha) con el giroscopio; INFO trae GIRO=1 si lo hay
     PADD G grados    en el show: gira esos grados (como G)
     MODE 7         se acerca despacio a lo de enfrente y se detiene a 10 cm, pitando más rápido al acercarse (PARK=1 en INFO)
@@ -186,6 +189,7 @@ int musP = 0;                            // música de fondo guardada: por dónd
 unsigned long musT = 0;                  // a esta hora toca la siguiente nota o silencio
 bool abortar = false;                // un "!" de la página: corta lo que esté haciendo
 bool moviendo = false;
+bool rumboOn = false;                // modo dirección: el giroscopio lleva la cuenta del rumbo (orden H0)
 unsigned long ultimoBoton = 0;
 unsigned long ultimaOrden = 0;
 
@@ -266,6 +270,7 @@ void color(int r, int g, int b) {
 }
 
 void aplicaModo() {
+  rumboOn = false;
   parar();
   tonoApaga();
   escEstado = 0;
@@ -283,7 +288,6 @@ void aplicaModo() {
       case 0: color(0, 0, 40);   break;
       case 1: color(0, 40, 0);   break;
       case 2: color(40, 30, 0);  break;
-      case 3: color(40, 0, 0);   break;
     }
   }
   if (modo < MODO_WEB) tono(500 + modo * 200, 120);
@@ -359,18 +363,6 @@ void seguir() {
   if (d > 12 && d < 40)      adelante(velFn);
   else if (d <= 8)           atras(velFn);
   else                       parar();
-}
-
-void testMotores() {
-  // Cada motor por separado, para ver cuál no responde
-  motores(150, 0);  espera(800); parar(); espera(400);
-  motores(0, 150);  espera(800); parar(); espera(400);
-  adelante(150);    espera(800); parar(); espera(400);
-  atras(150);       espera(800); parar(); espera(400);
-  giraIzq(150);     espera(600); parar(); espera(400);
-  giraDer(150);     espera(600); parar();
-  modo = 0;         // al terminar vuelve a reposo
-  aplicaModo();
 }
 
 // ---------- Botón de la placa ----------
@@ -753,28 +745,56 @@ void gyroIni() {
   giroOk = gyroEscribe(0x6B, 0) && gyroEscribe(0x1A, 3);
 }
 
-void giroGrados(int grados) {
+long calibraGiro() {
   parar();
-  const int g = grados < 0 ? -grados : grados;
-  if (!g || !giroOk) return;
   espera(120);
-  long reposo = 0;
-  for (uint8_t i = 0; i < 16; i++) { reposo += gyroZ(); espera(3); }
-  reposo /= 16;
-  const long meta = (long)(g - GIRO_ADEL) * 131000L;
-  long suma = 0;
-  const unsigned long t0 = millis();
-  unsigned long tp = t0;
+  long s = 0;
+  for (uint8_t i = 0; i < 16; i++) { s += gyroZ(); espera(3); }
+  return s >> 4;
+}
+
+long rumbo = 0, rumboRep = 0;
+unsigned long rumboT = 0;
+void rumboPaso() {
+  if (!rumboOn) return;
+  const unsigned long t = millis();
+  if (t - rumboT < 4) return;
+  rumbo += (long)(gyroZ() - rumboRep) * (long)(t - rumboT);
+  rumboT = t;
+}
+void rumboInicia() {
+  rumboRep = calibraGiro();
+  rumbo = 0;
+  rumboT = millis();
+  rumboOn = true;
+}
+int rumboGrados() { return (int)((65536L - rumbo) >> 17); }
+void rumboMueve(int obj, int v) {
+  if (v <= 0) { parar(); return; }
+  int e = obj - rumboGrados();
+  while (e > 180) e -= 360;
+  while (e < -180) e += 360;
+  const int a = e < 0 ? -e : e;
+  const int fwd = a >= 64 ? 0 : (v * (64 - a)) >> 6;
+  const int g = a < 4 ? 0 : constrain(a * 2 + 100, 110, 150);
+  const int s = e > 0 ? g : -g, tope = max(v, g);
+  motores(constrain(fwd + s, -tope, tope), constrain(fwd - s, -tope, tope));
+}
+
+void giroGrados(int grados) {
+  const int g = grados < 0 ? -grados : grados;
+  if (!g || !giroOk) { parar(); return; }
+  rumboInicia();
   if (grados > 0) giraDer(140); else giraIzq(140);
-  const unsigned long tope = min((unsigned long)g * 25 + 1200, 5000UL);
+  const unsigned long t0 = millis(), tope = min((unsigned long)g * 25 + 1200, 5000UL);
   while (!abortar && millis() - t0 < tope) {
     espera(3);
-    const unsigned long t = millis();
-    suma += (long)(gyroZ() - reposo) * (long)(t - tp);
-    tp = t;
-    if ((suma < 0 ? -suma : suma) >= meta) break;
+    rumboPaso();
+    const int r = rumboGrados();
+    if ((r < 0 ? -r : r) >= g - GIRO_ADEL) break;
   }
   parar();
+  rumboOn = false;
 }
 
 void pasoModo() {
@@ -1073,6 +1093,26 @@ void ejecuta(char *s) {
     Serial.print(F("SENS "));
     Serial.print(lnLee(0));
     Serial.println(lnLee(1));
+  } else if (!strcmp(cmd, "H0")) {
+    if (!giroOk) { err(F("giro")); }
+    else {
+      if (modo != MODO_WEB) { modo = MODO_WEB; aplicaModo(); }
+      rumboInicia();
+      ok();
+    }
+  } else if (!strcmp(cmd, "H1")) {
+    rumboOn = false;
+    parar();
+    ok();
+  } else if (!strcmp(cmd, "H") && a && b) {
+    if (!rumboOn) { err(F("rumbo")); }
+    else {
+      rumboMueve(constrain(atoi(a), -180, 180), constrain(atoi(b), 0, VEL_TURBO));
+      ok();
+    }
+  } else if (!strcmp(cmd, "HG")) {
+    Serial.print(F("HG "));
+    Serial.println(rumboGrados());
   } else if (!strcmp(cmd, "G") && a) {
     if (giroOk) { giroGrados(constrain(atoi(a), -360, 360)); ok(); } else err(F("giro"));
   } else if (!strcmp(cmd, "PCLR")) {
@@ -1189,18 +1229,19 @@ void setup() {
 
 void loop() {
   atiendeUSB();
+  rumboPaso();
   fxPaso();
   senalPaso();
 
-  // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
-  // De 3 sin show, de 4 (página) y de 5 vuelve a 0.
+  // Cambio de modo con el botón (con antirrebote): 0, 1, 2 y, si hay show guardado, 5.
+  // De 2 sin show, de 4 (página) y de 5 vuelve a 0.
   // Con la página al mando (mandó algo en los últimos 15 s) el botón de la placa se ignora: sus pulsaciones
   // falsas por ruido cambiaban de modo solas (luz azul y paro). Para parar está el Paro de la página.
   const bool paginaAlMando = ultimaOrden != 0 && millis() - ultimaOrden < 15000UL;
   if (!paginaAlMando && botonFlanco() && botonSostenido() && millis() - ultimoBoton > 300) {
     ultimoBoton = millis();
-    if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
-    else modo = (modo >= 3) ? 0 : modo + 1;
+    if (modo == 2 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
+    else modo = (modo >= 2) ? 0 : modo + 1;
     aplicaModo();
     Serial.print(F("BTN "));
     Serial.println(modo);
@@ -1214,7 +1255,6 @@ void loop() {
   }
 
   switch (modo) {
-    case 3: testMotores(); break;
     case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
     default: pasoModo(); break;
   }

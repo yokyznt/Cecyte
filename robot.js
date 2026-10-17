@@ -175,6 +175,17 @@ function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
     return { izq: Math.round(izq * V), der: Math.round(der * V) };
 }
 
+// Modo dirección: la palanca marca un rumbo (0 = arriba, 90 = derecha, 180 = atrás, -90 = izquierda) y v es la velocidad.
+// El robot gira hacia ese rumbo (con el giroscopio) y avanza; si la palanca apunta atrás, da la vuelta en vez de retroceder.
+function rumboDeJoystick(x, y, vmax, tope = VEL_MAX) {
+    x = clamp(Number(x) || 0, -1, 1);
+    y = clamp(Number(y) || 0, -1, 1);
+    const mag = Math.hypot(x, y), ZONA = 0.08;
+    if (mag < ZONA) return { grados: 0, v: 0 };
+    const k = Math.min(1, (mag - ZONA) / (1 - ZONA));
+    return { grados: Math.round(Math.atan2(x, y) * 180 / Math.PI), v: Math.round(k * clamp(Number(vmax) || 0, 0, 100) / 100 * clamp(Number(tope) || VEL_MAX, 0, VEL_TURBO)) };
+}
+
 const GIRO_DIRECCIONAL = 0.6;
 
 function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
@@ -1325,11 +1336,11 @@ function ruletaColores(pos, bola) {
 const lib = {
     ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
-    RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
+    rumboDeJoystick, RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
@@ -3128,6 +3139,9 @@ function iniciar() {
         estado: () => S.estado,
         listo: () => S.estado === 'listo',
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
+        soportaRumbo: () => S.estado === 'listo' && S.fwGiro,
+        rumboIniciar(si) { if (S.estado === 'listo' && S.fwGiro) S.cola.enviar([{ l: si ? 'H0' : 'H1', ex: true }]); },
+        rumbo(grados, v) { if (S.estado === 'listo' && S.fwGiro) { S.ultimaActividad = Date.now(); S.cola.ultimo('H', 'H ' + grados + ' ' + v); } },
         paro: pararTodo,
         // Distancia al obstáculo de enfrente (firmware con DIST): el mando pregunta ~3 veces por segundo, nunca con la cola ocupada
         soportaDistancia: () => S.estado === 'listo' && S.fwNuevo,

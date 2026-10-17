@@ -405,6 +405,7 @@
 .rb-turbo { width: 64px; height: 44px; margin-left: auto; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
 .rb-turbo .icon { width: 24px; height: 24px; fill: currentColor; stroke-width: 1.6; }
 .rb-btn.rb-turbo[aria-pressed="true"] { background: var(--m-naranja); color: var(--m-base); }
+.rb-btn.rb-dir[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
 .rb-alerta { padding: 4px 10px; border-radius: 999px; background: oklch(0.55 0.2 27); color: oklch(0.98 0 0); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 .rb-turbo.is-enfriando { animation: rb-latido 0.6s ease-in-out infinite; }
 .es-turbo .rb-caras, .es-turbo .rb-vel input { opacity: 0.3; pointer-events: none; }

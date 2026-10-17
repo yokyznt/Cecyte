@@ -566,6 +566,25 @@ for (const c of R.CANCIONES) {
     assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
 }
 
+// 23d) Modo dirección: la palanca marca un rumbo y el robot gira hacia él (atrás = da la vuelta, no retrocede)
+{
+    const D = R.rumboDeJoystick;
+    assert.deepStrictEqual(D(0, 1, 100), { grados: 0, v: 180 }, 'arriba: rumbo 0 a toda velocidad');
+    assert.deepStrictEqual(D(1, 0, 100), { grados: 90, v: 180 }, 'derecha: 90');
+    assert.deepStrictEqual(D(-1, 0, 100), { grados: -90, v: 180 }, 'izquierda: -90');
+    assert.deepStrictEqual(D(0, -1, 100), { grados: 180, v: 180 }, 'atrás: 180, es decir, da la vuelta');
+    assert.deepStrictEqual(D(0, -1, 60), { grados: 180, v: 108 }, '60 % de 180');
+    assert.deepStrictEqual(D(0.05, 0.05, 100), { grados: 0, v: 0 }, 'zona muerta: no se mueve');
+    assert.strictEqual(D(0.7, 0.7, 100).grados, 45, 'diagonal a la derecha');
+    assert.strictEqual(D(-0.7, -0.7, 100).grados, -135, 'diagonal atrás a la izquierda');
+    assert.strictEqual(D(0, 1, 100, R.VEL_TURBO).v, R.VEL_TURBO, 'el turbo sube el tope');
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(cmd, "H0"\)/.test(ino) && /strcmp\(cmd, "H1"\)/.test(ino) && /strcmp\(cmd, "H"\) && a && b/.test(ino) && /void rumboMueve/.test(ino), 'el firmware lleva el modo dirección (H0, H1, H)');
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const ctl = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8');
+    assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl) && /id="rb-dir-on"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')), 'la app manda H con el rumbo de la palanca');
+}
+
 // 23c) El robot solo se controla desde la app: sin Web Serial y con la pestaña oculta en la web
 {
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');

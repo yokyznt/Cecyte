@@ -54,6 +54,7 @@
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
         <symbol id="i-fn-mano" viewBox="0 0 24 24"><!-- @robot:line --><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6"/><path d="M11 10V4a1.5 1.5 0 0 1 3 0v7"/><path d="M14 10V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-3a1.5 1.5 0 0 1 2.5-1.5L8 15"/></symbol>
+        <symbol id="i-direccion" viewBox="0 0 24 24"><path d="M12 3v3"/><circle cx="12" cy="12" r="8"/><path d="m12 7.5 3 8-3-1.8-3 1.8z"/></symbol>
         <symbol id="i-fn-estacionar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="12" height="5" x="6" y="3" rx="1"/><path d="M12 10v7"/><path d="m8 14 4 4 4-4"/><path d="M4 21h16"/></symbol>
         <symbol id="i-fn-sirena" viewBox="0 0 24 24"><!-- @robot:line --><path d="M7 17v-5a5 5 0 0 1 10 0v5"/><path d="M5 17h14v4H5z"/><path d="M12 3v2"/><path d="m4.5 6.5 1.5 1.5"/><path d="m19.5 6.5-1.5 1.5"/></symbol>
         <symbol id="i-fn-cuadrado" viewBox="0 0 24 24"><!-- @robot:line --><rect width="14" height="14" x="5" y="5" rx="2"/><path d="m12 2 3 3-3 3"/></symbol>
@@ -745,6 +746,7 @@
                                     <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
                                     <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
                                     <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
+                                    <button type="button" id="rb-dir-on" class="rb-btn rb-btn--chico rb-dir" aria-pressed="false" aria-label="Modo dirección: el robot gira hacia donde apuntas la palanca y avanza" title="Modo dirección" hidden><svg class="icon" aria-hidden="true"><use href="#i-direccion"/></svg></button>
                                 </header>
 
                                 <div class="rb-mando__cuerpo">

@@ -20,6 +20,7 @@
         teclas: new Map(),                // teclado: tecla -> [x, y]
         vmax: 60,
         movido: false, ultimo: '', ultimoEnvio: 0,
+        dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo y el robot gira hacia él y avanza
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
         turbo: false, vmaxPrev: 60, luzPrev: null, carga: 0, enfriaHasta: 0, ultimaRev: 0,
@@ -74,6 +75,7 @@
         const f = fuente();
         const ahora = Date.now();
         const turbo = C.turbo && ahora >= C.enfriaHasta;
+        if (C.dirModo) return revisarRumbo(f, ahora, turbo);
         const m = raiz.Robot.mezclaJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         // Repitiendo un recorrido: si se toca la palanca, el teclado o el teléfono, el mando recupera el control
         if (C.repro) { if (m.izq || m.der) pararRepro(false); else return; }
@@ -103,6 +105,40 @@
             C.ultimo = clave;
             C.ultimoEnvio = ahora;
         }
+    }
+
+    // Modo dirección: se manda el rumbo de la palanca (redondeado, para no saturar el enlace) y la velocidad
+    function revisarRumbo(f, ahora, turbo) {
+        if (ahora < C.dirListoEn) return;
+        const r = raiz.Robot.rumboDeJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
+        if (C.repro) { if (!r.v) return; pararRepro(false); }
+        if (!r.v) {
+            if (C.movido) { enlace().rumbo(0, 0); C.movido = false; C.ultimo = ''; C.ultimoEnvio = ahora; }
+            return;
+        }
+        const g = Math.round(r.grados / 2) * 2, v = Math.round(r.v / 5) * 5;
+        if (C.turbo) guardaCalor({ izq: v, der: v }, ahora);
+        C.movido = true;
+        const clave = g + ',' + v;
+        if (clave !== C.ultimo || ahora - C.ultimoEnvio >= MS_LATIDO) {
+            enlace().rumbo(g, v);
+            C.ultimo = clave;
+            C.ultimoEnvio = ahora;
+        }
+    }
+
+    function ponerRumbo(si) {
+        if (si === C.dirModo) return;
+        const e = enlace();
+        if (si && !(listo() && e.soportaRumbo && e.soportaRumbo())) { vibrar([30, 40, 30]); return; }
+        if (si && C.inclinar) ponerInclinar(false);
+        frenar(false);
+        C.dirModo = si;
+        $('rb-dir-on').setAttribute('aria-pressed', String(si));
+        $('rb-mando').classList.toggle('es-dir', si);
+        C.dirListoEn = si ? Date.now() + 900 : 0;
+        if (listo()) e.rumboIniciar(si);
+        vibrar(si ? [20, 30, 20] : 14);
     }
 
     // Direccionales, luz de freno y de reversa: solo se manda cuando cambian, y se repiten cada MS_SENAL mientras duran
@@ -266,6 +302,7 @@
     }
 
     function ponerInclinar(si) {
+        if (si && C.dirModo) ponerRumbo(false);
         C.inclinar = si;
         $('rb-incl-on').setAttribute('aria-pressed', String(si));
         $('rb-mando').classList.toggle('es-incl', si);
@@ -435,6 +472,7 @@
         const b = $('rb-freno');
         const e = enlace();
         b.hidden = !(e && e.soportaDistancia && e.soportaDistancia());
+        $('rb-dir-on').hidden = !(e && e.soportaRumbo && e.soportaRumbo());
         const d = e && e.distancias ? e.distancias() : null;
         const cm = d && d.lecturas.length ? d.lecturas[d.lecturas.length - 1] : null;
         $('rb-dist').textContent = cm === null || cm >= 400 ? '-- cm' : cm + ' cm';
@@ -456,6 +494,7 @@
         });
         $('rb-ctl-bt').addEventListener('click', () => { const b = $('rb-conectar'); if (b) b.click(); });
         $('rb-turbo').addEventListener('click', () => ponerTurbo(!C.turbo));
+        $('rb-dir-on').addEventListener('click', () => ponerRumbo(!C.dirModo));
     }
 
     // ---------- Recorridos: grabar lo que mandas con el mando y repetirlo ----------
@@ -643,6 +682,7 @@
     function cerrarMando() {
         ponerTurbo(false);
         pararGrabacion(true);
+        ponerRumbo(false);
         frenar(false);
         if (C.inclinar) ponerInclinar(false);
         abrirMando(false);
@@ -684,7 +724,7 @@
         for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
         sec.classList.toggle('is-sin-enlace', e !== 'listo');
         pintarDistancia();
-        if (e !== 'listo') { pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
+        if (e !== 'listo') { C.dirModo = false; C.dirListoEn = 0; $('rb-dir-on').setAttribute('aria-pressed', 'false'); $('rb-mando').classList.remove('es-dir'); pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
     }
 
     function iniciar() {
