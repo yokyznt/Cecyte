@@ -1206,16 +1206,18 @@
                                     <div class="rb-leds">
                                         <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
                                         <div class="stack">
-                                            <div class="field">
-                                                <label class="field__label" for="rb-led-color">Color del LED elegido</label>
-                                                <input type="color" id="rb-led-color" class="rb-color">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos de ese color</button>
+                                            <div class="rb-led-sel" role="group" aria-label="LED elegido">
+                                                <button type="button" id="rb-led-ant" class="rb-led-sel__paso" aria-label="LED anterior"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+                                                <div class="rb-led-sel__info" role="status" aria-live="polite"><span class="rb-led-sel__dot" id="rb-led-dot"></span><span><b id="rb-led-nombre">LED 1</b><small id="rb-led-color-nombre"></small></span></div>
+                                                <button type="button" id="rb-led-sig" class="rb-led-sel__paso" aria-label="LED siguiente"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
                                             </div>
                                             <div>
-                                                <span class="field__label" id="rb-paleta-label">Colores rápidos (pintan todos)</span>
-                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"></div>
+                                                <span class="field__label" id="rb-paleta-label">Toca un color para pintar ese LED</span>
+                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"><label class="rb-sw rb-sw--otro" title="Otro color"><input type="color" id="rb-led-color" class="sr-only" aria-label="Otro color para el LED"><span class="rb-sw__dot rb-sw__dot--arco"></span><span class="rb-sw__name">Otro</span></label></div>
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos así</button>
+                                                <button type="button" id="rb-led-apagar" class="btn btn--secondary btn--sm">Apagar este LED</button>
                                             </div>
                                             <div class="field">
                                                 <label class="field__label" for="rb-brillo">Brillo: <span id="rb-brillo-v"></span></label>

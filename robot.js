@@ -2434,7 +2434,17 @@ function pintarAnillo() {
         b.style.setProperty('--c', S.leds[i]);
         b.setAttribute('aria-pressed', String(i === S.sel));
     });
-    $('rb-led-color').value = S.leds[S.sel];
+    const c = S.leds[S.sel];
+    $('rb-led-color').value = c;
+    $('rb-led-dot').style.setProperty('--c', c);
+    $('rb-led-nombre').textContent = 'LED ' + (S.sel + 1);
+    $('rb-led-color-nombre').textContent = nombreColor(c);
+    document.querySelectorAll('#rb-paleta button.rb-sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === c.toLowerCase())));
+}
+
+function nombreColor(hex) {
+    const p = PALETA.find(x => x[0].toLowerCase() === String(hex).toLowerCase());
+    return p ? p[1] : String(hex).toUpperCase();
 }
 
 function pintarTodo() {
@@ -2938,7 +2948,7 @@ function iniciar() {
     opciones($('rb-baile'), BAILES, 'Mi baile');
     $('rb-efecto').innerHTML = EFECTOS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
     $('rb-fn-var').innerHTML = VARIANTES.map(v => `<option value="${v.id}">${v.nombre}</option>`).join('');
-    $('rb-paleta').innerHTML = PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-label="Pintar todos de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join('');
+    $('rb-paleta').insertAdjacentHTML('afterbegin', PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-pressed="false" aria-label="Pintar el LED de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join(''));
     pintarTodo();
     ponEstado('desconectado');
 
@@ -3111,11 +3121,14 @@ function iniciar() {
         pintarAnillo();
     });
     $('rb-led-color').addEventListener('input', e => { S.leds[S.sel] = e.target.value; pintarAnillo(); cambio('led'); });
-    $('rb-led-todos').addEventListener('click', () => { S.leds.fill($('rb-led-color').value); pintarAnillo(); cambio('led'); });
+    $('rb-led-todos').addEventListener('click', () => { S.leds.fill(S.leds[S.sel]); pintarAnillo(); cambio('led'); });
+    $('rb-led-apagar').addEventListener('click', () => { S.leds[S.sel] = '#000000'; pintarAnillo(); cambio('led'); });
+    $('rb-led-ant').addEventListener('click', () => { S.sel = (S.sel + LEDS - 1) % LEDS; pintarAnillo(); });
+    $('rb-led-sig').addEventListener('click', () => { S.sel = (S.sel + 1) % LEDS; pintarAnillo(); });
     $('rb-paleta').addEventListener('click', e => {
-        const b = e.target.closest('.rb-sw');
+        const b = e.target.closest('button.rb-sw');
         if (!b) return;
-        S.leds.fill(b.dataset.c);
+        S.leds[S.sel] = b.dataset.c;
         pintarAnillo();
         cambio('led');
     });

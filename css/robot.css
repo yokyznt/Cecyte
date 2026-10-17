@@ -30,7 +30,19 @@
 .rb-sw { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; min-height: 44px; padding: 4px 2px; border: 0; background: transparent; cursor: pointer; }
 .rb-sw__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); transition: scale 120ms var(--ease-out); }
 .rb-sw__name { font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
+.rb-paleta .rb-sw { inline-size: auto; block-size: auto; min-inline-size: 56px; min-block-size: 44px; padding: 4px 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .rb-sw:hover .rb-sw__dot { scale: 1.1; }
+.rb-sw[aria-pressed="true"] .rb-sw__dot { outline: 3px solid var(--green-700); outline-offset: 2px; }
+.rb-sw--otro:focus-within { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
+.rb-sw__dot--arco { background: conic-gradient(#ff2a2a, #ffd400, #22d05a, #19c9ff, #7a3dff, #ff2a2a); }
+.rb-led-sel { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
+.rb-led-sel__paso { inline-size: 48px; block-size: 48px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.rb-led-sel__paso .icon { inline-size: 24px; block-size: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.rb-led-sel__paso:active { translate: 0 2px; }
+.rb-led-sel__info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rb-led-sel__info b { display: block; font-size: var(--fs-md); }
+.rb-led-sel__info small { display: block; color: var(--ink-2); font-size: var(--fs-sm); }
+.rb-led-sel__dot { inline-size: 40px; block-size: 40px; flex: none; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c, #000); box-shadow: inset 0 0 0 2px var(--surface); }
 .rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
 
 
@@ -518,6 +530,11 @@
 .es-app .rb-barra .rb-prog[value="0"] { display: none; }
 .es-app .rb-barra #rb-msg:empty { display: none; }
 .es-app .rb-barra #rb-msg { flex: 1 1 100%; margin: 0; }
+.es-app, .es-app * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+.es-app { -webkit-user-select: none; user-select: none; }
+.es-app input, .es-app textarea, .es-app [contenteditable] { -webkit-user-select: text; user-select: text; }
+.es-app ::selection { background: transparent; }
+.es-app input::selection, .es-app textarea::selection { background: Highlight; color: HighlightText; }
 
 /* App: animaciones. Solo dentro del APK (clase es-app que pone js/plataforma.js) y solo si el teléfono no pidió reducirlas */
 .es-app p.hint:not([id]):not(:has(button, a)) { display: none; }
