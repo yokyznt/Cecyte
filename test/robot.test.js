@@ -863,6 +863,10 @@ console.log('robot.test.js: todo bien');
     assert(['rb-fn-ventana', 'rb-fn-almacen', 'rb-fn-generico', 'rb-fn-ventana-cuerpo'].every(id => html.includes(`id="${id}"`)), 'los ajustes de cada función van en una ventana');
     const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function abrirVentanaFuncion/.test(rj) && /previo && c\.querySelector/.test(rj), 'tocar una función elegida abre su ventana');
-    assert(/\* 6000,/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
+    assert(/\* 2250\)/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
+    let saltos = 0, anterior = R.ruletaPos(0, 8 * 12, 0);
+    for (let u = 0.001; u <= 0.05; u += 0.001) { const p = R.ruletaPos(0, 8 * 12, u); if (p !== anterior) saltos++; anterior = p; }
+    assert(saltos >= 8, 'con 8 vueltas arranca rápido: más de 8 casillas en el primer 5 % del tiempo');
+    assert(/<option value="8" selected>Normal \(18 s\)/.test(html), 'la ruleta normal da 8 vueltas en 18 s');
     assert(['rb-ent-lista', 'rb-ent-usar', 'rb-ent-borrar', 'rb-ent-cuenta'].every(id => html.includes(`id="${id}"`)), 'Yokis puede entrenar una voz');
 }

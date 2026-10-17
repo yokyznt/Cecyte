@@ -1309,7 +1309,7 @@ function ruletaPos(inicio, total, u) {
 function ruletaPlan(azar, vueltas) {
     const r = typeof azar === 'function' ? azar : Math.random;
     const inicio = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N)), destino = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N));
-    const total = Math.round(clamp(vueltas, 1, 8)) * RULETA_N + ((destino - inicio + RULETA_N) % RULETA_N);
+    const total = Math.round(clamp(vueltas, 1, 14)) * RULETA_N + ((destino - inicio + RULETA_N) % RULETA_N);
     return { inicio, destino, total, num: destino + 1, color: ruletaColor(destino) };
 }
 
@@ -2044,8 +2044,8 @@ function girarRuleta(vueltas, alTerminar) {
     if (S.estado !== 'listo') { mensaje('Conecta el robot primero.', 'err'); return false; }
     if (S.ruleta) return false;
     if (S.corriendoFuncion || S.actuando) paro();
-    const plan = ruletaPlan(Math.random, vueltas || 3);
-    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 3, 1, 8)) * 6000, ult: -1, timer: null, parpadeo: null };
+    const plan = ruletaPlan(Math.random, vueltas || 8);
+    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 8, 1, 14) * 2250), ult: -1, timer: null, parpadeo: null };
     S.ruleta = R;
     S.guardarEn = 0;
     $('rb-rul-girar').textContent = 'Parar';
@@ -2828,7 +2828,7 @@ function reproducirGeneral() {
     const sec = seccionRobotActual();
     const listo = S.estado === 'listo';
     if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
-    if (sec === 'robot-funciones' && S.modoRuleta && !S.funcion) return girarRuleta(3);
+    if (sec === 'robot-funciones' && S.modoRuleta && !S.funcion) return girarRuleta(8);
     if (sec === 'robot-funciones') return S.modoBaile && !S.funcion ? (listo ? actuar(true, true) : escucharAqui()) : iniciarFuncion();
     if (sec === 'robot-luces') {
         if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
@@ -3029,7 +3029,7 @@ function iniciar() {
     ['rb-ln-vel', 'rb-ln-giro', 'rb-ln-buscar'].forEach(id => $(id).addEventListener('input', lineaCambio));
     $('rb-ln-color').addEventListener('change', lineaCambio);
     $('rb-ln-ver').addEventListener('click', alternarSensores);
-    $('rb-rul-girar').addEventListener('click', () => { if (S.ruleta) paro(); else girarRuleta(Number($('rb-rul-dur').value) || 3); });
+    $('rb-rul-girar').addEventListener('click', () => { if (S.ruleta) paro(); else girarRuleta(Number($('rb-rul-dur').value) || 8); });
     $('rb-rul-sonido').addEventListener('change', e => { S.ruletaSonido = e.target.checked; });
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
     $('rb-baile-guardar').addEventListener('click', guardarBaile);
@@ -3115,7 +3115,7 @@ function iniciar() {
             iniciarFuncion();
             return { nombre: f.nombre, modelo: cambio ? VARIANTES.find(v => v.id === S.variante).nombre : '' };
         },
-        ruleta(alTerminar) { return girarRuleta(3, alTerminar); },
+        ruleta(alTerminar) { return girarRuleta(8, alTerminar); },
         bailar(idBaile, idCancion) {
             if (S.estado !== 'listo') return null;
             if (S.corriendoFuncion || S.actuando) paro();
