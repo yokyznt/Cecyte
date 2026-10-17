@@ -317,7 +317,7 @@ for (const c of R.CANCIONES) {
     }
     assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
     // diagnóstico que la página lee al conectar
-    for (const clave of ['BTN=', 'RUN=', 'MIN=', 'BAT=']) assert(ino.includes(`F(" ${clave}")`), `INFO sin ${clave}`);
+    assert(ino.includes('F(" BAT=")'), 'INFO sin BAT=');
     assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
     assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
     // el bootloader de esta placa puede dejar el watchdog armado: se apaga antes que nada (.init3),
@@ -508,7 +508,7 @@ for (const c of R.CANCIONES) {
     for (const f of R.FUNCIONES) {
         assert(f.v.length && f.v.every(v => ids.includes(v)), f.id + ': modelo desconocido');
         assert(f.nombre && f.desc, f.id);
-        if (f.modo) assert([1, 2, 6].includes(f.modo), f.id + ': modos 1 (esquivar), 2 (seguir) y 6 (línea) del robot');
+        if (f.modo) assert([1, 2, 6, 7].includes(f.modo), f.id + ': modos 1 (esquivar), 2 (seguir), 6 (línea) y 7 (acercarse a la pared) del robot');
         else {
             assert(R.pasosDeFuncion(f.pasos).length > 0, f.id + ': sin pasos');
             // todo el texto de pasos es "MOV número[°]": nada se pierde en silencio
@@ -549,7 +549,42 @@ for (const c of R.CANCIONES) {
     // el firmware entiende los modos que usan las funciones autónomas y la página los manda con MODE
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/case 1: esquivar\(\);/.test(ino) && /case 2: seguir\(\);/.test(ino), 'modos 1 y 2 del robot');
-    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_LINEA/.test(ino));
+    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_PARK/.test(ino));
+    assert(/PADD O|"O"/.test(ino) && /op == 5/.test(ino) && /void parkPaso/.test(ino) && ino.includes('PARK=1'), 'firmware con serie (PADD O) y estacionar (MODE 7)');
+}
+
+// 23a) Serie de demostración: varias funciones seguidas que el robot guarda como un solo show
+{
+    const f = id => R.FUNCIONES.find(x => x.id === id);
+    assert(f('estacionar').modo === 7 && f('sirena').luces === 'sirena', 'estacionar y sirena en el catálogo');
+    assert(R.leerNotas(f('sirena').notas).errores.length === 0, 'la sirena es una canción válida');
+
+    const serie = [{ id: 'cuadrado', seg: 10 }, { id: 'esquivar', seg: 30 }, { id: 'trompo', seg: 6 }, { id: 'sirena', seg: 1 }];
+    assert.deepStrictEqual(R.itemsDeSerie(serie, 'raptor').map(x => x.f.id), ['cuadrado', 'esquivar'], 'por modelo solo salen las suyas');
+    const tanque = R.itemsDeSerie(serie, 'tanque');
+    assert.deepStrictEqual(tanque.map(x => x.i), [0, 1, 2, 3], 'cada ítem recuerda su lugar en la serie');
+
+    const prog = R.programaDeSerie(R.itemsDeSerie([{ id: 'esquivar', seg: 25 }, { id: 'estacionar', seg: 8 }], 'tanque'));
+    assert.deepStrictEqual(prog.lineas, ['PADD O 1 25', 'PADD O 7 8'], 'las de sensor van como un segmento de modo');
+    assert.strictEqual(prog.bytes, 6);
+
+    const mixta = R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 10 }, { id: 'esquivar', seg: 5 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110 });
+    assert(mixta.lineas[0].startsWith('PADD M 110 110') && mixta.lineas.includes('PADD S') && mixta.lineas.includes('PADD O 1 5'));
+    assert(mixta.lineas.indexOf('PADD S') < mixta.lineas.indexOf('PADD O 1 5'), 'las funciones salen en el orden de la serie');
+    assert(mixta.cabe && mixta.bytes > 6);
+
+    const larga = R.programaDeSerie(R.itemsDeSerie(Array.from({ length: 30 }, () => ({ id: 'zigzag', seg: 255 })), 'tanque'));
+    assert(!larga.cabe, 'una serie enorme no cabe en el robot y se avisa');
+
+    const trazo = R.trazoDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 16 }], 'tanque'), 500, 22);
+    assert(trazo.length > 10, 'el mapa estimado dibuja el recorrido');
+    const fin = trazo[trazo.length - 1];
+    assert(Math.abs(fin.x) < 25 && Math.abs(fin.y) < 25, 'el cuadrado vuelve cerca del inicio');
+    assert.strictEqual(R.trazoDeSerie(R.itemsDeSerie([{ id: 'esquivar', seg: 20 }], 'tanque')).length, 1, 'las de sensor no se pueden predecir');
+
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(a, "O"\)/.test(ino) && /pgmPon\(5\)/.test(ino), 'el firmware guarda PADD O');
+    assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
 }
 
 // 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz

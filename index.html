@@ -54,6 +54,8 @@
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
         <symbol id="i-fn-mano" viewBox="0 0 24 24"><!-- @robot:line --><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6"/><path d="M11 10V4a1.5 1.5 0 0 1 3 0v7"/><path d="M14 10V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-3a1.5 1.5 0 0 1 2.5-1.5L8 15"/></symbol>
+        <symbol id="i-fn-estacionar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="12" height="5" x="6" y="3" rx="1"/><path d="M12 10v7"/><path d="m8 14 4 4 4-4"/><path d="M4 21h16"/></symbol>
+        <symbol id="i-fn-sirena" viewBox="0 0 24 24"><!-- @robot:line --><path d="M7 17v-5a5 5 0 0 1 10 0v5"/><path d="M5 17h14v4H5z"/><path d="M12 3v2"/><path d="m4.5 6.5 1.5 1.5"/><path d="m19.5 6.5-1.5 1.5"/></symbol>
         <symbol id="i-fn-cuadrado" viewBox="0 0 24 24"><!-- @robot:line --><rect width="14" height="14" x="5" y="5" rx="2"/><path d="m12 2 3 3-3 3"/></symbol>
         <symbol id="i-fn-idavuelta" viewBox="0 0 24 24"><!-- @robot:line --><path d="M7 4v16"/><path d="m3 8 4-4 4 4"/><path d="M17 20V4"/><path d="m13 16 4 4 4-4"/></symbol>
         <symbol id="i-fn-vigilante" viewBox="0 0 24 24"><!-- @robot:line --><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
@@ -1000,6 +1002,23 @@
                                             </div>
                                             <canvas id="rb-radar-lienzo" class="rb-lienzo" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
                                             <p id="rb-herr-msg" class="hint" role="status"></p>
+                                        </div>
+                                        <div class="rb-card rb-serie" id="rb-serie">
+                                            <h4 class="panel__sub">Serie de demostración</h4>
+                                            <p class="hint">Elige una función arriba, pulsa Añadir y repite con las que quieras. El robot las hace una tras otra y vuelve a empezar. Cada una dura los segundos que pongas.</p>
+                                            <ol id="rb-serie-lista" class="rb-serie__lista"></ol>
+                                            <p id="rb-serie-total" class="hint"></p>
+                                            <canvas id="rb-serie-mapa" class="rb-lienzo" width="240" height="240" aria-label="Mapa estimado del recorrido de la serie" hidden></canvas>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-serie-add" class="btn btn--secondary btn--sm" disabled>Elige una función arriba para añadirla</button>
+                                                <button type="button" id="rb-serie-play" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Reproducir la serie</button>
+                                            </div>
+                                            <label class="rb-check"><input type="checkbox" id="rb-serie-auto"><span>Que empiece sola al encenderlo</span></label>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-serie-guardar" class="btn btn--primary btn--sm" disabled>Guardar la serie en el robot</button>
+                                                <button type="button" id="rb-serie-borrar" class="btn btn--secondary btn--sm" disabled>Borrar lo guardado en el robot</button>
+                                            </div>
+                                            <p id="rb-serie-info" class="msg" role="status"></p>
                                         </div>
                                         <p class="hint">Toca una función para elegirla y tócala otra vez para abrir sus ajustes en una ventana.</p>
                                         <div id="rb-fn-almacen" hidden>
