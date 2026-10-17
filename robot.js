@@ -9,7 +9,6 @@
 (function (raiz) {
 'use strict';
 
-const BAUDIOS = 115200;
 const VEL_MAX = 180;          // lo mismo que VEL_MAX del firmware
 const VEL_TURBO = 235;        // tope de la orden M en modo turbo (VEL_TURBO del firmware); el firmware sube en rampa, sin tirón de corriente
 const ARTICULACION = 0.9;     // cuánto de cada nota suena; el resto es el silencio entre notas
@@ -441,29 +440,6 @@ const PALETA = [
 ];
 const COLOR_INICIAL = '#00ff00';
 
-// Tonos con los que suenan los golpes de un ritmo. "Alterna" cambia de tono en cada golpe, y así
-// el efecto de luces "por nota" también cambia de color.
-const TONOS_RITMO = {
-    alterna: ['C5', 'E5', 'G5', 'C6'],
-    agudo: ['A5'],
-    grave: ['A4'],
-};
-
-// [[inicio, fin], ...] en ms -> texto de notas con duración en milisegundos: "C5:120 R:300 E5:90"
-function ritmoATexto(intervalos, tonos = TONOS_RITMO.alterna) {
-    const out = [];
-    let t = 0, k = 0;
-    for (const [s, e] of intervalos) {
-        if (out.length >= MAX_NOTAS - 2) break;
-        const pausa = Math.round(s - t);
-        if (pausa >= 10) out.push('R:' + Math.min(pausa, 60000));
-        const dur = Math.min(60000, Math.max(10, Math.round(e - s)));
-        out.push(`${tonos[k++ % tonos.length]}:${dur}`);
-        t = Math.max(t, s) + dur;
-    }
-    return out.join(' ');
-}
-
 // ---------- Melodía de un audio o de un MIDI ----------
 // El buzzer toca una nota a la vez, así que de una canción se queda la línea principal (la voz o el
 // instrumento que más se oye): el pico dominante del espectro entre fMin y fMax en cada instante.
@@ -662,7 +638,7 @@ function cortesDe(midi, amp) {
 //  4. Viterbi: elige el camino de alturas que más suena y menos salta, con un estado "sin
 //     melodía" para los silencios y las partes sin línea clara.
 // Es un generador: va cediendo el progreso (0 a 1) para que la página pueda mostrarlo sin congelarse.
-// Devuelve { midi, amp, energia, hopMs, o } con un valor por cuadro (midi NaN = sin melodía) o null si no hay audio.
+// Devuelve { midi, amp, hopMs, o } con un valor por cuadro (midi NaN = sin melodía) o null si no hay audio.
 function* rastrearMelodia(x, sr, op = {}) {
     const o = Object.assign({ fMin: 110, fMax: 1000, sens: 50, estacionario: 0.7 }, op);
     const k = Math.max(1, Math.round(sr / 16000)), sr2 = sr / k;
@@ -815,9 +791,8 @@ function* rastrearMelodia(x, sr, op = {}) {
         v.sort((p, q) => p - q);
         liso[f] = v[v.length >> 1];
     }
-    const en = Float32Array.from(energia, v => (maxE ? v / maxE : 0));
     yield 1;
-    return { midi: liso, amp, energia: en, hopMs, o };
+    return { midi: liso, amp, hopMs, o };
 }
 
 // Pedazo [ini, ini + dur] en ms ya rastreado -> texto de notas
@@ -833,50 +808,6 @@ function* melodiaDeAudioGen(x, sr, op = {}) {
 
 function melodiaDeAudio(x, sr, op = {}) {
     return correrSync(melodiaDeAudioGen(x, sr, op));
-}
-
-// Modo automático: rastrea TODA la canción con un registro amplio y se queda con el pedazo de durSeg segundos donde la
-// melodía suena más clara, más fuerte y menos fragmentada (así se salta intros y partes sin melodía).
-// Devuelve lo mismo que melodiaDeAudio más ini y dur (en segundos) del pedazo elegido y voz (0 a 1, qué tanta melodía clara hay).
-function* melodiaAutoGen(x, sr, op = {}) {
-    const o = Object.assign({ fMin: 110, fMax: 1400, sens: 50, durSeg: 30 }, op);
-    const r = yield* rastrearMelodia(x, sr, o);
-    if (!r) return Object.assign(VACIO(), { ini: 0, dur: 0, voz: 0 });
-    const n = r.midi.length, hopMs = r.hopMs;
-    const L = Math.min(n, Math.max(8, Math.round(o.durSeg * 1000 / hopMs)));
-    const cuentaVoz = new Float32Array(n + 1), cuentaAmp = new Float32Array(n + 1), cuentaEn = new Float32Array(n + 1);
-    for (let f = 0; f < n; f++) {
-        const v = !Number.isNaN(r.midi[f]);
-        cuentaVoz[f + 1] = cuentaVoz[f] + (v ? 1 : 0);
-        cuentaAmp[f + 1] = cuentaAmp[f] + (v ? r.amp[f] : 0);
-        cuentaEn[f + 1] = cuentaEn[f] + r.energia[f];
-    }
-    const paso = Math.max(1, Math.round(500 / hopMs));
-    let mejor = -1, mejorF = 0, mejorVoz = 0;
-    for (let f0 = 0; f0 + L <= n; f0 += paso) {
-        const voz = (cuentaVoz[f0 + L] - cuentaVoz[f0]) / L;
-        const conf = voz ? (cuentaAmp[f0 + L] - cuentaAmp[f0]) / (cuentaVoz[f0 + L] - cuentaVoz[f0]) : 0;
-        const fuerza = (cuentaEn[f0 + L] - cuentaEn[f0]) / L;
-        const intro = f0 * hopMs < 8000 ? 0.85 : 1;                  // los primeros segundos suelen ser intro
-        const puntos = voz * Math.min(1, conf) * (0.6 + 0.4 * Math.min(1, fuerza * 2)) * intro;
-        if (puntos > mejor) { mejor = puntos; mejorF = f0; mejorVoz = voz; }
-    }
-    const t = textoDeRastro(r, mejorF, mejorF + L);
-    return Object.assign(t, { ini: mejorF * hopMs / 1000, dur: L * hopMs / 1000, voz: mejorVoz });
-}
-
-// notas: [{ s, e, p }] en ms y p = número MIDI. Si suenan varias a la vez, se queda la más aguda.
-function melodiaDeMidi(notas, op = {}) {
-    const hopMs = 20;
-    const fin = notas.reduce((m, n) => Math.max(m, n.e), 0);
-    const n = Math.ceil(fin / hopMs);
-    const midi = new Float32Array(n).fill(NaN);
-    for (const t of notas) {
-        for (let f = Math.floor(t.s / hopMs); f < Math.min(n, Math.ceil(t.e / hopMs)); f++) {
-            if (Number.isNaN(midi[f]) || t.p > midi[f]) midi[f] = t.p;
-        }
-    }
-    return melodiaATexto(midi, hopMs, Object.assign({ minNotaMs: 40, tonalidad: false }, op));
 }
 
 // Show guardado en el robot: la canción y el baile compilados, para que los haga solo, sin la página.
@@ -1396,11 +1327,11 @@ const lib = {
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
-    BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
+    VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
-    hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
-    melodiaDeAudio, melodiaDeAudioGen, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
+    hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
+    melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
 };
 
@@ -1436,11 +1367,7 @@ const S = {
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
     musicaIds: [],            // temporizadores de la música que la página manda nota a nota en las funciones autónomas
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
-    fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
-    fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
-    fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
-    fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
-    fwPark: false,            // su INFO trae PARK=1: tiene el modo 7 (acercarse a la pared) y las series guardadas (PADD O)
+    fwNuevo: false,           // su INFO trae PARK=1: el robot tiene el programa de esta versión (BAT, DIST, DIR, línea, modo 7 y series)
     fwGiro: false,            // su INFO trae GIRO=1: el giroscopio responde y la orden G gira los grados exactos
     serie: [], serieAuto: false, serieOn: false, serieT: 0, serieK: -1,   // serie de demostración: [{ id, seg }]
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
@@ -1450,9 +1377,15 @@ const S = {
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
 const MAX_GUARDADAS = 40;
-let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
+let guardarT = 0;
 function guardar() {
+    clearTimeout(guardarT);
+    guardarT = setTimeout(guardarYa, 300);
+}
+
+function guardarYa() {
+    clearTimeout(guardarT);
     try {
         const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto } = S;
         localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto }));
@@ -1579,11 +1512,7 @@ function alLinea(l) {
     } else if (/^INFO /.test(l)) {
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
-        S.fwNuevo = true;                  // este programa ya entiende la orden BAT
-        S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
-        S.fwDir = kv.DIR === 1;
-        S.fwLin = kv.LIN === 1;
-        S.fwPark = kv.PARK === 1;
+        S.fwNuevo = kv.PARK === 1;
         S.fwGiro = kv.GIRO === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
@@ -1911,8 +1840,7 @@ function iniciarFuncion(reinicio) {
         return esperarYTocar({ fn: true });
     }
     S.guardarEn = 0;                       // unas luces apagadas por la función no se guardan en el robot
-    if (f.modo === 6 && !S.fwLin) return mensaje('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
-    if (f.modo === 7 && !S.fwPark) return mensaje('El programa que lleva el robot no trae esta función: instálalo otra vez en Conexión.', 'err');
+    if (f.modo && !S.fwNuevo) return mensaje('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
     if (f.modo) {
         S.actuando = false;
         S.corriendoFuncion = true;
@@ -2067,8 +1995,7 @@ function iniciarSerie(listo) {
         paro();
         return esperarYSerie();
     }
-    if (items.some(x => x.f.modo === 6) && !S.fwLin) return serieInfo('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
-    if (items.some(x => x.f.modo === 7) && !S.fwPark) return serieInfo('El programa que lleva el robot no trae «Acercarse a la pared»: instálalo otra vez en Conexión.', 'err');
+    if (!S.fwNuevo) return serieInfo('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
     S.guardarEn = 0;
     S.corriendoFuncion = true;
     S.serieOn = true;
@@ -2080,7 +2007,7 @@ function guardarSerie() {
     const items = itemsDeSerie(S.serie, S.variante);
     if (!items.length) return serieInfo('Añade al menos una función a la serie.', 'err');
     if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
-    if (!S.fwPark) return serieInfo('El programa que lleva el robot no sabe guardar series: instálalo otra vez en Conexión.', 'err');
+    if (!S.fwNuevo) return serieInfo('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
     const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion, exacto: S.fwGiro });
     if (!prog.cabe) return serieInfo(`La serie es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): quita funciones o baja los segundos.`, 'err');
     if (S.corriendoFuncion || S.actuando || S.serieOn) paro();
@@ -2370,7 +2297,7 @@ function pintarFunciones() {
     $('rb-fn-vel').value = S.vel;
     $('rb-fn-vel-v').textContent = S.vel;
     $('rb-ln').hidden = !(f && f.modo === 6);
-    $('rb-ln-aviso').hidden = S.fwLin || S.estado !== 'listo';
+    $('rb-ln-aviso').hidden = S.fwNuevo || S.estado !== 'listo';
     $('rb-ln-vel').value = S.linea.vel;
     $('rb-ln-vel-v').textContent = S.linea.vel;
     $('rb-ln-giro').value = S.linea.giro;
@@ -2527,32 +2454,7 @@ function pintarCanciones() {
     $('rb-cancion').value = S.cancion;
 }
 
-// ---------- Audio o MIDI -> ritmo ----------
-// Reutiliza la detección de golpes de timbre.js (la misma del ritmo del timbre) y deja el
-// resultado como texto de notas con milisegundos, para poder editarlo, escucharlo y guardarlo.
-
-function infoAudio(texto, tipo) {
-    const el = $('rb-aud-info');
-    el.textContent = texto || '';
-    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
-}
-
-async function leerArchivoMusica(f) {
-    const buf = await f.arrayBuffer();
-    if (/\.midi?$/i.test(f.name)) {
-        const notas = parseMidi(new Uint8Array(buf));
-        if (!notas.length) throw new Error('el MIDI no trae notas');
-        return { tipo: 'midi', notas, dur: notas[notas.length - 1].e / 1000 };
-    }
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new Ctx();
-    try {
-        const buffer = await ctx.decodeAudioData(buf);
-        return { tipo: 'audio', buffer, dur: buffer.duration };
-    } finally {
-        ctx.close();
-    }
-}
+// ---------- Cantar: la voz del micrófono -> notas ----------
 
 // Pedazo [ini, ini + dur] segundos, mezclado a mono
 function monoVentana(buffer, ini, dur) {
@@ -2579,65 +2481,6 @@ function estimarBpm(intervalos) {
     while (bpm > 200) bpm /= 2;
     while (bpm < 70) bpm *= 2;
     return Math.round(bpm);
-}
-
-// Registro donde buscar la melodía: [Hz mínimo, Hz máximo]
-const REGISTROS = { voz: [130, 1000], agudo: [260, 1800], grave: [60, 350] };
-
-function convertirAudio() {
-    if (!musicaCargada) return infoAudio('Primero elige un archivo de audio o un MIDI.', 'err');
-    const ini = clamp(Number($('rb-aud-ini').value) || 0, 0, Math.max(0, musicaCargada.dur - 1));
-    const dur = clamp(Number($('rb-aud-dur').value) || 20, 1, 60);
-    const desde = ini * 1000, hasta = (ini + dur) * 1000;
-    const melodia = $('rb-aud-que').value === 'melodia';
-    let texto, intervalos, aviso = '';
-
-    if (melodia) {
-        // la línea melódica dominante: la voz si la hay, o el instrumento principal si es solo instrumental
-        const reg = REGISTROS[$('rb-aud-reg').value] || REGISTROS.voz;
-        const op = { fMin: reg[0], fMax: reg[1], sens: Number($('rb-aud-sens').value), tonalidad: $('rb-aud-tonal').checked, subir: $('rb-aud-subir').checked };
-        let r;
-        if (musicaCargada.tipo === 'midi') {
-            const notas = musicaCargada.notas
-                .filter(n => n.c !== 9 && n.p !== undefined && n.e > desde && n.s < hasta)       // sin la batería
-                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p }));
-            r = melodiaDeMidi(notas, op);
-        } else {
-            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
-            r = melodiaDeAudio(x, sr, op);
-        }
-        texto = r.texto;
-        intervalos = r.intervalos;
-        if (r.tonalidad && texto) aviso = ' Tonalidad: ' + r.tonalidad + '.';
-        if (r.truncado) aviso += ' Se cortó en ' + MAX_NOTAS + ' notas.';
-        if (!texto) return infoAudio('No encontré una melodía clara en ese pedazo. Sube la sensibilidad, cambia el registro o elige otra parte.', 'err');
-    } else {
-        const op = { modo: $('rb-aud-modo').value, sens: Number($('rb-aud-sens').value), golpe: 120, sep: 120 };
-        if (musicaCargada.tipo === 'midi') {
-            const notas = musicaCargada.notas
-                .filter(n => n.e > desde && n.s < hasta)
-                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde }));
-            intervalos = midiARitmo(notas, op).intervalos;
-        } else {
-            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
-            intervalos = audioARitmo(x, sr, op).intervalos;
-        }
-        texto = ritmoATexto(intervalos, TONOS_RITMO[$('rb-aud-tono').value] || TONOS_RITMO.alterna);
-        if (!texto) return infoAudio('No encontré golpes en ese pedazo. Sube la sensibilidad o elige otra parte.', 'err');
-    }
-
-    const n = leerNotas(texto).notas;
-    const total = n.reduce((suma, x) => suma + (x.ms || 0), 0);
-    const bpm = estimarBpm(intervalos);
-    S.notas = texto;
-    S.cancion = 'propia';
-    if (bpm) S.bpm = bpm;
-    $('rb-nombre').value = '';
-    pintarCanciones();
-    pintarTodo();
-    cambio('cancion');
-    const que = melodia ? n.filter(x => x.hz > 0).length + ' notas' : intervalos.length + ' golpes';
-    infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
 }
 
 const REGISTROS_CANTO = { hombre: [80, 400], media: [120, 700], aguda: [200, 1000] };
@@ -2730,122 +2573,6 @@ async function alternarCanto() {
         }
     };
     rec.start();
-}
-
-// Corre un generador cediendo el hilo entre pasos, para mostrar el avance sin congelar la página
-async function correrAsync(gen, alAvance) {
-    let r = gen.next();
-    while (!r.done) {
-        if (alAvance) alAvance(r.value);
-        await new Promise(ok => setTimeout(ok, 0));
-        r = gen.next();
-    }
-    return r.value;
-}
-
-// «Mi canción (Official Video) [HD].mp3» -> «Mi canción»
-function nombreDeArchivo(archivo, n) {
-    let t = archivo.slice(0, archivo.lastIndexOf('.') > 0 ? archivo.lastIndexOf('.') : archivo.length);
-    for (const [a, b] of [['(', ')'], ['[', ']']]) {
-        for (let i = t.indexOf(a); i >= 0; i = t.indexOf(a)) {
-            const j = t.indexOf(b, i);
-            t = t.slice(0, i) + (j > i ? t.slice(j + 1) : '');
-        }
-    }
-    t = t.split('_').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 40).trim();
-    return t || 'Canción ' + n;
-}
-
-// Un archivo -> { texto, bpm, notas, seg, ritmo } o null si no se pudo sacar nada
-async function convertirArchivoAuto(f, durSeg, alAvance) {
-    const m = await leerArchivoMusica(f);
-    let r, ritmo = false, intervalos = [];
-    const dur = clamp(durSeg, 10, 60);
-    if (m.tipo === 'midi') {
-        const utiles = m.notas.filter(n => n.c !== 9 && n.p !== undefined);
-        const desde = utiles.length ? Math.min(...utiles.map(n => n.s)) : 0, hasta = desde + dur * 1000;
-        r = melodiaDeMidi(utiles.filter(n => n.e > desde && n.s < hasta).map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p })), {});
-        intervalos = r.intervalos;
-    } else {
-        const { x, sr } = monoVentana(m.buffer, 0, Math.min(m.dur, 600));
-        r = await correrAsync(melodiaAutoGen(x, sr, { durSeg: dur, sens: Number($('rb-aud-sens').value) || 50 }), alAvance);
-        intervalos = r.intervalos;
-        if (!r.texto || r.voz < 0.15) {                        // sin melodía clara: se queda el ritmo del mejor pedazo
-            const w = monoVentana(m.buffer, r.ini || 0, dur);
-            const rit = audioARitmo(w.x, w.sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
-            const texto = ritmoATexto(rit.intervalos, TONOS_RITMO.alterna);
-            if (texto) { r = { texto, notas: rit.intervalos.length, ms: 0, intervalos: rit.intervalos }; ritmo = true; intervalos = rit.intervalos; }
-        }
-    }
-    if (!r || !r.texto) return null;
-    const n = leerNotas(r.texto).notas;
-    const ms = n.reduce((suma, q) => suma + (q.ms || 0), 0);
-    return { texto: r.texto, bpm: estimarBpm(intervalos) || 110, notas: n.filter(q => q.hz > 0).length, seg: ms / 1000, ritmo };
-}
-
-function guardarConNombre(nombre, texto, bpm) {
-    let g = S.guardadas.find(x => x.nombre.toLowerCase() === nombre.toLowerCase());
-    if (g) { g.texto = texto; g.bpm = bpm; }
-    else {
-        if (S.guardadas.length >= MAX_GUARDADAS) return null;
-        g = { id: Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), nombre, texto, bpm };
-        S.guardadas.push(g);
-    }
-    return g;
-}
-
-let agregando = false;
-async function agregarAutomatico(archivos) {
-    if (agregando) return;
-    agregando = true;
-    const lista = $('rb-aud-lista'), barra = $('rb-aud-prog');
-    lista.textContent = '';
-    infoAudio('');
-    barra.hidden = false;
-    let ultimo = null, bien = 0;
-    const durSeg = Number($('rb-aud-dur').value) || 30;
-    try {
-        for (let i = 0; i < archivos.length; i++) {
-            const f = archivos[i];
-            const li = document.createElement('li');
-            li.className = 'rb-aud-item';
-            const nom = document.createElement('b');
-            nom.textContent = nombreDeArchivo(f.name, S.guardadas.length + 1);
-            const est = document.createElement('span');
-            est.textContent = 'Analizando…';
-            li.append(nom, est);
-            lista.appendChild(li);
-            barra.value = i / archivos.length;
-            try {
-                const r = await convertirArchivoAuto(f, durSeg, p => { barra.value = (i + p) / archivos.length; });
-                if (!r) { li.className += ' is-error'; est.textContent = 'No encontré una melodía'; continue; }
-                const g = guardarConNombre(nom.textContent, r.texto, r.bpm);
-                if (!g) { li.className += ' is-error'; est.textContent = 'Ya tienes ' + MAX_GUARDADAS + ' guardadas'; continue; }
-                li.className += ' is-ok';
-                est.textContent = (r.ritmo ? 'Solo ritmo · ' : '') + r.notas + ' notas · ' + Math.round(r.seg) + ' s';
-                ultimo = g;
-                bien++;
-            } catch (err) {
-                li.className += ' is-error';
-                est.textContent = 'No pude leer el archivo';
-            }
-        }
-    } finally {
-        barra.hidden = true;
-        agregando = false;
-    }
-    if (ultimo) {
-        S.cancion = 'g:' + ultimo.id;
-        S.notas = ultimo.texto;
-        S.bpm = ultimo.bpm;
-        $('rb-nombre').value = ultimo.nombre;
-        pintarCanciones();
-        pintarTodo();
-        guardar();
-        infoAudio(bien === 1 ? 'Guardada. Ya sale en la lista de canciones.' : bien + ' canciones guardadas.', 'ok');
-    } else {
-        infoAudio('No se pudo agregar ninguna canción.', 'err');
-    }
 }
 
 function guardarCancion() {
@@ -3220,17 +2947,6 @@ function iniciar() {
     $('rb-guardar').addEventListener('click', guardarCancion);
     $('rb-borrar').addEventListener('click', borrarCancion);
 
-    // Elegir archivos los convierte y los guarda solos; el último queda en la pantalla y también cargado para los ajustes manuales
-    $('rb-audio').addEventListener('change', async e => {
-        const archivos = Array.from(e.target.files || []).slice(0, 12);
-        musicaCargada = null;
-        if (!archivos.length) return infoAudio('');
-        try { musicaCargada = await leerArchivoMusica(archivos[archivos.length - 1]); $('rb-aud-ini').value = 0; } catch (err) { /* lo dirá el automático */ }
-        await agregarAutomatico(archivos);
-        e.target.value = '';
-    });
-    $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
-    $('rb-aud-convertir').addEventListener('click', convertirAudio);
     $('rb-cant-grabar').addEventListener('click', alternarCanto);
     $('rb-bpm').addEventListener('input', e => {
         S.bpm = Number(e.target.value);
@@ -3403,7 +3119,8 @@ function iniciar() {
 
     new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
     if (hayBluetooth()) mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
-    window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+    window.addEventListener('pagehide', () => { guardarYa(); if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) guardarYa(); });
 
     // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
     raiz.RobotUI = { cerrarSuave };
@@ -3413,8 +3130,8 @@ function iniciar() {
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
         paro: pararTodo,
         // Distancia al obstáculo de enfrente (firmware con DIST): el mando pregunta ~3 veces por segundo, nunca con la cola ocupada
-        soportaDistancia: () => S.estado === 'listo' && S.fwDist,
-        pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
+        soportaDistancia: () => S.estado === 'listo' && S.fwNuevo,
+        pedirDistancia() { if (S.estado === 'listo' && S.fwNuevo && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
         distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
         giro90: () => S.giro90,
         funcionPorId(id) {
@@ -3446,8 +3163,8 @@ function iniciar() {
         },
         canciones: () => CANCIONES.map(c => ({ id: c.id, nombre: c.nombre })).concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre }))),
         cancionActual: () => S.cancion,
-        soportaSenal: () => S.estado === 'listo' && S.fwDir,
-        senal(tipo, v) { if (S.estado === 'listo' && S.fwDir) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
+        soportaSenal: () => S.estado === 'listo' && S.fwNuevo,
+        senal(tipo, v) { if (S.estado === 'listo' && S.fwNuevo) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
         luzAhora: () => ({ efecto: S.efecto, leds: S.leds.slice() }),
         ponerLuz(o) {

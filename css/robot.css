@@ -33,9 +33,6 @@
 .rb-sw:hover .rb-sw__dot { scale: 1.1; }
 .rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
 
-.rb-audio { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
-.rb-audio summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.rb-audio[open] > .stack { padding-bottom: 12px; }
 
 /* Funciones por modelo: tarjetas con icono agrupadas por tipo, la elegida resaltada */
 .rb-fn-grupo { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -433,22 +430,6 @@
 .rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
 
 /* Agregar canciones: un solo botón grande y la lista de lo que salió */
-.rb-soltar {
-    display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 96px; padding: 16px; border-radius: var(--r-lg); cursor: pointer;
-    border: 2px dashed var(--green-300); background: var(--green-50); color: var(--green-800); font-weight: 700; font-size: var(--fs-md);
-    transition: background 0.15s, border-color 0.15s;
-}
-.rb-soltar:hover, input:focus-visible + .rb-soltar { background: var(--green-100); border-color: var(--green-600); }
-.rb-soltar .icon { width: 28px; height: 28px; }
-.rb-aud-prog { width: 100%; height: 8px; accent-color: var(--green-600); }
-.rb-aud-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.rb-aud-item { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
-.rb-aud-item b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rb-aud-item span { flex: none; font-size: var(--fs-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.rb-aud-item.is-ok { border-color: var(--green-300); background: var(--green-50); }
-.rb-aud-item.is-error span { color: var(--rose-700); }
-.rb-avanzado > summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
-.rb-avanzado[open] > summary { margin-bottom: 8px; }
 
 .rb-ln { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--green-50); }
 .rb-ln[hidden] { display: none; }

@@ -960,7 +960,7 @@ void imprimeInfo() {
   imprimeBat();
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
-  Serial.print(F(" DIST=1 DIR=1 LIN=1 PARK=1 GIRO="));
+  Serial.print(F(" PARK=1 GIRO="));
   Serial.print(giroOk ? 1 : 0);
   Serial.println();
 }

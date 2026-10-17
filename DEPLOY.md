@@ -137,7 +137,7 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 
 - **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
 - **Timbre:** Timbre, Ritmo y ESP32.
-- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones, Luces e Instalar.
+- **Robot:** Música (canción, teclado y cántalo), Baile, Funciones, Luces e Instalar.
   La conexión, el paro, el progreso y la batería están siempre arriba. El volumen del robot está en Música.
   - **Batería:** barra con el porcentaje, el voltaje y cuánto va a durar. El robot manda su voltaje al
     conectar (`INFO ... BAT=`) y la página se lo pregunta (`BAT`) cada 10 s cuando está quieto; con los
@@ -167,9 +167,7 @@ El USB solo sirve para subir el programa desde la computadora; después la app s
 
 - **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`). También
   acepta milisegundos (`A5:120 R:300`).
-- **Audio a ritmo:** se sube un MP3/WAV/OGG o un MIDI, se detectan los golpes (la misma
-  detección que usa el ritmo del timbre) y quedan como notas editables. Los ritmos y las
-  canciones se guardan con nombre en el navegador.
+- **Canciones guardadas:** las canciones y los ritmos se guardan con nombre en el celular. Ya no se importan audios ni MIDI; lo que sí queda es «Cántalo» (grabar la voz y convertirla en pitidos) y el teclado.
 - **Luces:** los 12 LEDs del anillo, brillo y efectos; se aplican al instante. El efecto
   corre solo dentro del robot (no se traba mientras suena) y se guarda en su EEPROM: sigue
   igual al desconectarlo del USB y vuelve solo al encenderlo.
@@ -181,11 +179,7 @@ El USB solo sirve para subir el programa desde la computadora; después la app s
 - **Funciones guardadas:** en Funciones, "Guardar la función en el robot" deja la función (con la canción y las luces
   marcadas) en su EEPROM y la hace sin USB: con el botón de la placa o, si lo marcas, sola 2,5 s después de
   encenderlo. Cada guardado reemplaza al anterior. Úsalo con las baterías puestas y el interruptor encendido.
-- **Melodía de un audio:** además del ritmo, "Sacar la melodía" sigue la línea dominante
-  (la voz si la canción la tiene, o el instrumento principal si es solo instrumental): suma los
-  armónicos de cada altura posible y un Viterbi elige el camino que más suena y menos salta.
-  Se afina con el registro (medio, agudo, grave) y la sensibilidad; las notas se ajustan a la
-  tonalidad y se suben al registro donde el zumbador suena bien. En un MIDI se ignora la batería.
+- **Cántalo:** la voz grabada con el micrófono se convierte en notas siguiendo la línea dominante: suma los armónicos de cada altura posible y un Viterbi elige el camino que más suena y menos salta. Se ajusta a la tonalidad y se sube al registro donde el zumbador suena bien.
 - **Teclado:** tocas con el ratón o con Z X C V B N M / Q W E R T Y U (y S D G H J / 2 3 5 6 7
   para las negras); "Grabar" registra cada nota con su duración y sus silencios en tiempo real,
   y la grabación se usa como canción o se guarda con nombre en la biblioteca.

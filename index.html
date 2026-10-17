@@ -869,67 +869,6 @@
                                         <p id="rb-cant-info" class="msg" role="status"></p>
                                     </div>
                                 </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Agregar canciones</h4>
-                                    <div class="stack">
-                                        <label class="rb-soltar" for="rb-audio">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-                                            <span>Elegir audio o MIDI</span>
-                                        </label>
-                                        <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" multiple class="sr-only">
-                                        <progress id="rb-aud-prog" class="rb-aud-prog" max="1" value="0" hidden></progress>
-                                        <ul id="rb-aud-lista" class="rb-aud-lista" aria-live="polite"></ul>
-                                        <p id="rb-aud-info" class="msg" role="status"></p>
-                                        <details class="rb-avanzado">
-                                            <summary>Ajustes manuales</summary>
-                                            <div class="stack">
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-que">Qué sacar</label>
-                                                    <select id="rb-aud-que" class="select">
-                                                        <option value="melodia">La melodía: voz o instrumento principal (recomendado)</option>
-                                                        <option value="ritmo">Solo el ritmo (golpes)</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-reg">Registro de la melodía</label>
-                                                    <select id="rb-aud-reg" class="select">
-                                                        <option value="voz">Voz y melodía (medio)</option>
-                                                        <option value="agudo">Agudo (flauta, violín, voz aguda)</option>
-                                                        <option value="grave">Grave (bajo, voz grave)</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="btn-row">
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-tonal" checked><span>Ajustar las notas a la tonalidad</span></label>
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-subir" checked><span>Subir al registro donde suena bien el zumbador</span></label>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-ini">Empezar en (segundos)</label>
-                                                    <input type="number" id="rb-aud-ini" class="input" min="0" step="0.5" value="0"></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-dur">Duración (máximo 60 s)</label>
-                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="30"></div>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-modo">Cómo convertir el ritmo</label>
-                                                    <select id="rb-aud-modo" class="select">
-                                                        <option value="golpes">Un toque por cada golpe (recomendado)</option>
-                                                        <option value="sostenido">Seguir el volumen</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-tono">Tonos del robot</label>
-                                                    <select id="rb-aud-tono" class="select">
-                                                        <option value="alterna">Alterna 4 tonos (las luces cambian de color)</option>
-                                                        <option value="agudo">Un solo tono agudo</option>
-                                                        <option value="grave">Un solo tono grave</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-aud-sens">Sensibilidad: <span id="rb-aud-sens-v">50</span></label>
-                                                <input type="range" id="rb-aud-sens" min="0" max="100" value="50">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir</button>
-                                            </div>
-                                            </div>
-                                        </details>
-                                    </div>
-                                </div>
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
                                     <div class="stack">

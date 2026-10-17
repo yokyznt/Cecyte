@@ -186,30 +186,6 @@ for (const c of R.CANCIONES) {
     const b = R.compilar({ notas: R.leerNotas('A5:200 R:100').notas, bpm: 240 });
     assert.deepStrictEqual(a.cmds.map(c => c.l), b.cmds.map(c => c.l));
     assert.strictEqual(a.ms, 300);
-    // intervalos -> texto: pausas, tonos que alternan y duración mínima
-    const txt = R.ritmoATexto([[0, 100], [250, 350], [600, 605]]);
-    assert.strictEqual(txt, 'C5:100 R:150 E5:100 R:250 G5:10');
-    assert.deepStrictEqual(R.leerNotas(txt).errores, []);
-    assert.strictEqual(R.ritmoATexto([[200, 300]], R.TONOS_RITMO.agudo), 'R:200 A5:100');
-    // un audio larguísimo nunca pasa del máximo de notas
-    const muchos = Array.from({ length: 1000 }, (_, i) => [i * 100, i * 100 + 50]);
-    assert.deepStrictEqual(R.leerNotas(R.ritmoATexto(muchos)).errores, []);
-}
-
-// 16d) Audio -> ritmo del robot con la detección de golpes de timbre.js (8 golpes sintéticos cada 500 ms)
-{
-    const T = require('../timbre.js');
-    const sr = 8000, x = new Float32Array(sr * 4);
-    for (let c = 0; c < 8; c++) for (let i = 0; i < 240; i++) x[c * 4000 + 800 + i] = Math.sin(i * 0.9) * Math.exp(-i / 60);
-    const { intervalos } = T.audioARitmo(x, sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
-    assert.strictEqual(intervalos.length, 8);
-    const { notas, errores } = R.leerNotas(R.ritmoATexto(intervalos));
-    assert.deepStrictEqual(errores, []);
-    assert.strictEqual(notas.filter(n => n.hz > 0).length, 8);
-    const total = notas.reduce((s, n) => s + n.ms, 0);
-    assert(Math.abs(total - intervalos[7][1]) <= 60, 'dura lo mismo que el audio: ' + total);
-    const { cmds, ms } = R.compilar({ notas });
-    assert.strictEqual(cmds.reduce((s, c) => s + c.ms, 0), ms);
 }
 
 // 16f) Cola: una orden de luces que llega rota (ERR) se reintenta UNA vez; las de tiempo (T, W, M) no
@@ -323,7 +299,7 @@ for (const c of R.CANCIONES) {
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`VEL_TURBO = ${R.VEL_TURBO};`).test(ino), 'VEL_TURBO distinto entre página y firmware');
-    assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
+    assert(/Serial\.begin\(115200\)/.test(ino), 'baudios distintos');
 }
 
 // 18) Melodía de un audio: se recuperan las notas, un salto normal no se "corrige" y un salto de
@@ -355,10 +331,6 @@ for (const c of R.CANCIONES) {
     const grave = R.melodiaDeAudio(tono([[48, 0.3], [52, 0.3], [55, 0.3], [52, 0.3]]), sr, { fMin: 80, fMax: 400, tonalidad: false });
     assert.deepStrictEqual(nombres(grave).map(n => n.replace(/\d/, '')), ['C', 'E', 'G', 'E'], grave.texto);
     assert(nombres(grave).every(n => /[5-6]$/.test(n)), grave.texto);
-
-    // un MIDI se convierte igual, y a la vez suena la más aguda
-    const m = R.melodiaDeMidi([{ s: 0, e: 200, p: 60 }, { s: 0, e: 200, p: 48 }, { s: 200, e: 400, p: 64 }], { subir: false });
-    assert.deepStrictEqual(nombres(m), ['C4', 'E4'], m.texto);
 
     // y la ficha resultante es una canción que la página sabe tocar
     assert(R.leerNotas(r1.texto).notas.length === 6);
@@ -625,7 +597,7 @@ for (const c of R.CANCIONES) {
     const lin = R.FUNCIONES.find(f => f.id === 'linea');
     assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
+    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw), 'el firmware lleva el seguidor');
     assert(/esquinaI/.test(fw) && /s == 5 && fase\) ledsTodos\(150, 0, 0\)/.test(fw), 'direccionales en las esquinas y reversa en rojo intermitente');
     assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
     assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
@@ -748,13 +720,13 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(F(100, 100, [0, 0], 100, false).bloqueado, false, '0 no es una lectura');
     assert.strictEqual(F(100, 100, [5], 100, false).bloqueado, false, 'con una sola lectura todavía no frena');
     assert.strictEqual(F(100, 100, undefined, 0, false).bloqueado, false);
-    // el firmware responde a DIST, avisa DIST=1 en INFO y la página sabe leerlo
+    // el firmware responde a DIST y avisa PARK=1 en INFO: así la página sabe que es el programa de esta versión
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/!strcmp\(cmd, "DIST"\)/.test(ino) && /Serial\.print\(F\("DIST "\)\)/.test(ino), 'DIST en el firmware');
-    assert(/F\(" DIST=1/.test(ino), 'INFO avisa DIST=1');
-    assert(/DIST=1 DIR=1/.test(ino) && /!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
+    assert(/F\(" PARK=1/.test(ino), 'INFO avisa PARK=1');
+    assert(/!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
-    assert(/\^DIST /.test(js) && /kv\.DIST === 1/.test(js), 'la página lee DIST y DIST=1');
+    assert(/\^DIST /.test(js) && /kv\.PARK === 1/.test(js), 'la página lee DIST y PARK=1');
 }
 
 console.log('robot.test.js: todo bien');
