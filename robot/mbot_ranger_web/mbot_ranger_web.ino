@@ -620,17 +620,16 @@ void senalPaso() {
     reversaT = millis() + 900;
     if (volumen) { tonoInicia(1200); tonoFin = millis() + 90; }
   }
-  const uint8_t fase = s <= 3 ? (millis() / 350UL) & 1 : 0;
+  const uint8_t fase = (s <= 3 || s == 5) ? (millis() / 350UL) & 1 : 0;
   if (s == senalVista && fase == senalFase) return;
   if (!senalVista) memcpy(anilloGuardado, anillo, 36);
   senalVista = s;
   senalFase = fase;
   ledsTodos(0, 0, 0);
-  if (s == 1 && fase) for (uint8_t i = 6; i < 12; i++) ledPon(i, 150, 60, 0);
-  else if (s == 2 && fase) for (uint8_t i = 0; i < 6; i++) ledPon(i, 150, 60, 0);
-  else if (s == 3 && fase) ledsTodos(150, 60, 0);
-  else if (s == 4) ledsTodos(120, 0, 0);
-  else if (s == 5) ledsTodos(70, 70, 70);
+  static const uint8_t esquinaI[4] = { 10, 11, 7, 8 }, esquinaD[4] = { 1, 2, 4, 5 };
+  if ((s == 1 || s == 3) && fase) for (uint8_t i = 0; i < 4; i++) ledPon(esquinaI[i], 150, 60, 0);
+  if ((s == 2 || s == 3) && fase) for (uint8_t i = 0; i < 4; i++) ledPon(esquinaD[i], 150, 60, 0);
+  if (s == 5 && fase) ledsTodos(150, 0, 0);
   ledsMuestra();
 }
 

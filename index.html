@@ -49,6 +49,7 @@
         <symbol id="i-ruta" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></symbol>
         <symbol id="i-fn-linea" viewBox="0 0 24 24"><!-- @robot:line --><path d="M3 18c5 0 4-12 9-12s4 12 9 12"/></symbol>
         <symbol id="i-fn-baile" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="14" cy="4.5" r="2"/><path d="m12 8-3 4 4 2-1 6"/><path d="m12 8 4 3 3-2"/><path d="m13 14 4 3"/></symbol>
+        <symbol id="i-fn-ruleta" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></symbol>
         <symbol id="i-fn-ninguna" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="12" cy="12" r="8"/><path d="m6.3 6.3 11.4 11.4"/></symbol>
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
@@ -278,6 +279,9 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Panel de administración</h2>
+<!-- @robot:start -->
+                        <div id="rb-estado-fila" class="rb-estado-fila"></div>
+<!-- @robot:end -->
                     </div>
                     <div class="admin-head__actions">
                         <button type="button" onclick="logoutAdmin()" class="btn btn--secondary">
@@ -334,13 +338,13 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Funciones</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-jarvis" data-section-tab="robot-jarvis" aria-controls="sec-robot-jarvis" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Jarvis</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Yokis</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-dibujar" data-section-tab="robot-dibujar" aria-controls="sec-robot-dibujar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg><span>Dibujar</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-musica" data-section-tab="robot-musica" aria-controls="sec-robot-musica" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Música</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Audio</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
@@ -802,7 +806,7 @@
                         </section>
 
                         <!-- Música: canción, teclado y melodía de un audio -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-musica" data-section="robot-musica" role="tabpanel" aria-label="Música del robot" hidden>
+                        <section class="panel admin-sec rb-panel" id="sec-robot-musica" data-section="robot-musica" role="tabpanel" aria-label="Audio del robot" hidden>
                             <div class="panel__body">
                                 <div class="rb-card">
                                     <h4 class="panel__sub">Canción</h4>
@@ -841,6 +845,26 @@
                                         <button type="button" id="rb-tocar" class="btn btn--primary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg> Cantar en el robot</button>
                                     </div>
 
+                                    </div>
+                                </div>
+                                <div class="rb-card" data-solo="android">
+                                    <h4 class="panel__sub">Cántalo y el robot lo toca en pitidos</h4>
+                                    <div class="stack">
+                                        <p class="hint">Pulsa Grabar, canta una melodía (con letra o con «la la la»), cerca del micrófono y sin música de fondo, y pulsa Parar: se convierte sola en notas del zumbador.</p>
+                                        <div class="field">
+                                            <label class="field__label" for="rb-cant-voz">Tu voz</label>
+                                            <select id="rb-cant-voz" class="select"><option value="hombre">Grave (voz de hombre)</option><option value="media" selected>Media</option><option value="aguda">Aguda (mujer o niño)</option></select>
+                                        </div>
+                                        <div class="btn-row">
+                                            <label class="rb-check"><input type="checkbox" id="rb-cant-tonal" checked><span>Corregir las notas desafinadas</span></label>
+                                            <label class="rb-check"><input type="checkbox" id="rb-cant-oir" checked><span>Tocarlo al terminar</span></label>
+                                        </div>
+                                        <div class="rb-ent-audio">
+                                            <button type="button" id="rb-cant-grabar" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Grabar</button>
+                                            <canvas id="rb-cant-nivel" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de tu voz"></canvas>
+                                            <span id="rb-cant-tiempo" class="rb-ent-tiempo">0:00</span>
+                                        </div>
+                                        <p id="rb-cant-info" class="msg" role="status"></p>
                                     </div>
                                 </div>
                                 <div class="rb-card">
@@ -958,6 +982,40 @@
                                             <legend class="field__label">Función</legend>
                                             <div id="rb-fn-lista" class="rb-fn-lista"></div>
                                         </fieldset>
+                                        <div class="rb-herr">
+                                            <h4 class="rb-fn-t">Herramientas con el sensor</h4>
+                                            <div class="rb-herr__rejilla">
+                                                <div class="rb-herr__tarjeta">
+                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-radar"/></svg></span>
+                                                    <b>Radar 360°</b>
+                                                    <small>Gira en su sitio midiendo la distancia en 12 direcciones y dibuja el mapa aquí.</small>
+                                                    <button type="button" id="rb-radar" class="btn btn--secondary btn--sm">Escanear</button>
+                                                </div>
+                                                <div class="rb-herr__tarjeta">
+                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg></span>
+                                                    <b>Guardia</b>
+                                                    <small>Se queda quieto; si algo se le acerca, suena la alarma, parpadea y vibra el celular.</small>
+                                                    <button type="button" id="rb-guardia" class="btn btn--secondary btn--sm" aria-pressed="false">Armar guardia</button>
+                                                </div>
+                                            </div>
+                                            <canvas id="rb-radar-lienzo" class="rb-lienzo" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
+                                            <p id="rb-herr-msg" class="hint" role="status"></p>
+                                        </div>
+                                        <p class="hint">Toca una función para elegirla y tócala otra vez para abrir sus ajustes en una ventana.</p>
+                                        <div id="rb-fn-almacen" hidden>
+                                        <div id="rb-ruleta-panel" class="rb-ln" hidden>
+                                            <h4 class="rb-fn-t">Ruleta de casino</h4>
+                                            <p class="hint">Los 12 LEDs son la mesa, rojo y negro. Una bolita verde gira, va frenando y cae en un número; esa casilla parpadea.</p>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-rul-dur">Qué tan larga</label>
+                                                <select id="rb-rul-dur" class="select"><option value="5">Corta (11 s)</option><option value="8" selected>Normal (18 s)</option><option value="12">Larga (27 s)</option></select>
+                                            </div>
+                                            <label class="rb-check"><input type="checkbox" id="rb-rul-sonido" checked><span>Con sonido de matraca</span></label>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-rul-girar" class="btn btn--primary btn--sm" disabled>Girar la ruleta</button>
+                                            </div>
+                                            <p id="rb-rul-res" class="rb-rul-res" role="status"></p>
+                                        </div>
                                         <div id="rb-baile-panel" class="rb-ln" hidden>
                                             <h4 class="rb-fn-t">Ajustes del baile</h4>
                                     <div class="field">
@@ -1012,31 +1070,13 @@
                                             </div>
                                             <p class="hint">El módulo va en el puerto 9. Con «Ver sensores» pasa una hoja blanca y una negra bajo cada sensor: el punto se enciende cuando ve la línea. Si no cambia, gira el potenciómetro del módulo.</p>
                                         </div>
-                                        <div class="rb-herr">
-                                            <h4 class="rb-fn-t">Herramientas con el sensor</h4>
-                                            <div class="rb-herr__rejilla">
-                                                <div class="rb-herr__tarjeta">
-                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-radar"/></svg></span>
-                                                    <b>Radar 360°</b>
-                                                    <small>Gira en su sitio midiendo la distancia en 12 direcciones y dibuja el mapa aquí.</small>
-                                                    <button type="button" id="rb-radar" class="btn btn--secondary btn--sm">Escanear</button>
-                                                </div>
-                                                <div class="rb-herr__tarjeta">
-                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg></span>
-                                                    <b>Guardia</b>
-                                                    <small>Se queda quieto; si algo se le acerca, suena la alarma, parpadea y vibra el celular.</small>
-                                                    <button type="button" id="rb-guardia" class="btn btn--secondary btn--sm" aria-pressed="false">Armar guardia</button>
-                                                </div>
-                                            </div>
-                                            <canvas id="rb-radar-lienzo" class="rb-lienzo" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
-                                            <p id="rb-herr-msg" class="hint" role="status"></p>
-                                        </div>
+                                            <div id="rb-fn-generico" class="rb-fn-generico">
                                         <p class="hint">Al poner una función se quita el baile (los dos mueven las ruedas). Corre hasta pulsar Paro.</p>
                                         <div class="btn-row">
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-luces"><span>Con luces</span></label>
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-musica"><span>Con música: <b id="rb-fn-cancion"></b></span></label>
                                         </div>
-                                        <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Música y suena en el zumbador del robot, también mientras esquiva o sigue la mano y también guardada en el robot (se repite hasta pulsar Paro).</p>
+                                        <p class="hint">Con luces usa las de la sección Luces; sin marcar, las apaga mientras la función corre. La música es la canción de la sección Audio y suena en el zumbador del robot, también mientras esquiva o sigue la mano y también guardada en el robot (se repite hasta pulsar Paro).</p>
                                         <div class="field">
                                             <label class="field__label" for="rb-fn-vel">Velocidad (de lo más lento a lo más rápido): <span id="rb-fn-vel-v"></span></label>
                                             <input type="range" id="rb-fn-vel" min="40" max="180" step="5">
@@ -1065,33 +1105,94 @@
                                             <p id="rb-fn-info" class="msg" role="status"></p>
                                         </div>
                                         <p class="hint">Esquivar obstáculos y Seguir mi mano las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
+                                            </div>
+                                        </div>
+                                        <dialog id="rb-fn-ventana" class="rb-ventana" aria-labelledby="rb-fn-ventana-titulo">
+                                            <header class="rb-ventana__cab">
+                                                <h3 id="rb-fn-ventana-titulo">Ajustes</h3>
+                                            </header>
+                                            <div id="rb-fn-ventana-cuerpo" class="rb-ventana__cuerpo"></div>
+                                        </dialog>
                                     </div>
                                 </div>
                             </div>
                         </section>
 
                         <!-- Luces -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Jarvis, control por voz" hidden>
+                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Yokis, control por voz" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Jarvis</h4>
+                                    <h4 class="panel__sub">Yokis</h4>
                                     <div class="rb-jarvis">
-                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Jarvis"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Jarvis</span></button>
-                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Jarvis».</p>
+                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Yokis"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Yokis</span></button>
+                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
+                                    <h4 class="rb-fn-t">La voz de Yokis</h4>
+                                    <div class="rb-calib">
+                                        <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
+                                        <label class="field"><span class="field__label">Más grave ← → más aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
+                                        <label class="field"><span class="field__label">Más calmada ← → más enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
+                                    </div>
+                                    <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
+                                    <h4 class="rb-fn-t">Voces entrenadas</h4>
+                                    <p class="hint">Entrena una voz con un amigo: lee unas frases, la guardas con un nombre y Yokis habla con ella. Con su propia voz solo dice las frases que se grabaron; en lo demás ajusta la voz del teléfono al tono de tu amigo. No es una clonación perfecta.</p>
+                                    <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
+                                    </div>
+                                    <p id="rb-ent-msg" class="msg" role="status"></p>
+                                    <dialog id="rb-ent-ventana" class="rb-ventana" aria-labelledby="rb-ent-titulo">
+                                        <header class="rb-ventana__cab">
+                                            <h3 id="rb-ent-titulo">Entrenar una voz</h3>
+                                            <button type="button" id="rb-ent-cerrar" class="icon-btn" aria-label="Cerrar el entrenamiento"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                        </header>
+                                        <div class="rb-ventana__cuerpo">
+                                            <div id="rb-ent-pasos" class="rb-ent-pasos">
+                                                <div class="rb-ent-prog">
+                                                    <progress id="rb-ent-prog" max="12" value="0" aria-label="Avance del entrenamiento"></progress>
+                                                    <span id="rb-ent-paso">Frase 1 de 12</span>
+                                                </div>
+                                                <p class="rb-ent-pide">Que tu amigo lea en voz alta:</p>
+                                                <blockquote id="rb-ent-frase" class="rb-ent-frase"></blockquote>
+                                                <div class="rb-ent-audio">
+                                                    <button type="button" id="rb-ent-play" class="rb-ent-play" aria-label="Escuchar la grabación" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
+                                                    <canvas id="rb-ent-onda" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de la grabación"></canvas>
+                                                    <span id="rb-ent-tiempo" class="rb-ent-tiempo">0:00</span>
+                                                </div>
+                                                <div class="rb-ent-botones">
+                                                    <button type="button" id="rb-ent-grabar" class="btn btn--primary">Grabar</button>
+                                                    <button type="button" id="rb-ent-sig" class="btn btn--secondary" disabled>Siguiente</button>
+                                                </div>
+                                                <p id="rb-ent-aviso" class="msg" role="status"></p>
+                                            </div>
+                                            <div id="rb-ent-final" class="rb-ent-final" hidden>
+                                                <p class="rb-ent-pide">¡Listo! Ponle un nombre a esta voz para guardarla.</p>
+                                                <label class="field"><span class="field__label">Nombre de la voz</span><input id="rb-ent-nombre" class="input" type="text" maxlength="30" placeholder="Por ejemplo: Voz de Carlos" autocomplete="off"></label>
+                                                <div class="rb-ent-botones">
+                                                    <button type="button" id="rb-ent-guardar" class="btn btn--primary" disabled>Guardar la voz</button>
+                                                    <button type="button" id="rb-ent-atras" class="btn btn--secondary">Volver</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </dialog>
                                     <h4 class="rb-fn-t">Prueba con estas frases</h4>
                                     <ul class="rb-frases">
-                                        <li><b>Moverse</b><span>«Jarvis, avanza dos metros», «Jarvis, ve para atrás tres segundos»</span></li>
-                                        <li><b>Girar</b><span>«Jarvis, gira a la derecha», «Jarvis, gira cuarenta y cinco grados», «Jarvis, da la vuelta»</span></li>
-                                        <li><b>Dibujar</b><span>«Jarvis, dibuja un círculo», «Jarvis, hazme una estrella»</span></li>
-                                        <li><b>Funciones</b><span>«Jarvis, inicia la función zigzag», «Jarvis, sigue la línea», «Jarvis, activa esquivar obstáculos»</span></li>
-                                        <li><b>Canciones</b><span>«Jarvis, toca estrellita», «Jarvis, pon la canción de la cucaracha», «Jarvis, detén la música»</span></li>
-                                        <li><b>Luces</b><span>«Jarvis, enciende las luces rojas», «Jarvis, luces arcoíris», «Jarvis, apaga las luces»</span></li>
-                                        <li><b>Casa y sensor</b><span>«Jarvis, regresa a casa», «Jarvis, haz un radar», «Jarvis, activa la guardia»</span></li>
-                                        <li><b>Otros</b><span>«Jarvis, toca el claxon», «Jarvis, cuánta batería tienes», «Jarvis, para»</span></li>
+                                        <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
+                                        <li><b>Girar</b><span>«Yokis, gira a la derecha», «Yokis, gira cuarenta y cinco grados», «Yokis, da la vuelta»</span></li>
+                                        <li><b>Dibujar</b><span>«Yokis, dibuja un círculo», «Yokis, hazme una estrella»</span></li>
+                                        <li><b>Funciones</b><span>«Yokis, inicia la función zigzag», «Yokis, sigue la línea», «Yokis, activa esquivar obstáculos»</span></li>
+                                        <li><b>Canciones</b><span>«Yokis, toca estrellita», «Yokis, pon la canción de la cucaracha», «Yokis, detén la música»</span></li>
+                                        <li><b>Baile</b><span>«Yokis, baila», «Yokis, baila el zigzag con estrellita», «Yokis, deja de bailar»</span></li>
+                                        <li><b>Plática</b><span>«Yokis, cómo estás», «Yokis, cuéntame un chiste», «Yokis, qué hora es», «Yokis, gracias»</span></li>
+                                        <li><b>Luces</b><span>«Yokis, enciende las luces rojas», «Yokis, luces arcoíris», «Yokis, apaga las luces»</span></li>
+                                        <li><b>Casa y sensor</b><span>«Yokis, regresa a casa», «Yokis, haz un radar», «Yokis, activa la guardia»</span></li>
+                                        <li><b>Otros</b><span>«Yokis, toca el claxon», «Yokis, cuánta batería tienes», «Yokis, para»</span></li>
                                     </ul>
-                                    <p class="hint">Empieza siempre con «Jarvis»: sin eso no obedece. Se escucha una orden por toque y el robot tiene que estar conectado. El turbo solo se usa desde el mando.</p>
+                                    <p class="hint">Empieza siempre con «Yokis»: sin eso no obedece. Se escucha una orden por toque y el robot tiene que estar conectado. El turbo solo se usa desde el mando.</p>
                                 </div>
                             </div>
                         </section>
@@ -1221,6 +1322,12 @@
                                     </div>
                                 </details>
                                     <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
+                                </div>
+                                <div class="rb-card rb-card--ancho" data-solo="android">
+                                    <h4 class="panel__sub">Sesión</h4>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="logoutAdmin()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg> Cerrar sesión</button>
+                                    </div>
                                 </div>
                             </div>
                         </section>

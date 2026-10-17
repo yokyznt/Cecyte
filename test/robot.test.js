@@ -575,6 +575,7 @@ for (const c of R.CANCIONES) {
     assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
+    assert(/esquinaI/.test(fw) && /s == 5 && fase\) ledsTodos\(150, 0, 0\)/.test(fw), 'direccionales en las esquinas y reversa en rojo intermitente');
     assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
     assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
@@ -724,8 +725,8 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(S(180, 40, false, true), { dir: 'd', luz: 'o' }, 'giro fuerte a la derecha');
     assert.deepStrictEqual(S(40, 180, false, true), { dir: 'i', luz: 'o' }, 'giro fuerte a la izquierda');
     assert.deepStrictEqual(S(-180, 180, false, true), { dir: 'i', luz: 'o' }, 'giro en el sitio');
-    assert.deepStrictEqual(S(0, 0, true, true), { dir: 'x', luz: 'f' }, 'bloqueado por obstáculo: intermitentes y freno');
-    assert.deepStrictEqual(S(0, 0, false, true), { dir: 'o', luz: 'f' }, 'al soltar: luz de freno');
+    assert.deepStrictEqual(S(0, 0, true, true), { dir: 'x', luz: 'o' }, 'bloqueado por obstáculo: intermitentes');
+    assert.deepStrictEqual(S(0, 0, false, true), { dir: 'o', luz: 'o' }, 'al soltar la palanca no se prende ninguna luz roja');
     assert.deepStrictEqual(S(0, 0, false, false), { dir: 'o', luz: 'o' }, 'quieto sin haberse movido: nada');
     assert.strictEqual(S(-100, -100, false, true).luz, 'r', 'reversa');
 }
@@ -748,45 +749,64 @@ console.log('robot.test.js: todo bien');
     assert.strictEqual(R.giroARecorrido(-180, 500).pasos[0].izq < 0, true);
     assert.strictEqual(R.movimientoARecorrido(-1, 1000).pasos[0].izq < 0, true);
     const V = R.ordenDeVoz;
-    assert.deepStrictEqual(V('avanza'), { a: 'sinNombre' }, 'sin decir Jarvis no obedece');
+    assert.deepStrictEqual(V('avanza'), { a: 'sinNombre' }, 'sin decir Yokis no obedece');
     assert.deepStrictEqual(V('para'), { a: 'sinNombre' });
-    assert.deepStrictEqual(V('Jarvis'), { a: 'saludo' });
-    assert.deepStrictEqual(V('Oye Jarvis, para'), { a: 'paro' });
-    assert.deepStrictEqual(V('yarvis alto ya'), { a: 'paro' }, 'tolera cómo se oye el nombre');
-    assert.deepStrictEqual(V('Jarvis avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
-    assert.deepStrictEqual(V('Jarvis por favor avanza dos metros'), { a: 'mover', sentido: 1, cm: 200, s: null }, 'números en palabras');
-    assert.deepStrictEqual(V('Jarvis avanza medio metro'), { a: 'mover', sentido: 1, cm: 50, s: null });
-    assert.deepStrictEqual(V('Jarvis ve para atrás tres segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
-    assert.deepStrictEqual(V('Jarvis gira a la izquierda'), { a: 'giro', grados: -90 });
-    assert.deepStrictEqual(V('Jarvis gira cuarenta y cinco grados a la derecha'), { a: 'giro', grados: 45 });
-    assert.deepStrictEqual(V('Jarvis gira ciento ochenta grados'), { a: 'giro', grados: 180 });
-    assert.deepStrictEqual(V('Jarvis a la derecha'), { a: 'giro', grados: 90 });
-    assert.deepStrictEqual(V('Jarvis da la vuelta'), { a: 'giro', grados: 180 });
-    assert.deepStrictEqual(V('Jarvis dibuja un círculo'), { a: 'figura', f: 'circulo' });
-    assert.deepStrictEqual(V('Jarvis hazme una estrella'), { a: 'figura', f: 'estrella' });
-    assert.deepStrictEqual(V('Jarvis regresa a casa'), { a: 'casa' });
-    assert.deepStrictEqual(V('Jarvis activa el modo guardia'), { a: 'guardia', on: true });
-    assert.deepStrictEqual(V('Jarvis desactiva la guardia'), { a: 'guardia', on: false });
-    assert.deepStrictEqual(V('Jarvis hazme un radar'), { a: 'radar' });
-    assert.deepStrictEqual(V('Jarvis quita el turbo'), { a: 'turbo', on: false });
-    assert.deepStrictEqual(V('Jarvis enciende las luces rojas'), { a: 'luces', efecto: 'fijo', color: '#ff2a2a' });
-    assert.deepStrictEqual(V('Jarvis pon las luces en arcoíris'), { a: 'luces', efecto: 'arcoiris' });
-    assert.deepStrictEqual(V('Jarvis apaga las luces'), { a: 'luces', efecto: 'fijo', color: '#000000' });
-    assert.deepStrictEqual(V('Jarvis luces respirando'), { a: 'luces', efecto: 'respirar' });
-    assert.deepStrictEqual(V('Jarvis inicia la función zigzag'), { a: 'funcion', id: 'zigzag' });
-    assert.deepStrictEqual(V('Jarvis activa esquivar obstáculos'), { a: 'funcion', id: 'esquivar' });
-    assert.deepStrictEqual(V('Jarvis modo seguir mi mano'), { a: 'funcion', id: 'mano' });
-    assert.deepStrictEqual(V('Jarvis sigue la línea'), { a: 'funcion', id: 'linea' });
-    assert.deepStrictEqual(V('Jarvis deja de seguir la línea'), { a: 'paro' });
-    assert.deepStrictEqual(V('Jarvis haz círculos'), { a: 'funcion', id: 'circulos' });
-    assert.deepStrictEqual(V('Jarvis toca estrellita'), { a: 'cancion', id: 'estrellita' });
-    assert.deepStrictEqual(V('Jarvis pon la canción de la cucaracha'), { a: 'cancion', id: 'cucaracha' });
-    assert.deepStrictEqual(V('Jarvis reproduce música'), { a: 'cancion', id: null, q: '' });
-    assert.deepStrictEqual(V('Jarvis toca la canción mi vals'), { a: 'cancion', id: null, q: 'mi vals' });
-    assert.deepStrictEqual(V('Jarvis detén la música'), { a: 'cancionParar' });
-    assert.deepStrictEqual(V('Jarvis cuánta batería tienes'), { a: 'bateria' });
-    assert.deepStrictEqual(V('Jarvis toca el claxon'), { a: 'claxon' });
-    assert.strictEqual(V('Jarvis qué hora es'), null);
+    assert.deepStrictEqual(V('Yokis'), { a: 'saludo' });
+    assert.deepStrictEqual(V('Oye Yokis, para'), { a: 'paro' });
+    assert.deepStrictEqual(V('yoquis alto ya'), { a: 'paro' }, 'tolera cómo se oye el nombre');
+    assert.deepStrictEqual(V('Yokis avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
+    assert.deepStrictEqual(V('Yokis por favor avanza dos metros'), { a: 'mover', sentido: 1, cm: 200, s: null }, 'números en palabras');
+    assert.deepStrictEqual(V('Yokis avanza medio metro'), { a: 'mover', sentido: 1, cm: 50, s: null });
+    assert.deepStrictEqual(V('Yokis ve para atrás tres segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
+    assert.deepStrictEqual(V('Yokis gira a la izquierda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('Yokis gira cuarenta y cinco grados a la derecha'), { a: 'giro', grados: 45 });
+    assert.deepStrictEqual(V('Yokis gira ciento ochenta grados'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Yokis a la derecha'), { a: 'giro', grados: 90 });
+    assert.deepStrictEqual(V('Yokis da la vuelta'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Yokis dibuja un círculo'), { a: 'figura', f: 'circulo' });
+    assert.deepStrictEqual(V('Yokis hazme una estrella'), { a: 'figura', f: 'estrella' });
+    assert.deepStrictEqual(V('Yokis regresa a casa'), { a: 'casa' });
+    assert.deepStrictEqual(V('Yokis activa el modo guardia'), { a: 'guardia', on: true });
+    assert.deepStrictEqual(V('Yokis desactiva la guardia'), { a: 'guardia', on: false });
+    assert.deepStrictEqual(V('Yokis hazme un radar'), { a: 'radar' });
+    assert.deepStrictEqual(V('Yokis quita el turbo'), { a: 'turbo', on: false });
+    assert.deepStrictEqual(V('Yokis enciende las luces rojas'), { a: 'luces', efecto: 'fijo', color: '#ff2a2a' });
+    assert.deepStrictEqual(V('Yokis pon las luces en arcoíris'), { a: 'luces', efecto: 'arcoiris' });
+    assert.deepStrictEqual(V('Yokis apaga las luces'), { a: 'luces', efecto: 'fijo', color: '#000000' });
+    assert.deepStrictEqual(V('Yokis luces respirando'), { a: 'luces', efecto: 'respirar' });
+    assert.deepStrictEqual(V('Yokis inicia la función zigzag'), { a: 'funcion', id: 'zigzag' });
+    assert.deepStrictEqual(V('Yokis activa esquivar obstáculos'), { a: 'funcion', id: 'esquivar' });
+    assert.deepStrictEqual(V('Yokis modo seguir mi mano'), { a: 'funcion', id: 'mano' });
+    assert.deepStrictEqual(V('Yokis sigue la línea'), { a: 'funcion', id: 'linea' });
+    assert.deepStrictEqual(V('Yokis deja de seguir la línea'), { a: 'paro' });
+    assert.deepStrictEqual(V('Yokis haz círculos'), { a: 'funcion', id: 'circulos' });
+    assert.deepStrictEqual(V('Yokis toca estrellita'), { a: 'cancion', id: 'estrellita' });
+    assert.deepStrictEqual(V('Yokis pon la canción de la cucaracha'), { a: 'cancion', id: 'cucaracha' });
+    assert.deepStrictEqual(V('Yokis reproduce música'), { a: 'cancion', id: null, q: '' });
+    assert.deepStrictEqual(V('Yokis toca la canción mi vals'), { a: 'cancion', id: null, q: 'mi vals' });
+    assert.deepStrictEqual(V('Yokis detén la música'), { a: 'cancionParar' });
+    assert.deepStrictEqual(V('Yokis cuánta batería tienes'), { a: 'bateria' });
+    assert.deepStrictEqual(V('Yokis toca el claxon'), { a: 'claxon' });
+    assert.deepStrictEqual(V('Yokis qué hora es'), { a: 'charla', t: 'hora' });
+    assert.deepStrictEqual(V('Jarvis para'), { a: 'sinNombre' }, 'el nombre viejo ya no sirve');
+    ['yokis', 'yoquis', 'yoki', 'joquis', 'llokis', 'yo kis', 'oye yoki', 'hola yoquis'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'nombre ' + n));
+    assert.deepStrictEqual(V('Yokis baila'), { a: 'baile', id: null, cancion: null });
+    assert.deepStrictEqual(V('Yokis ponte a bailar'), { a: 'baile', id: null, cancion: null });
+    assert.deepStrictEqual(V('Yokis baila el zigzag con estrellita'), { a: 'baile', id: 'zigzag', cancion: 'estrellita' });
+    assert.deepStrictEqual(V('Yokis baila la cucaracha'), { a: 'baile', id: 'cucaracha', cancion: 'cucaracha' });
+    assert.deepStrictEqual(V('Yokis deja de bailar'), { a: 'paro' });
+    assert.deepStrictEqual(V('Yokis cómo estás'), { a: 'charla', t: 'estado' });
+    assert.deepStrictEqual(V('Yokis cuéntame un chiste'), { a: 'charla', t: 'chiste' });
+    assert.deepStrictEqual(V('Yokis gracias'), { a: 'charla', t: 'gracias' });
+    assert.deepStrictEqual(V('Yokis quién eres'), { a: 'charla', t: 'quien' });
+    assert.deepStrictEqual(V('Yokis qué puedes hacer'), { a: 'charla', t: 'ayuda' });
+    assert.deepStrictEqual(V('Yokis eres el mejor'), { a: 'charla', t: 'elogio' });
+    assert.deepStrictEqual(V('Yokis adiós'), { a: 'charla', t: 'adios' });
+    assert.strictEqual(V('Yokis cuántos planetas hay'), null);
+    for (const tipo of Object.keys(R.FRASES)) assert(R.FRASES[tipo].length && R.FRASES[tipo].every(x => typeof x === 'string' && x.length > 3), 'frases de ' + tipo);
+    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., compa.');
+    assert.strictEqual(R.frase('figura', { f: 'una estrella' }, () => 0.99), 'Órale, una estrella va saliendo.');
+    assert(R.frase('noExiste').length > 3, 'tipo desconocido: contesta algo');
 }
 
 {
@@ -797,9 +817,114 @@ console.log('robot.test.js: todo bien');
     R.VARIANTES.forEach(v => assert(html.includes(`id="i-mod-${v.id}"`), 'icono del modelo ' + v.id));
     ['radar', 'escudo', 'casa', 'fig-circulo', 'fig-cuadrado', 'fig-triangulo', 'fig-estrella'].forEach(i => assert(html.includes(`id="i-${i}"`), 'icono ' + i));
     ['robot-jarvis', 'robot-dibujar', 'robot-funciones'].forEach(sec => assert(html.includes(`id="sec-${sec}"`) && html.includes(`id="tab-${sec}"`), 'sección ' + sec));
-    assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Jarvis');
+    assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Yokis');
     assert(html.includes('id="rb-baile-panel"') && !html.includes('id="tab-robot-baile"') && !html.includes('id="sec-robot-baile"'), 'el baile es una función de Funciones con su panel de ajustes');
     assert(html.includes('id="i-fn-baile"'), 'icono del baile');
     const nav = fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8');
     assert(/'robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar'/.test(nav), 'Funciones va junto a Control');
+}
+
+{
+    assert.strictEqual(R.RULETA_N, 12);
+    assert.deepStrictEqual([0, 1, 2, 3].map(R.ruletaColor), ['rojo', 'negro', 'rojo', 'negro'], 'rojo y negro alternados');
+    const plan = R.ruletaPlan(() => 0.5, 3);
+    assert.strictEqual(plan.destino, 6);
+    assert.strictEqual(plan.inicio, 6);
+    assert.strictEqual(R.ruletaPosEn(plan, plan.dur), plan.destino, 'al terminar cae en el destino');
+    assert.strictEqual(R.ruletaPosEn(plan, 0), plan.inicio, 'al principio está donde empezó');
+    const finales = new Set(), ultimos = [], duraciones = [];
+    let aleatorio = 0;
+    const gen = () => { aleatorio = (aleatorio * 9301 + 49297) % 233280; return aleatorio / 233280; };
+    for (let i = 0; i < 300; i++) {
+        const p = R.ruletaPlan(gen, 8);
+        finales.add(p.tipo);
+        assert.strictEqual(R.ruletaPosEn(p, p.dur), p.destino, 'siempre cae en su destino');
+        assert.strictEqual(p.color, R.ruletaColor(p.destino));
+        assert.strictEqual(p.num, p.destino + 1);
+        for (let k = 1; k < p.pasos.length; k++) assert(p.pasos[k].t > p.pasos[k - 1].t, 'el tiempo siempre avanza');
+        const ints = p.pasos.map((x, k) => x.t - (k ? p.pasos[k - 1].t : 0));
+        assert(ints[0] < 120, 'arranca rápido');
+        ultimos.push(p.pasos[p.pasos.length - 1].t - p.pasos[p.pasos.length - 2].t);
+        duraciones.push(p.dur);
+    }
+    assert.deepStrictEqual([...finales].sort(), ['directo', 'doble', 'rebote'], 'el final cambia: directo, con rebote o con doble saltito');
+    assert(Math.max.apply(null, ultimos) - Math.min.apply(null, ultimos) > 200, 'el último saltito dura distinto cada vez');
+    assert(Math.max.apply(null, duraciones) < 26000 && Math.min.apply(null, duraciones) > 12000, 'la ruleta normal dura entre 12 y 26 s');
+    const lento = R.ruletaPlan(() => 0.99, 8);
+    assert(lento.pasos[lento.pasos.length - 1].t - lento.pasos[lento.pasos.length - 2].t < 1300, 'el último saltito nunca se eterniza');
+    const col = R.ruletaColores(4, true);
+    assert.strictEqual(col.length, 12);
+    assert.deepStrictEqual(col[4], [0, 255, 60], 'la bolita es verde');
+    assert(col[0][0] > 100 && col[0][1] === 0, 'las casillas pares son rojas');
+    assert(col[1][0] < 20 && col[1][1] < 20, 'las impares son negras');
+    assert.deepStrictEqual(R.ordenDeVoz('Yokis juega a la ruleta'), { a: 'ruleta' });
+    assert.deepStrictEqual(R.ordenDeVoz('Yokis detén la ruleta'), { a: 'paro' });
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(html.includes('id="rb-ruleta-panel"') && html.includes('id="rb-rul-girar"') && html.includes('id="i-fn-ruleta"'), 'la ruleta tiene panel e icono');
+    assert(['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido', 'rb-voz-probar'].every(id => html.includes(`id="${id}"`)), 'Yokis deja elegir su voz');
+    const ex = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
+    assert(/pitch: 0\.75/.test(ex) && /rate: 1\.15/.test(ex), 'voz grave y enérgica por defecto');
+}
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(['rb-fn-ventana', 'rb-fn-almacen', 'rb-fn-generico', 'rb-fn-ventana-cuerpo'].every(id => html.includes(`id="${id}"`)), 'los ajustes de cada función van en una ventana');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/function abrirVentanaFuncion/.test(rj) && /previo && c\.querySelector/.test(rj), 'tocar una función elegida abre su ventana');
+    assert(/laps \* 2250/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
+    assert(/<option value="8" selected>Normal \(18 s\)/.test(html), 'la ruleta normal da 8 vueltas en 18 s');
+    assert(['rb-vz-lista', 'rb-ent-abrir', 'rb-ent-ventana', 'rb-ent-prog', 'rb-ent-frase', 'rb-ent-grabar', 'rb-ent-sig', 'rb-ent-onda', 'rb-ent-nombre', 'rb-ent-guardar'].every(id => html.includes(`id="${id}"`)), 'el entrenamiento de voz es un asistente con progreso, grabar, siguiente, onda y nombre');
+}
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(['rb-cant-grabar', 'rb-cant-voz', 'rb-cant-nivel', 'rb-cant-tonal', 'rb-cant-oir', 'rb-cant-info'].every(id => html.includes(`id="${id}"`)), 'se puede cantar y convertir la voz en pitidos');
+    assert(/id="tab-robot-musica"[^>]*>\s*<svg[^>]*><use href="#i-music"\/><\/svg><span>Audio<\/span>/.test(html), 'la pestaña Música ahora se llama Audio');
+    assert(!html.includes('<span>Música</span>'), 'ya no hay pestañas llamadas Música');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/function melodiaDeCanto/.test(rj) && /REGISTROS_CANTO/.test(rj) && /echoCancellation: false/.test(rj), 'la voz cantada se convierte con el rastreador de melodía y sin filtros que alteren el tono');
+    const sr = 16000, cantadas = [[392, 0.5], [440, 0.5], [523.25, 0.5], [440, 0.5], [392, 0.7]];
+    const x = new Float32Array(Math.floor(cantadas.reduce((a, n) => a + n[1], 0) * sr));
+    let pos = 0;
+    for (const [f, d] of cantadas) { const n = Math.floor(d * sr); for (let k = 0; k < n; k++, pos++) { const env = Math.min(1, k / 400, (n - k) / 400); x[pos] = 0.5 * env * (Math.sin(2 * Math.PI * f * k / sr) + 0.3 * Math.sin(4 * Math.PI * f * k / sr)); } }
+    const melodia = R.melodiaDeAudio(x, sr, { fMin: 120, fMax: 700, sens: 60, tonalidad: true, subir: true });
+    assert.deepStrictEqual(melodia.texto.split(' ').map(t => t.split(':')[0]), ['G5', 'A5', 'C6', 'A5', 'G5'], 'una melodía cantada sol-la-do-la-sol sale como cinco pitidos (subida de octava)');
+}
+
+{
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    const marca = css.indexOf('/* App: animaciones.');
+    assert(marca > 0, 'hay un bloque de animaciones de la app');
+    const bloque = css.slice(marca);
+    assert(/@media \(prefers-reduced-motion: no-preference\)/.test(bloque), 'las animaciones respetan «reducir animaciones»');
+    ['app-sube', 'app-elige', 'app-pop', 'app-ventana', 'app-resultado', 'app-onda-mic', 'app-burbuja', 'app-frase', 'app-barra', 'app-onda'].forEach(k => assert(bloque.includes('@keyframes ' + k), 'animación ' + k));
+    const selectores = bloque.split('\n').map(l => l.trim()).filter(l => /^[.:]/.test(l));
+    assert(selectores.length > 20 && selectores.every(l => /^\.(es-app|app-onda)/.test(l)), 'todas las reglas están limitadas a la app (es-app) o a clases que solo crea la app');
+    const pl = fs.readFileSync(path.join(__dirname, '..', 'js', 'plataforma.js'), 'utf8');
+    assert(/if \(nativo\) document\.documentElement\.classList\.add\('es-app'\)/.test(pl) && /function ondas\(\)/.test(pl), 'la clase es-app y las ondas al tocar solo se activan en el APK');
+    assert(/if \(!nativo\) return;\s*ondas\(\);/.test(pl), 'las ondas se registran solo en la app');
+}
+
+{
+    const ay = fs.readFileSync(path.join(__dirname, '..', 'js', 'ayudas.js'), 'utf8');
+    assert(/isNativePlatform/.test(ay), 'en la app no se crean los iconos de información');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    assert(/\.es-app p\.hint:not\(\[id\]\):not\(:has\(button, a\)\) \{ display: none; \}/.test(css), 'en la app se esconden los textos de ayuda');
+}
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!html.includes('rb-fn-ventana-cerrar') && html.includes('id="rb-fn-ventana"'), 'el menú de función ya no lleva la X: se cierra tocando fuera');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/origenFuera/.test(rj), 'solo se cierra si el toque empieza y termina fuera de la ventana');
+    assert(html.includes('id="rb-estado-fila"'), 'hay una fila para batería y conexión bajo el título del panel');
+    const inst = html.slice(html.indexOf('id="sec-robot-instalar"'));
+    assert(/data-solo="android">\s*<h4 class="panel__sub">Sesión<\/h4>[\s\S]*logoutAdmin\(\)/.test(inst), 'Cerrar sesión está en Instalar (solo app)');
+    const pl = fs.readFileSync(path.join(__dirname, '..', 'js', 'plataforma.js'), 'utf8');
+    assert(/function moverEstadoRobot/.test(pl) && /function navAutoOcultar/.test(pl) && /toque\(8\)/.test(pl), 'en la app la batería sube al encabezado, las pestañas se esconden y los toques vibran');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    assert(/\.es-app \.admin-head__actions \{ display: none; \}/.test(css) && /\.es-app \.rb-barra__que \{ display: none; \}/.test(css), 'en la app no sale Cerrar sesión arriba y la barra de abajo es compacta');
+    const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
+    assert(/android\.permission\.VIBRATE/.test(man), 'la app puede vibrar');
+    assert(/pantallaViva\(true, 'ruleta'\)/.test(rj) && /razonesPantalla/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8')), 'la pantalla sigue encendida con el mando, la ruleta y las rutas');
 }

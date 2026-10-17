@@ -178,8 +178,7 @@ function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
     let dir = 'o', luz = 'o';
     if (bloqueado) dir = 'x';
     else if (V && Math.abs(izq - der) >= V * GIRO_DIRECCIONAL) dir = izq > der ? 'd' : 'i';
-    if (V === 0) luz = veniaEnMarcha ? 'f' : 'o';
-    else if (izq < 0 && der < 0) luz = 'r';
+    if (V !== 0 && izq < 0 && der < 0) luz = 'r';
     return { dir, luz };
 }
 
@@ -1107,6 +1106,58 @@ function figura(nombre, lado) {
 
 function sinAcentos(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
+const FRASES = {
+    saludo: ['¡Qué onda, compa! Aquí andamos, listo para lo que sea.', '¡Quihubo! Dime qué hacemos.', '¡Ey, mi buen! ¿Qué se te antoja hacer?'],
+    estado: ['Todo chido, compa, con la batería llena de ganas. ¿Y tú qué tal?', 'Al cien, carnal. Listo para rodar.', 'De lujo, aquí echando relajo con mis ruedas. ¿Qué hacemos?'],
+    gracias: ['¡De nada, compa! Para eso estamos.', 'No hay de qué, carnal.', 'Siempre a la orden, mi buen.'],
+    elogio: ['¡Ay, gracias, compa! Tú tampoco estás nada mal.', 'Me vas a hacer sonrojar, carnal.', '¡Eso! Tú y yo somos el mejor equipo.'],
+    queja: ['Uy, perdón, compa. Dime cómo lo arreglo.', 'Oye, no me regañes. Dime qué necesitas y le echo ganas.'],
+    adios: ['¡Nos vemos, compa! Aquí me quedo cuidando.', 'Cuídate, carnal. Cuando quieras me llamas.'],
+    quien: ['Soy tu robot y tu compa, el mBot que te sigue la corriente. Tú dime Yokis cuando me hables.', 'Soy tu amigo de ruedas, compa. Pa lo que se ofrezca.'],
+    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar y cuidar con la guardia. Solo empieza diciendo Yokis.'],
+    chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, compa.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
+    hora: ['Son las {hora}, compa.', 'Ya van siendo las {hora}.'],
+    fecha: ['Hoy es {fecha}, compa.', 'Estamos a {fecha}.'],
+    ruleta: ['¡Va! A girar la ruleta, compa. Hagan sus apuestas.', 'Hagan sus apuestas… ¡y ahí va la bolita!'],
+    ruletaFin: ['¡Cayó en el {num}, {color}! ¿Le apostaste a ese?', '¡{color}! La bolita se quedó en el {num}, compa.', 'Y la ganadora es el {num}, {color}. ¡Qué emoción!'],
+    paro: ['¡Alto ahí, compa! Ya me frené.', 'Listo, me quedé quieto.', 'Va, me detengo.'],
+    mover: ['Va, ahí voy.', '¡Órale, a rodar!', 'Simón, avanzando.'],
+    reversa: ['Reversa, compa. Cuidado con la cola.', 'Va, me echo para atrás.'],
+    giro: ['A la orden, girando.', 'Va, doy la vuelta.', 'Órale, ahí voy dando vuelta.'],
+    figura: ['¡Va! Voy a dibujar {f}. Mira nomás qué arte.', 'Órale, {f} va saliendo.'],
+    funcion: ['Va, arrancando {nombre}.', '¡Órale! {nombre}, ahí te va.'],
+    cancion: ['¡Va! Ahí va la música.', 'Música, maestro. ¡Dale!'],
+    cancionParar: ['Va, ya no más música.', 'Listo, silencio.'],
+    baile: ['¡Eso! A bailar, compa.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
+    luces: ['¡Luces listas, mira qué chidas!', 'Va, a iluminar el cuarto.'],
+    lucesOff: ['Listo, luces apagadas.'],
+    casa: ['Va, me regreso a casa.', 'Órale, de vuelta a casa.'],
+    radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, compa.'],
+    guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
+    guardiaOff: ['Listo, ya dejé de vigilar.'],
+    alerta: ['¡Alerta, compa! Algo se acercó.', '¡Ojo! Alguien anda cerca.'],
+    claxon: ['¡Beep beep!', '¡Pi pi! A ver quién se quita.'],
+    turbo: ['El turbo solo lo uso con el mando abierto, compa.'],
+    bateria: ['Traigo la batería al {pct}, compa.', 'Ando con {pct} de batería.'],
+    sinBateria: ['No sé cuánta batería traigo ahorita, compa.'],
+    sinNombre: ['Oye, primero dime Yokis, así sé que me hablas a mí.', 'Compa, empieza diciendo Yokis, para saber que es conmigo.'],
+    noEntendi: ['No te cacho, compa. ¿Me lo repites de otra forma?', 'Uy, no te entendí. Dime otra vez, más despacito.'],
+    sinRobot: ['Primero conéctame, compa, y le damos. Está en el apartado Conexión.', 'No me veo conectado. Conéctame en Conexión y arrancamos.'],
+    ocupado: ['Espérame tantito, compa, sigo con lo anterior. O dime para y lo cortamos.'],
+    sinFuncion: ['Esa función no me la sé, compa.'],
+    sinCancion: ['Esa canción no la tengo, compa.', 'No encontré esa rola.'],
+    sinMicro: ['Necesito permiso del micrófono para escucharte, compa.'],
+    sinVoz: ['Este celular no me deja escucharte aquí, compa.'],
+    nada: ['No escuché nada, compa. Inténtalo otra vez.'],
+    fallo: ['Se me fue la onda. Inténtalo otra vez, compa.'],
+};
+
+function frase(tipo, datos, azar) {
+    const lista = FRASES[tipo] || FRASES.noEntendi;
+    const r = typeof azar === 'function' ? azar() : Math.random();
+    return lista[Math.min(lista.length - 1, Math.floor(r * lista.length))].replace(/\{(\w+)\}/g, (m, k) => (datos && datos[k] != null ? datos[k] : ''));
+}
+
 const NUMEROS_VOZ = {
     cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
     once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19,
@@ -1131,7 +1182,7 @@ function numerosEnPalabras(t) {
     return sal.join(' ');
 }
 
-const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas)\s+)?(?:jarvis|jarvi|jarbis|jarbi|yarvis|yarvi|yarbis|harvis|charvis|garvis|jarves|yarves|jarvin|jervis|yervis)\b\s*/;
+const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas|que onda|quihubo)\s+)?(?:(?:y|ll|j)o ?(?:k|qu|ck|c)[iey]s?z?)\b[,.]?\s*/;
 const COLORES_VOZ = {
     rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
     verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
@@ -1142,6 +1193,9 @@ const FUNCIONES_VOZ = [
     ['circulos', /\bcirculos\b|vueltas en circulo/], ['ocho', /figura de ocho|\bocho\b(?! centimetros| metros| segundos| grados)/], ['slalom', /slalom|eslalon/],
     ['derrape', /derrape|derrapa/], ['picoteo', /pajarito|picote/], ['paso', /paso de pajaro/], ['mirada', /mirar a los lados|mirada/],
     ['cuadrado', /patrulla|cuadrada/], ['avanzar', /seguir avanzando|avanza sin parar|avanza siempre|sin parar/],
+];
+const BAILES_VOZ = [
+    ['vaiven', /vaiven|vai ?ven|de un lado a otro/], ['trompo', /trompo|dando vueltas|girando/], ['zigzag', /zig ?zag/], ['cucaracha', /cucaracha/],
 ];
 const CANCIONES_VOZ = [
     ['estrellita', /estrellita|estrellita brillante/], ['cumple', /cumple|feliz cumple/], ['cucaracha', /cucaracha/],
@@ -1159,6 +1213,24 @@ function ordenDeVoz(texto) {
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
     const dice0 = r => r.test(tp);
+    if (dice0(/ruleta|casino|apuesta|apuestas/)) return quita ? { a: 'paro' } : { a: 'ruleta' };
+    if (dice0(/\b(gracias|grax)\b/)) return { a: 'charla', t: 'gracias' };
+    if (dice0(/como estas|como andas|como te va|como amaneciste|que onda|que tal|como te sientes/)) return { a: 'charla', t: 'estado' };
+    if (dice0(/chiste|chistes|hazme reir|hacerme reir|algo gracioso/)) return { a: 'charla', t: 'chiste' };
+    if (dice0(/que hora|la hora/)) return { a: 'charla', t: 'hora' };
+    if (dice0(/que dia|la fecha|a cuanto estamos|que fecha/)) return { a: 'charla', t: 'fecha' };
+    if (dice0(/quien eres|que eres|como te llamas|tu nombre|presentate/)) return { a: 'charla', t: 'quien' };
+    if (dice0(/que puedes hacer|que hacer|que sabes hacer|que haces|ayuda|ayudame|comandos|que te puedo decir/)) return { a: 'charla', t: 'ayuda' };
+    if (dice0(/adios|hasta luego|nos vemos|\bbye\b|chao|hasta manana|buenas noches amigo/)) return { a: 'charla', t: 'adios' };
+    if (dice0(/eres (el )?(mejor|crack|genial|chido|grande|increible|bueno|padre)|te quiero|te amo|buen trabajo|bien hecho|muy bien|buen chico|felicidades|eres un crack/)) return { a: 'charla', t: 'elogio' };
+    if (dice0(/\b(tonto|inutil|malo|menso|estupido|bobo|feo|torpe)\b/)) return { a: 'charla', t: 'queja' };
+    const verboBaile = /\b(baila|bailar|bailes|baile|bailando|bailemos|bailamos)\b|ponte a bailar|a bailar/.test(tp);
+    if (verboBaile) {
+        if (quita) return { a: 'paro' };
+        const bl = BAILES_VOZ.find(x => x[1].test(tp));
+        const cn = CANCIONES_VOZ.find(x => x[1].test(tp));
+        return { a: 'baile', id: bl ? bl[0] : null, cancion: cn ? cn[0] : null };
+    }
     if (dice0(/\b(cancion|canciones|musica|melodia)\b/) && quita) return { a: 'cancionParar' };
     const cancion = CANCIONES_VOZ.find(c => c[1].test(tp));
     const verboCancion = /\b(toca|tocar|pon|poner|reproduce|reproducir|canta|cantar|suena|sonar|escuchar|cancion|musica|melodia)\b/.test(tp);
@@ -1191,7 +1263,7 @@ function ordenDeVoz(texto) {
     if (dice(/turbo/)) return { a: 'turbo', on: !quita };
     if (dice(/bateria|pilas|carga|energia/)) return { a: 'bateria' };
     if (dice(/claxon|pito|pitar|bocina|pitido/)) return { a: 'claxon' };
-    if (dice(/\b(hola|quien eres|que eres|presentate|como estas|estas ahi|buenos dias|buenas tardes|buenas noches)\b/)) return { a: 'saludo' };
+    if (dice(/\b(hola|holi|ey|buenas|estas ahi|buenos dias|buenas tardes|buenas noches|presente|despierta)\b/)) return { a: 'saludo' };
     const fig = dice(/circulo|redondo|redonda/) ? 'circulo' : dice(/cuadrado|cuadro/) ? 'cuadrado' : dice(/triangulo/) ? 'triangulo' : dice(/estrella/) ? 'estrella' : null;
     if (fig) return { a: 'figura', f: fig };
     const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
@@ -1224,10 +1296,53 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
     return { izq: 0, der: 0, cerca, bloqueado: true };
 }
 
+const RULETA_N = 12;
+const RULETA_ROJO = [170, 0, 0], RULETA_NEGRO = [6, 6, 6], RULETA_BOLA = [0, 255, 60];
+
+function ruletaColor(i) { return i % 2 === 0 ? 'rojo' : 'negro'; }
+
+function ruletaPlan(azar, vueltas, duracionMs) {
+    const r = typeof azar === 'function' ? azar : Math.random;
+    const laps = Math.round(clamp(vueltas, 1, 14));
+    const dur = duracionMs || laps * 2250;
+    const inicio = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N)), destino = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N));
+    const rnd = r();
+    const tipo = rnd < 0.4 ? 'directo' : rnd < 0.7 ? 'rebote' : 'doble';
+    const llegada = tipo === 'rebote' ? (destino + 1) % RULETA_N : tipo === 'doble' ? (destino + RULETA_N - 1) % RULETA_N : destino;
+    const n = laps * RULETA_N + ((llegada - inicio + RULETA_N) % RULETA_N);
+    const c = 1.7 + r() * 0.9;
+    const d0 = dur * c / (n * (Math.exp(c) - 1));
+    const pasos = [];
+    let t = 0;
+    for (let k = 1; k <= n; k++) {
+        t += d0 * Math.exp(c * k / n) * (0.88 + r() * 0.24);
+        pasos.push({ pos: (inicio + k) % RULETA_N, t: Math.round(t) });
+    }
+    if (tipo === 'rebote') {
+        t += 160 + r() * 260;
+        pasos.push({ pos: destino, t: Math.round(t) });
+    } else if (tipo === 'doble') {
+        t += 280 + r() * 520;
+        pasos.push({ pos: destino, t: Math.round(t) });
+    }
+    return { inicio, destino, tipo, pasos, dur: Math.round(t + 350), num: destino + 1, color: ruletaColor(destino) };
+}
+
+function ruletaPosEn(plan, t) {
+    let pos = plan.inicio;
+    for (const p of plan.pasos) { if (p.t <= t) pos = p.pos; else break; }
+    return pos;
+}
+
+function ruletaColores(pos, bola) {
+    return Array.from({ length: RULETA_N }, (_, i) => (bola && i === pos ? RULETA_BOLA : (ruletaColor(i) === 'rojo' ? RULETA_ROJO : RULETA_NEGRO)));
+}
+
 const lib = {
+    ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
-    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
@@ -1275,6 +1390,7 @@ const S = {
     fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
+    ruleta: null, modoRuleta: false, ruletaSonido: true,
     distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
@@ -1337,6 +1453,16 @@ function mensaje(texto, tipo) {
     const el = $('rb-msg');
     el.textContent = texto || '';
     el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+    clearTimeout(mensaje.t);
+    if (texto && document.documentElement.classList.contains('es-app')) mensaje.t = setTimeout(() => { el.textContent = ''; }, 7000);
+}
+
+function toque(ms) {
+    if (document.documentElement.classList.contains('es-app') && navigator.vibrate) navigator.vibrate(ms);
+}
+
+function pantallaViva(si, razon) {
+    if (raiz.RobotControl && raiz.RobotControl.pantalla) raiz.RobotControl.pantalla(si, razon);
 }
 
 const TEXTO_ESTADO = {
@@ -1353,7 +1479,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
         if ($('rb-instalar')) $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1887,6 +2013,7 @@ function elegirBaile() {
     if (S.corriendoFuncion) paro();
     S.funcion = '';
     S.modoBaile = true;
+    S.modoRuleta = false;
     if (S.baile === 'quieto' && S.pasos.trim() === '') {
         const b = BAILES.find(x => x.id !== 'quieto');
         S.baile = b.id;
@@ -1897,10 +2024,124 @@ function elegirBaile() {
     mensaje('Baile puesto: ajústalo abajo y pulsa Bailar y cantar.', 'ok');
 }
 
+function abrirVentanaFuncion() {
+    const d = $('rb-fn-ventana');
+    if (!d || d.open) return;
+    const f = funcionActual();
+    let titulo = '', ids = [];
+    if (S.modoRuleta && !S.funcion) { titulo = 'Ruleta de casino'; ids = ['rb-ruleta-panel']; }
+    else if (S.modoBaile && !S.funcion) { titulo = 'Baile'; ids = ['rb-baile-panel']; }
+    else if (f) { titulo = f.nombre; ids = f.modo === 6 ? ['rb-ln', 'rb-fn-generico'] : ['rb-fn-generico']; }
+    else return;
+    $('rb-fn-ventana-titulo').textContent = titulo;
+    const cuerpo = $('rb-fn-ventana-cuerpo');
+    ids.forEach(id => cuerpo.appendChild($(id)));
+    d.showModal();
+}
+
+function cerrarSuave(d) {
+    if (!d || !d.open) return;
+    if (!document.documentElement.classList.contains('es-app') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { d.close(); return; }
+    d.classList.add('is-cerrando');
+    setTimeout(() => { d.close(); d.classList.remove('is-cerrando'); }, 190);
+}
+
+function cerrarVentanaFuncion() {
+    cerrarSuave($('rb-fn-ventana'));
+}
+
+function cascada() {
+    document.querySelectorAll('.rb-fn-lista, .rb-modelos, .rb-figuras, .rb-frases, .rb-herr__rejilla, .rb-vz-lista').forEach(el => {
+        el.classList.add('is-entrando');
+        clearTimeout(el.cascadaT);
+        el.cascadaT = setTimeout(() => el.classList.remove('is-entrando'), 1000);
+    });
+}
+
+function guardarPanelesFuncion() {
+    const almacen = $('rb-fn-almacen'), cuerpo = $('rb-fn-ventana-cuerpo');
+    if ($('rb-fn-ventana').open) return;
+    [...cuerpo.children].forEach(n => almacen.appendChild(n));
+}
+
+function elegirRuleta() {
+    if (S.corriendoFuncion || S.actuando) paro();
+    S.funcion = '';
+    S.modoBaile = false;
+    S.modoRuleta = true;
+    guardar();
+    pintarTodo();
+    mensaje('Ruleta lista: pulsa Girar la ruleta.', 'ok');
+}
+
+function pararRuleta() {
+    const R = S.ruleta;
+    if (!R) return;
+    clearInterval(R.timer);
+    clearInterval(R.parpadeo);
+    pantallaViva(false, 'ruleta');
+    S.ruleta = null;
+    S.sucio = true;
+    const b = $('rb-rul-girar');
+    if (b) b.textContent = 'Girar la ruleta';
+}
+
+function girarRuleta(vueltas, alTerminar) {
+    if (S.estado !== 'listo') { mensaje('Conecta el robot primero.', 'err'); return false; }
+    if (S.ruleta) return false;
+    if (S.corriendoFuncion || S.actuando) paro();
+    const plan = ruletaPlan(Math.random, vueltas || 8);
+    const R = { plan, t0: performance.now(), ult: -1, timer: null, parpadeo: null };
+    S.ruleta = R;
+    pantallaViva(true, 'ruleta');
+    S.guardarEn = 0;
+    $('rb-rul-girar').textContent = 'Parar';
+    $('rb-rul-res').textContent = '';
+    $('rb-rul-res').className = 'rb-rul-res';
+    mensaje('La ruleta está girando…');
+    const frame = (pos, bola) => 'LS ' + marcoHex(ruletaColores(pos, bola), Math.max(S.brillo, 30));
+    R.timer = setInterval(() => {
+        if (S.estado !== 'listo') { pararRuleta(); return; }
+        const ms = performance.now() - R.t0;
+        if (ms < plan.dur) {
+            const pos = ruletaPosEn(plan, ms);
+            if (pos === R.ult) return;
+            R.ult = pos;
+            toque(5);
+            if (!S.cola.ocupado()) S.cola.ultimo('RL', frame(pos, true));
+            if (S.ruletaSonido) S.cola.ultimo('T', 'T 1800 10');
+            return;
+        }
+        clearInterval(R.timer);
+        toque([40, 60, 90]);
+        let n = 0;
+        S.cola.enviar([{ l: frame(plan.destino, true), ex: true }]);
+        if (S.ruletaSonido) S.cola.enviar(['T 784 120', 'T 988 120', 'T 1319 260']);
+        R.parpadeo = setInterval(() => {
+            if (S.estado !== 'listo') { pararRuleta(); return; }
+            n++;
+            S.cola.enviar([{ l: frame(plan.destino, n % 2 === 0), ex: true }]);
+            if (n < 12) return;
+            clearInterval(R.parpadeo);
+            S.ruleta = null;
+            pantallaViva(false, 'ruleta');
+            S.sucio = true;
+            $('rb-rul-girar').textContent = 'Girar la ruleta';
+            const res = $('rb-rul-res');
+            res.textContent = `${plan.num} ${plan.color}`;
+            res.className = 'rb-rul-res is-' + plan.color;
+            mensaje(`Cayó en el ${plan.num}, ${plan.color}.`, 'ok');
+            if (alTerminar) alTerminar({ num: plan.num, color: plan.color });
+        }, 260);
+    }, 35);
+    return true;
+}
+
 function elegirFuncion(id) {
     if (S.corriendoFuncion) paro();
     const habiaBaile = S.baile !== 'quieto' || S.pasos.trim() !== '';
     S.modoBaile = false;
+    S.modoRuleta = false;
     S.funcion = id;
     if (id) {
         S.baile = 'quieto';
@@ -1954,10 +2195,10 @@ function pintarFunciones() {
     const f = funcionActual();
     $('rb-fn-var').value = v.id;
     $('rb-fn-nota').textContent = v.nota;
-    const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile : x.id === S.funcion);
+    const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === 'ruleta' ? S.modoRuleta && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile && !S.modoRuleta : x.id === S.funcion);
     const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${marca(x) ? ' checked' : ''}>`
         + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
-        + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}</label>`;
+        + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}${x.id === '' ? '' : '<span class="rb-fn__cfg">Toca otra vez para ajustar</span>'}</label>`;
     const ninguna = tarjeta({ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' });
     const grupos = GRUPOS_FN.map(g => {
         const fs = FUNCIONES.filter(x => x.v.includes(v.id) && g.ids.includes(x.id));
@@ -1965,7 +2206,10 @@ function pintarFunciones() {
     }).join('');
     const baile = tarjeta({ id: 'baile', nombre: 'Baile', desc: 'Mueve las ruedas al ritmo de una canción, con luces. Al elegirlo se abren sus ajustes.' });
     $('rb-baile-panel').hidden = !(S.modoBaile && !S.funcion);
-    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}</div>${grupos}`;
+    $('rb-ruleta-panel').hidden = !(S.modoRuleta && !S.funcion);
+    $('rb-rul-sonido').checked = S.ruletaSonido;
+    const ruleta = tarjeta({ id: 'ruleta', nombre: 'Ruleta', desc: 'Ruleta de casino con los LEDs: rojo y negro, una bolita que gira, va frenando y cae en un número.' });
+    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}${ruleta}</div>${grupos}`;
     $('rb-fn-modelos').innerHTML = VARIANTES.map(x =>
         `<button type="button" role="radio" class="rb-modelo" data-v="${x.id}" aria-checked="${x.id === v.id}">`
         + `<svg class="icon" aria-hidden="true"><use href="#i-mod-${x.id}"/></svg><span>${x.nombre}</span></button>`).join('');
@@ -1995,6 +2239,7 @@ function pintarFunciones() {
 
 function paro() {
     document.dispatchEvent(new CustomEvent('robot-paro'));
+    pararRuleta();
     pararMusicaAutonoma();
     S.ultimaActividad = Date.now();
     S.actuando = false;
@@ -2243,6 +2488,98 @@ function convertirAudio() {
     cambio('cancion');
     const que = melodia ? n.filter(x => x.hz > 0).length + ' notas' : intervalos.length + ' golpes';
     infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
+}
+
+const REGISTROS_CANTO = { hombre: [80, 400], media: [120, 700], aguda: [200, 1000] };
+let cantando = null;
+
+function infoCanto(texto, tipo) {
+    const el = $('rb-cant-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function dibujarNivelCanto(niveles) {
+    const cv = $('rb-cant-nivel'), g = cv.getContext('2d'), n = 48, ancho = cv.width / n, falta = n - niveles.length;
+    g.clearRect(0, 0, cv.width, cv.height);
+    for (let i = 0; i < n; i++) {
+        const v = i >= falta ? niveles[i - falta] : undefined;
+        const h = v === undefined ? 3 : Math.max(3, v * (cv.height - 6));
+        g.fillStyle = 'oklch(0.55 0.2 27)';
+        g.beginPath();
+        g.roundRect(i * ancho + 1, (cv.height - h) / 2, ancho - 3, h, 2);
+        g.fill();
+    }
+}
+
+function melodiaDeCanto(buffer) {
+    const { x, sr } = monoVentana(buffer, 0, Math.min(buffer.duration, 60));
+    const reg = REGISTROS_CANTO[$('rb-cant-voz').value] || REGISTROS_CANTO.media;
+    const r = melodiaDeAudio(x, sr, { fMin: reg[0], fMax: reg[1], sens: 60, tonalidad: $('rb-cant-tonal').checked, subir: true });
+    if (!r.texto) return infoCanto('No encontré una melodía clara. Canta más fuerte y cerca del micrófono, sin ruido ni música de fondo.', 'err');
+    const n = leerNotas(r.texto).notas;
+    const total = n.reduce((suma, q) => suma + (q.ms || 0), 0);
+    const bpm = estimarBpm(r.intervalos);
+    S.notas = r.texto;
+    S.cancion = 'propia';
+    if (bpm) S.bpm = bpm;
+    $('rb-nombre').value = '';
+    pintarCanciones();
+    pintarTodo();
+    cambio('cancion');
+    infoCanto(`Listo: ${n.filter(q => q.hz > 0).length} notas en ${(total / 1000).toFixed(1)} s.${r.tonalidad ? ' Tonalidad: ' + r.tonalidad + '.' : ''} Ponle nombre arriba (Canción) para guardarla.`, 'ok');
+    if ($('rb-cant-oir').checked) { if (S.estado === 'listo') actuar(true, false); else escucharAqui(); }
+}
+
+async function alternarCanto() {
+    if (cantando) { cantando.parar(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) return infoCanto('Este celular no deja grabar audio aquí.', 'err');
+    let flujo;
+    try {
+        flujo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch (e) {
+        return infoCanto('No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.', 'err');
+    }
+    detenerAudio();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx(), analizador = ctx.createAnalyser();
+    analizador.fftSize = 512;
+    ctx.createMediaStreamSource(flujo).connect(analizador);
+    const buf = new Uint8Array(analizador.fftSize), niveles = [], trozos = [], rec = new MediaRecorder(flujo), t0 = Date.now();
+    const b = $('rb-cant-grabar');
+    b.lastChild.textContent = ' Parar';
+    b.classList.add('is-grabando');
+    infoCanto('Cantando… pulsa Parar cuando termines (máximo 60 s).');
+    const timer = setInterval(() => {
+        analizador.getByteTimeDomainData(buf);
+        let suma = 0;
+        for (let j = 0; j < buf.length; j++) { const v = (buf[j] - 128) / 128; suma += v * v; }
+        niveles.push(Math.min(1, Math.sqrt(suma / buf.length) * 4));
+        const seg = Math.floor((Date.now() - t0) / 1000);
+        $('rb-cant-tiempo').textContent = `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+        dibujarNivelCanto(niveles.slice(-48));
+        if (Date.now() - t0 > 60000 && rec.state === 'recording') rec.stop();
+    }, 70);
+    cantando = { parar: () => { if (rec.state === 'recording') rec.stop(); } };
+    rec.ondataavailable = e => { if (e.data && e.data.size) trozos.push(e.data); };
+    rec.onstop = async () => {
+        clearInterval(timer);
+        flujo.getTracks().forEach(t => t.stop());
+        cantando = null;
+        b.lastChild.textContent = ' Grabar';
+        b.classList.remove('is-grabando');
+        const blob = new Blob(trozos, { type: rec.mimeType || 'audio/webm' });
+        try {
+            if (blob.size < 2000) return infoCanto('No se oyó nada: intenta otra vez más cerca del micrófono.', 'err');
+            infoCanto('Convirtiendo tu voz en pitidos…');
+            melodiaDeCanto(await ctx.decodeAudioData(await blob.arrayBuffer()));
+        } catch (e) {
+            infoCanto('No pude analizar la grabación. Intenta otra vez.', 'err');
+        } finally {
+            ctx.close();
+        }
+    };
+    rec.start();
 }
 
 // Corre un generador cediendo el hilo entre pasos, para mostrar el avance sin congelar la página
@@ -2624,7 +2961,7 @@ function seccionRobotActual() {
 
 function pintarBarra() {
     const sec = seccionRobotActual();
-    $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
+    $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoRuleta && !S.funcion ? 'la ruleta' : sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
     $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar'].includes(sec);
 }
 
@@ -2633,6 +2970,7 @@ function reproducirGeneral() {
     const sec = seccionRobotActual();
     const listo = S.estado === 'listo';
     if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
+    if (sec === 'robot-funciones' && S.modoRuleta && !S.funcion) return girarRuleta(8);
     if (sec === 'robot-funciones') return S.modoBaile && !S.funcion ? (listo ? actuar(true, true) : escucharAqui()) : iniciarFuncion();
     if (sec === 'robot-luces') {
         if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
@@ -2657,7 +2995,7 @@ function iniciarBarraYBateria() {
     });
     $('rb-barra-paro').addEventListener('click', pararTodo);
     $('rb-barra-play').addEventListener('click', reproducirGeneral);
-    document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); });
+    document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); cascada(); });
     pintarBarra();
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto
     $('rb-bat-quim').value = S.bateria.quimica;
@@ -2745,6 +3083,7 @@ function iniciar() {
     });
     $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
     $('rb-aud-convertir').addEventListener('click', convertirAudio);
+    $('rb-cant-grabar').addEventListener('click', alternarCanto);
     $('rb-bpm').addEventListener('input', e => {
         S.bpm = Number(e.target.value);
         $('rb-bpm-v').textContent = S.bpm + ' tiempos por minuto';
@@ -2780,6 +3119,27 @@ function iniciar() {
     $('rb-fn-vel').addEventListener('input', ponVel);
 
     // Funciones por modelo
+    let previo = false;
+    const listaFn = $('rb-fn-lista');
+    listaFn.addEventListener('pointerdown', e => {
+        const c = e.target.closest('.rb-fn');
+        previo = !!(c && c.querySelector('input').checked);
+    });
+    listaFn.addEventListener('click', e => {
+        const c = e.target.closest('.rb-fn');
+        if (c && previo && c.querySelector('input').value !== '') abrirVentanaFuncion();
+        previo = false;
+    });
+    listaFn.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.matches('input[type="radio"]') && e.target.checked && e.target.value !== '') abrirVentanaFuncion();
+    });
+    $('rb-fn-ventana').addEventListener('close', guardarPanelesFuncion);
+    let origenFuera = false;
+    $('rb-fn-ventana').addEventListener('pointerdown', e => { origenFuera = e.target === $('rb-fn-ventana'); });
+    $('rb-fn-ventana').addEventListener('click', e => {
+        if (e.target === $('rb-fn-ventana') && origenFuera) cerrarVentanaFuncion();
+        origenFuera = false;
+    });
     $('rb-fn-modelos').addEventListener('click', e => {
         const b = e.target.closest('[data-v]');
         if (!b) return;
@@ -2795,7 +3155,7 @@ function iniciar() {
     });
     $('rb-fn-lista').addEventListener('change', e => {
         if (e.target.name !== 'rb-fn') return;
-        if (e.target.value === 'baile') elegirBaile(); else elegirFuncion(e.target.value);
+        if (e.target.value === 'baile') elegirBaile(); else if (e.target.value === 'ruleta') elegirRuleta(); else elegirFuncion(e.target.value);
     });
     $('rb-fn-luces').addEventListener('change', e => { S.funLuces = e.target.checked; cambio('led'); });
     $('rb-fn-musica').addEventListener('change', e => { S.funMusica = e.target.checked; cambio('funcion'); });
@@ -2816,6 +3176,8 @@ function iniciar() {
     ['rb-ln-vel', 'rb-ln-giro', 'rb-ln-buscar'].forEach(id => $(id).addEventListener('input', lineaCambio));
     $('rb-ln-color').addEventListener('change', lineaCambio);
     $('rb-ln-ver').addEventListener('click', alternarSensores);
+    $('rb-rul-girar').addEventListener('click', () => { if (S.ruleta) paro(); else girarRuleta(Number($('rb-rul-dur').value) || 8); });
+    $('rb-rul-sonido').addEventListener('change', e => { S.ruletaSonido = e.target.checked; });
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
     $('rb-baile-guardar').addEventListener('click', guardarBaile);
     $('rb-baile-auto').addEventListener('change', e => { S.baileAuto = e.target.checked; guardar(); });
@@ -2880,6 +3242,7 @@ function iniciar() {
     window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
 
     // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
+    raiz.RobotUI = { cerrarSuave };
     raiz.RobotEnlace = {
         estado: () => S.estado,
         listo: () => S.estado === 'listo',
@@ -2899,6 +3262,23 @@ function iniciar() {
             pintarFunciones();
             iniciarFuncion();
             return { nombre: f.nombre, modelo: cambio ? VARIANTES.find(v => v.id === S.variante).nombre : '' };
+        },
+        ruleta(alTerminar) { return girarRuleta(8, alTerminar); },
+        bailar(idBaile, idCancion) {
+            if (S.estado !== 'listo') return null;
+            if (S.corriendoFuncion || S.actuando) paro();
+            S.funcion = '';
+            S.modoBaile = true;
+            let b = BAILES.find(x => x.id === idBaile);
+            if (!b) b = BAILES.find(x => x.id === S.baile && x.id !== 'quieto') || BAILES[0];
+            S.baile = b.id;
+            S.pasos = b.texto;
+            const c = idCancion ? CANCIONES.find(x => x.id === idCancion) : null;
+            if (c) { S.cancion = c.id; S.notas = c.texto; S.bpm = c.bpm; }
+            guardar();
+            pintarTodo();
+            setTimeout(() => actuar(true, true), 400);
+            return { baile: b.nombre, cancion: c ? c.nombre : '' };
         },
         canciones: () => CANCIONES.map(c => ({ id: c.id, nombre: c.nombre })).concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre }))),
         cancionActual: () => S.cancion,
