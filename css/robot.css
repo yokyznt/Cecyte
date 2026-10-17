@@ -382,3 +382,16 @@
 .rb-aud-item.is-error span { color: var(--rose-700); }
 .rb-avanzado > summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
 .rb-avanzado[open] > summary { margin-bottom: 8px; }
+
+.rb-menu--extra { width: min(400px, 58vw); }
+.rb-extra__t { margin: 10px 4px 2px; font-size: var(--fs-cap); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--m-tenue); }
+.rb-extra__fila { display: flex; gap: 6px; }
+.rb-extra__fila .rb-cancion { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; }
+.rb-lienzo { width: 100%; height: auto; border-radius: 14px; touch-action: none; background: var(--m-base); }
+.rb-lienzo--radar { max-width: 240px; align-self: center; }
+.rb-lienzo[hidden] { display: none; }
+.rb-extra__cal { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px; font-size: var(--fs-sm); color: var(--m-texto); }
+.rb-extra__cal input { width: 84px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--m-tapa); color: var(--m-texto); font: inherit; text-align: center; }
+.rb-cancion--jarvis .icon { background: var(--m-naranja); color: var(--m-base); }
+.rb-cancion.is-activo, .rb-cancion[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
+.rb-cancion--jarvis.is-activo .icon { background: var(--m-base); color: var(--m-verde); }

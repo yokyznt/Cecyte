@@ -1019,6 +1019,114 @@ function pasoEn(r, t) {
     return paso;
 }
 
+const RUTA_VEL = 110, RUTA_CM_S = 22, RUTA_PAUSA_MS = 120;
+
+function rutaARecorrido(puntos, cmS, giro90, nombre) {
+    if (!Array.isArray(puntos) || puntos.length < 2) return null;
+    const v = clamp(Number(cmS) || RUTA_CM_S, 3, 200), g = clamp(Number(giro90) || 500, 100, 3000);
+    const pasos = [];
+    let t = 0, rumbo = 0;
+    const poner = (izq, der, ms) => { pasos.push({ t: Math.round(t), izq, der }); t += ms; };
+    for (let i = 1; i < puntos.length; i++) {
+        const dx = puntos[i].x - puntos[i - 1].x, dy = puntos[i].y - puntos[i - 1].y;
+        const d = Math.hypot(dx, dy);
+        if (d < 1) continue;
+        let giro = Math.atan2(dx, dy) * 180 / Math.PI - rumbo;
+        giro = ((giro + 540) % 360) - 180;
+        rumbo += giro;
+        if (Math.abs(giro) >= 3) {
+            poner(giro > 0 ? RUTA_VEL : -RUTA_VEL, giro > 0 ? -RUTA_VEL : RUTA_VEL, Math.abs(giro) / 90 * g);
+            poner(0, 0, RUTA_PAUSA_MS);
+        }
+        poner(RUTA_VEL, RUTA_VEL, d / v * 1000);
+        poner(0, 0, RUTA_PAUSA_MS);
+    }
+    return pasos.length ? validarRecorrido({ nombre: nombre || 'Ruta', ms: Math.round(t), pasos }) : null;
+}
+
+function giroARecorrido(grados, giro90) {
+    const g = clamp(Number(giro90) || 500, 100, 3000), a = clamp(Number(grados) || 0, -720, 720);
+    if (!a) return null;
+    const ms = Math.round(Math.abs(a) / 90 * g);
+    return validarRecorrido({ nombre: 'Giro', ms, pasos: [{ t: 0, izq: a > 0 ? RUTA_VEL : -RUTA_VEL, der: a > 0 ? -RUTA_VEL : RUTA_VEL }, { t: ms, izq: 0, der: 0 }] });
+}
+
+function movimientoARecorrido(sentido, ms) {
+    const d = clamp(Math.round(Number(ms) || 0), 200, 20000);
+    const v = sentido < 0 ? -RUTA_VEL : RUTA_VEL;
+    return validarRecorrido({ nombre: 'Mover', ms: d, pasos: [{ t: 0, izq: v, der: v }, { t: d, izq: 0, der: 0 }] });
+}
+
+function inversoDeRecorrido(pasos, msTotal, nombre) {
+    if (!Array.isArray(pasos) || !pasos.length) return null;
+    const total = Math.max(msTotal, pasos[pasos.length - 1].t);
+    const tramos = pasos.map((p, i) => ({ izq: p.izq, der: p.der, dur: (i + 1 < pasos.length ? pasos[i + 1].t : total) - p.t })).filter(x => x.dur > 0);
+    const salida = [];
+    let t = 0;
+    for (let i = tramos.length - 1; i >= 0; i--) {
+        salida.push({ t: Math.round(t), izq: -tramos[i].izq || 0, der: -tramos[i].der || 0 });
+        t += tramos[i].dur;
+    }
+    return validarRecorrido({ nombre: nombre || 'Casa', ms: Math.round(t), pasos: salida });
+}
+
+function figura(nombre, lado) {
+    const L = clamp(Number(lado) || 60, 15, 300);
+    const poligono = (n, giroExt) => {
+        const pts = [{ x: 0, y: 0 }];
+        let r = 0;
+        for (let i = 0; i < n; i++) {
+            const a = r * Math.PI / 180, p = pts[pts.length - 1];
+            pts.push({ x: p.x + L * Math.sin(a), y: p.y + L * Math.cos(a) });
+            r += giroExt;
+        }
+        return pts;
+    };
+    if (nombre === 'cuadrado') return poligono(4, 90);
+    if (nombre === 'triangulo') return poligono(3, 120);
+    if (nombre === 'estrella') return poligono(5, 144);
+    if (nombre === 'circulo') {
+        const R = L / 2, pts = [];
+        for (let a = 0; a <= 360; a += 15) {
+            const r = a * Math.PI / 180;
+            pts.push({ x: R - R * Math.cos(r), y: R * Math.sin(r) });
+        }
+        return pts;
+    }
+    return null;
+}
+
+function sinAcentos(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+function ordenDeVoz(texto) {
+    const t = sinAcentos(texto).replace(/^(oye |hey |ok )?jarvis ?/, '');
+    if (!t) return null;
+    const dice = r => r.test(t);
+    if (dice(/\b(para(?! atras)|alto|detente|detenerte|frena|stop|basta)\b/)) return { a: 'paro' };
+    if (dice(/guardia|vigila|vigilancia/)) return { a: 'guardia', on: !dice(/\b(quita|apaga|desactiva|deja de|termina|cancela)\b/) };
+    if (dice(/\b(regresa|vuelve|ven|regreso)\b.*\bcasa\b|\bcasa\b/)) return { a: 'casa' };
+    if (dice(/radar|escanea|escaner|mapa/)) return { a: 'radar' };
+    if (dice(/turbo/)) return { a: 'turbo', on: !dice(/\b(quita|apaga|desactiva|sin)\b/) };
+    if (dice(/bateria|pilas|carga/)) return { a: 'bateria' };
+    if (dice(/claxon|pito|bocina|toca el claxon/)) return { a: 'claxon' };
+    if (dice(/\b(hola|quien eres|que eres|presentate)\b/)) return { a: 'saludo' };
+    const fig = dice(/circulo|redondo/) ? 'circulo' : dice(/cuadrado/) ? 'cuadrado' : dice(/triangulo/) ? 'triangulo' : dice(/estrella/) ? 'estrella' : null;
+    if (fig && dice(/\b(dibuja|haz|traza|hacer|dibujar|forma)\b/)) return { a: 'figura', f: fig };
+    const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
+    const n = num ? parseFloat(num.replace(',', '.')) : null;
+    if (dice(/\b(da la vuelta|media vuelta|date la vuelta|dar la vuelta)\b/)) return { a: 'giro', grados: 180 };
+    if (dice(/\b(gira|girar|voltea|vuelta|dobla)\b/)) {
+        const lado = dice(/izquierda/) ? -1 : 1;
+        return { a: 'giro', grados: lado * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) };
+    }
+    const sentido = dice(/\b(atras|reversa|retrocede|reversa|para atras)\b/) ? -1 : dice(/\b(avanza|adelante|ve|camina|anda|sigue|derecho|recto)\b/) ? 1 : 0;
+    if (sentido) {
+        const metros = dice(/metro/), seg = dice(/segundo/);
+        return { a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && dice(/centimetro|cm/) ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null };
+    }
+    return null;
+}
+
 // ---------- Freno por obstáculo del mando ----------
 // Si va hacia adelante y las dos últimas lecturas de DIST están más cerca que el umbral (15 cm; 35 en turbo, que frena peor),
 // no avanza. Retroceder y girar en el sitio siguen permitidos. Una lectura vieja (el robot dejó de contestar) no frena:
@@ -1036,6 +1144,7 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
 const lib = {
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
@@ -2601,6 +2710,7 @@ function iniciar() {
         soportaDistancia: () => S.estado === 'listo' && S.fwDist,
         pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
         distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
+        giro90: () => S.giro90,
         soportaSenal: () => S.estado === 'listo' && S.fwDir,
         senal(tipo, v) { if (S.estado === 'listo' && S.fwDir) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
