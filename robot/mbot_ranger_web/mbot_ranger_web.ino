@@ -34,7 +34,9 @@
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
     LINEA clave valor ajustes del seguidor de línea (puerto 9): vel 40..150, giro 10..100, buscar ms, color 0/1
-    MODE 7          se acerca despacio a lo de enfrente y se detiene a 10 cm, pitando más rápido al acercarse (PARK=1 en INFO)
+    G n              gira n grados (-360..360, positivo = derecha) con el giroscopio; INFO trae GIRO=1 si lo hay
+    PADD G grados    en el show: gira esos grados (como G)
+    MODE 7         se acerca despacio a lo de enfrente y se detiene a 10 cm, pitando más rápido al acercarse (PARK=1 en INFO)
     PADD O modo s    en el show: corre el modo (1, 2, 6 o 7) durante s segundos (1..255) y sigue con lo siguiente
     SENS             responde "SENS 01": lo que ven los dos sensores de línea (1 = nivel alto)
     DIR i|d|x|o      direccional izquierda, derecha, intermitentes o apagar (se apaga sola a los 4 s sin repetir)
@@ -112,21 +114,19 @@ void ledsMuestra() {
 
 // Sensor ultrasónico del puerto 10 (señal en A11): igual que la librería, pero sin floats
 int distanciaCm() {                        // 400 si no hay eco
-  pinMode(A11, OUTPUT);
-  digitalWrite(A11, LOW);
+  DDRK |= _BV(PK3);
+  PORTK &= ~_BV(PK3);
   delayMicroseconds(2);
-  digitalWrite(A11, HIGH);
+  PORTK |= _BV(PK3);
   delayMicroseconds(10);
-  digitalWrite(A11, LOW);
-  pinMode(A11, INPUT);
+  PORTK &= ~_BV(PK3);
+  DDRK &= ~_BV(PK3);
   unsigned long us = pulseIn(A11, HIGH, 30000UL);
   return us == 0 ? 400 : (int)(us / 58);
 }
 
-// Motores del Auriga (SLOT1 = izquierdo, SLOT2 = derecho): pines PWM, H1 y H2 de MeAuriga.h
-const uint8_t MOT_PWM[2] = { 11, 10 };
-const uint8_t MOT_H1[2]  = { 49, 47 };
-const uint8_t MOT_H2[2]  = { 48, 46 };
+// Motores del Auriga (motor 0 = SLOT1, motor 1 = SLOT2): PWM en OC1A (pin 11) y OC2A (pin 10), sentido en PL0/PL1 y PL2/PL3
+// (pines 49/48 y 47/46). Se escriben los registros directo: digitalWrite, pinMode y analogWrite de Arduino pesan ~700 bytes.
 int motUltimo[2] = { 1000, 1000 };
 // Corrección de rumbo (orden TRIM, -30..30): dos motores nunca son idénticos y el robot se va de un lado.
 // Positivo = la rueda derecha va a (100 - n) %, así gira hacia la derecha; negativo = la izquierda se frena.
@@ -136,16 +136,27 @@ void motorPwm(uint8_t m, int pwm) {
   pwm = constrain(pwm, -255, 255);
   if (pwm == motUltimo[m]) return;
   motUltimo[m] = pwm;
+  const uint8_t h1 = m ? _BV(PL2) : _BV(PL0), h2 = m ? _BV(PL3) : _BV(PL1);
   if (pwm < 0) {
-    digitalWrite(MOT_H1[m], LOW);
+    PORTL &= ~h1;
     delayMicroseconds(5);
-    digitalWrite(MOT_H2[m], HIGH);
+    PORTL |= h2;
   } else {
-    digitalWrite(MOT_H1[m], HIGH);
+    PORTL |= h1;
     delayMicroseconds(5);
-    digitalWrite(MOT_H2[m], LOW);
+    PORTL &= ~h2;
   }
-  analogWrite(MOT_PWM[m], abs(pwm));
+  const uint8_t v = abs(pwm);
+  const uint8_t pin = m ? _BV(PB4) : _BV(PB5);
+  const uint8_t com = m ? _BV(COM2A1) : _BV(COM1A1);
+  volatile uint8_t *tccr = m ? &TCCR2A : &TCCR1A;
+  if (v == 0 || v == 255) {
+    *tccr &= ~com;
+    if (v) PORTB |= pin; else PORTB &= ~pin;
+  } else {
+    if (m) OCR2A = v; else OCR1A = v;
+    *tccr |= com;
+  }
 }
 
 const int VEL = 150;                 // 0 a 255. Con 90 las orugas no vencían la fricción: zumbaban sin avanzar
@@ -153,8 +164,6 @@ int velFn = VEL;                     // velocidad de esquivar y seguir la mano (
 const int VEL_MAX = 180;             // tope de lo que puede pedir la página (programas guardados, baile y funciones)
 const int VEL_TURBO = 235;           // tope de la orden M (modo turbo del mando); la rampa de motores() evita el tirón de corriente
 const int DIST_OBSTACULO = 18;       // cm: a menos de esto esquiva (con 20 reaccionaba muy pronto; con 10, se pegaba a las paredes)
-const int PIN_BUZZER = 45;
-const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
 const int MODO_LINEA = 6;            // seguir la línea con el módulo Me Line Follower del puerto 9 (solo por la página)
@@ -457,7 +466,7 @@ uint16_t anchoPermil() {
 void tonoApaga() {
   TCCR5B = 0;
   TCCR5A = 0;
-  digitalWrite(PIN_BUZZER, LOW);
+  PORTL &= ~_BV(PL4);
   tonoFin = 0;
 }
 
@@ -468,7 +477,6 @@ void tonoInicia(int hz) {                  // enciende el zumbador y sigue: lo a
   uint16_t tope = (uint16_t)(ciclos - 1);
   uint32_t ancho = (uint32_t)tope * anchoPermil() / 1000UL;
   if (ancho < 1) ancho = 1;
-  pinMode(PIN_BUZZER, OUTPUT);
   TCCR5A = _BV(COM5B1) | _BV(WGM51);
   TCCR5B = _BV(WGM53) | _BV(WGM52) | cs;
   ICR5 = tope;
@@ -623,7 +631,8 @@ void senalPaso() {
 // a 255 derecha) que sube mientras un sensor ve la línea, se relaja en cuanto vuelve a quedar entre los dos y, si la
 // pierde, sigue creciendo hacia el último lado (arco cada vez más cerrado, y luego hacia el otro lado) hasta hallarla.
 // En las curvas baja la velocidad. Ajustes por la orden LINEA (en RAM): vel, giro, buscar, color.
-const uint8_t LN_S1 = A7, LN_S2 = A12;
+void lnInicia() { DDRF &= ~_BV(PF7); DDRK &= ~_BV(PK4); }
+uint8_t lnLee(uint8_t i) { return i ? (PINK >> 4) & 1 : (PINF >> 7) & 1; }
 uint8_t lnVel = 120, lnGiro = 55, lnColor = 0;
 uint16_t lnBuscarMs = 4000;
 int lnS = 0;
@@ -648,14 +657,13 @@ void seguirLinea() {
     lnPerdidoDesde = 0;
     lnEstado = 255;
     lnUsa = true;
-    pinMode(LN_S1, INPUT);
-    pinMode(LN_S2, INPUT);
+    lnInicia();
   }
   const unsigned long dt = ahora - lnUlt;
   if (dt < 5) return;
   lnUlt = ahora;
-  const bool s1 = (digitalRead(LN_S1) == LOW) != (lnColor == 1);
-  const bool s2 = (digitalRead(LN_S2) == LOW) != (lnColor == 1);
+  const bool s1 = (lnLee(0) == 0) != (lnColor == 1);
+  const bool s2 = (lnLee(1) == 0) != (lnColor == 1);
   int objetivo = 0, ritmo = 2;
   uint8_t estado = 1;
   if (s1 != s2) {
@@ -713,6 +721,60 @@ void parkPaso() {
     tonoFin = t + 40;
     parkBip = t + constrain(d * 8, 80, 700);
   }
+}
+
+const uint8_t GYRO_DIR = 0x69 << 1;
+const int GIRO_ADEL = 3;
+bool giroOk = false;
+bool twiCmd(uint8_t c) {
+  TWCR = _BV(TWINT) | c | _BV(TWEN);
+  for (uint16_t n = 0; n < 30000; n++) if (TWCR & _BV(TWINT)) return true;
+  return false;
+}
+bool twiTx(uint8_t d) { TWDR = d; return twiCmd(0); }
+bool gyroEscribe(uint8_t reg, uint8_t v) {
+  const bool bien = twiCmd(_BV(TWSTA)) && twiTx(GYRO_DIR) && (TWSR & 0xF8) == 0x18 && twiTx(reg) && twiTx(v);
+  TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
+  return bien;
+}
+int16_t gyroZ() {
+  int16_t v = 0;
+  if (twiCmd(_BV(TWSTA)) && twiTx(GYRO_DIR) && twiTx(0x47) && twiCmd(_BV(TWSTA)) && twiTx(GYRO_DIR | 1) && twiCmd(_BV(TWEA))) {
+    v = (int16_t)TWDR << 8;
+    if (twiCmd(0)) v |= TWDR;
+  }
+  TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
+  return v;
+}
+void gyroIni() {
+  PORTD |= 3;
+  TWSR = 0;
+  TWBR = 72;
+  giroOk = gyroEscribe(0x6B, 0) && gyroEscribe(0x1A, 3);
+}
+
+void giroGrados(int grados) {
+  parar();
+  const int g = grados < 0 ? -grados : grados;
+  if (!g || !giroOk) return;
+  espera(120);
+  long reposo = 0;
+  for (uint8_t i = 0; i < 16; i++) { reposo += gyroZ(); espera(3); }
+  reposo /= 16;
+  const long meta = (long)(g - GIRO_ADEL) * 131000L;
+  long suma = 0;
+  const unsigned long t0 = millis();
+  unsigned long tp = t0;
+  if (grados > 0) giraDer(140); else giraIzq(140);
+  const unsigned long tope = min((unsigned long)g * 25 + 1200, 5000UL);
+  while (!abortar && millis() - t0 < tope) {
+    espera(3);
+    const unsigned long t = millis();
+    suma += (long)(gyroZ() - reposo) * (long)(t - tp);
+    tp = t;
+    if ((suma < 0 ? -suma : suma) >= meta) break;
+  }
+  parar();
 }
 
 void pasoModo() {
@@ -851,6 +913,9 @@ void correShow() {
         parar();
         if (corta) { modo = 0; break; }
         modo = MODO_SHOW;
+      } else if (op == 6 && p + 2 <= largo) {
+        giroGrados((int)(EEPROM.read(PGM_DIR + 4 + p) | (EEPROM.read(PGM_DIR + 4 + p + 1) << 8)));
+        p += 2;
       } else {
         break;                               // dato raro: se termina el show
       }
@@ -895,7 +960,8 @@ void imprimeInfo() {
   imprimeBat();
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
-  Serial.print(F(" DIST=1 DIR=1 LIN=1 PARK=1"));
+  Serial.print(F(" DIST=1 DIR=1 LIN=1 PARK=1 GIRO="));
+  Serial.print(giroOk ? 1 : 0);
   Serial.println();
 }
 
@@ -1003,11 +1069,12 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "SENS")) {
     lnUsa = true;
-    pinMode(LN_S1, INPUT);
-    pinMode(LN_S2, INPUT);
+    lnInicia();
     Serial.print(F("SENS "));
-    Serial.print(digitalRead(LN_S1));
-    Serial.println(digitalRead(LN_S2));
+    Serial.print(lnLee(0));
+    Serial.println(lnLee(1));
+  } else if (!strcmp(cmd, "G") && a) {
+    if (giroOk) { giroGrados(constrain(atoi(a), -360, 360)); ok(); } else err(F("giro"));
   } else if (!strcmp(cmd, "PCLR")) {
     EEPROM.update(PGM_DIR, 0);                 // el show queda inválido hasta que PEND lo cierre
     pgmFin = 0;
@@ -1025,6 +1092,9 @@ void ejecuta(char *s) {
       bien = pgmPon(3) && pgmPon((uint8_t)(int8_t)izq) && pgmPon((uint8_t)(int8_t)der);
     } else if (!strcmp(a, "S")) {
       bien = pgmPon(4);
+    } else if (!strcmp(a, "G") && b) {
+      const int g = constrain(atoi(b), -360, 360);
+      bien = pgmPon(6) && pgmPon(g & 0xFF) && pgmPon(g >> 8);
     } else if (!strcmp(a, "O") && b && c) {
       bien = pgmPon(5) && pgmPon(constrain(atoi(b), 0, MODO_PARK)) && pgmPon(constrain(atoi(c), 1, 255));
     }
@@ -1098,12 +1168,8 @@ void setup() {
   TCCR2A = _BV(WGM21) | _BV(WGM20);
   TCCR2B = _BV(CS21);
 
-  for (uint8_t m = 0; m < 2; m++) {
-    pinMode(MOT_PWM[m], OUTPUT);
-    pinMode(MOT_H1[m], OUTPUT);
-    pinMode(MOT_H2[m], OUTPUT);
-  }
-  pinMode(PIN_LEDS, OUTPUT);           // pin 44 = PL5, el que mueve ledsMuestra()
+  DDRB |= _BV(PB4) | _BV(PB5);
+  DDRL |= _BV(PL0) | _BV(PL1) | _BV(PL2) | _BV(PL3) | _BV(PL4) | _BV(PL5);   // sentido de motores, zumbador (45) y anillo (44)
   semilla ^= (uint16_t)analogRead(A0) << 3 | 1;
 
   aplicaModo();
@@ -1114,6 +1180,7 @@ void setup() {
     modo = MODO_SHOW;
     showT0 = millis() + 2500;
   }
+  gyroIni();
   fnCargar();
   if (fnModo && EEPROM.read(FN_DIR + 2)) fnEspera = millis() + 2500;   // arranca sola, a los 2,5 s
   imprimeInfo();

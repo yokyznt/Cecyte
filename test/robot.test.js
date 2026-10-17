@@ -576,7 +576,20 @@ for (const c of R.CANCIONES) {
     assert(Math.abs(fin.x) < 25 && Math.abs(fin.y) < 25, 'el cuadrado vuelve cerca del inicio');
     assert.strictEqual(R.trazoDeSerie(R.itemsDeSerie([{ id: 'esquivar', seg: 20 }], 'tanque')).length, 1, 'las de sensor no se pueden predecir');
 
+    const exacto = R.pasosDeFuncion('AD 1 GD 90° GI 45°', 500, 120, 0, true);
+    assert.deepStrictEqual(exacto.map(p => p.grados || 0), [0, 90, 45], 'con giroscopio los giros llevan sus grados');
+    assert.deepStrictEqual(R.pasosDeFuncion('AD 1 GD 90°', 500, 120, 0), [{ mov: 'AD', beats: 2 }, { mov: 'GD', beats: 1 }], 'sin giroscopio no cambia nada');
+    const girando = R.compilar({ pasos: R.pasosDeFuncion('AD 1 GD 90° GI 45° AD 1', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert.deepStrictEqual(girando.filter(l => l[0] !== 'W'), ['M 110 110', 'G 90', 'G -45', 'M 110 110'], 'los giros salen como G grados y las rectas se reanudan después');
+    const conMusica = R.compilar({ notas: R.leerNotas('C5/4 C5 C5 C5').notas, pasos: R.pasosDeFuncion('GD 90°', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert(!conMusica.some(l => l.startsWith('G ')), 'con música el giro sigue siendo por tiempo (la orden G bloquea las notas)');
+    const progG = R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110, exacto: true });
+    assert(progG.lineas.includes('PADD G 90'), 'la serie guarda el giro exacto');
+    assert(!R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110 }).lineas.some(l => l.startsWith('PADD G')), 'sin giroscopio no hay PADD G');
+
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(a, "G"\)/.test(ino) && /op == 6/.test(ino) && /strcmp\(cmd, "G"\)/.test(ino) && ino.includes('GIRO='), 'el firmware gira con el giroscopio (G, PADD G, INFO GIRO)');
+    assert(!/digitalWrite|digitalRead|pinMode|analogWrite/.test(ino.replace(/\/\/.*$/gm, '')), 'el firmware usa los registros directo (las funciones de pines pesan ~700 bytes)');
     assert(/strcmp\(a, "O"\)/.test(ino) && /pgmPon\(5\)/.test(ino), 'el firmware guarda PADD O');
     assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
 }

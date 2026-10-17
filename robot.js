@@ -114,7 +114,7 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
             let u = c * ciclo;
             for (const p of pasos) {
                 const a = R(u), b = Math.min(R(u + p.beats * beatMs), limite);
-                if (b > a) baile.push({ a, b, mov: p.mov });
+                if (b > a) baile.push({ a, b, mov: p.mov, grados: p.grados });
                 u += p.beats * beatMs;
                 if (u >= limite) break;
             }
@@ -135,6 +135,11 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
         if (luz && s && s.hz > 0 && s.a === a) {
             const h = luz(s.i, s.hz);
             if (h) cmds.push({ l: 'LS ' + h, ms: 0, ex: true });
+        }
+        if (d && d.grados && !s && a === d.a && b === d.b) {
+            movPrev = null;
+            cmds.push({ l: `G ${d.mov === 'GD' ? d.grados : -d.grados}`, ms: b - a });
+            continue;
         }
         if (d && d.mov !== movPrev) {
             movPrev = d.mov;
@@ -408,18 +413,18 @@ const GRUPOS_FN = [
 
 // Pasos de una función ya en tiempos del bpm dado (para que compilar() los pueda mezclar con una canción)
 // y repetidos hasta cubrir al menos minS segundos, así la página no tiene que reiniciarlos a cada rato.
-function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30) {
+function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30, exacto = false) {
     const base = [];
     for (const m of String(texto).matchAll(/\b(AD|AT|GI|GD|PA|CI|CD)\s+(\d+(?:\.\d+)?)(°?)/g)) {
         const n = Number(m[2]);
-        base.push({ mov: m[1], s: m[3] ? n / 90 * giro90 / 1000 : n });
+        base.push(m[3] && exacto ? { mov: m[1], s: n / 90 * giro90 / 1000, grados: n } : { mov: m[1], s: m[3] ? n / 90 * giro90 / 1000 : n });
     }
     const ciclo = base.reduce((a, p) => a + p.s, 0);
     if (!(ciclo > 0)) return [];
     const veces = Math.min(200, Math.max(1, Math.ceil(minS / ciclo)));
     const porSegundo = bpm / 60;
     const pasos = [];
-    for (let i = 0; i < veces; i++) for (const p of base) pasos.push({ mov: p.mov, beats: p.s * porSegundo });
+    for (let i = 0; i < veces; i++) for (const p of base) pasos.push(p.grados ? { mov: p.mov, beats: p.s * porSegundo, grados: p.grados } : { mov: p.mov, beats: p.s * porSegundo });
     return pasos;
 }
 
@@ -877,7 +882,7 @@ function melodiaDeMidi(notas, op = {}) {
 // Show guardado en el robot: la canción y el baile compilados, para que los haga solo, sin la página.
 // Espacio en su EEPROM: nota 5 bytes, espera 3, motores 3, parar 1 (igual que PGM_MAX del firmware).
 const PGM_MAX = 2800;
-const BYTES_ORDEN = { T: 5, W: 3, M: 3, S: 1 };
+const BYTES_ORDEN = { T: 5, W: 3, M: 3, S: 1, G: 3 };
 
 function programaParaRobot(cmds) {
     const lineas = [];
@@ -903,7 +908,7 @@ function itemsDeSerie(serie, variante) {
     return items;
 }
 
-function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = () => [] } = {}) {
+function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = () => [], exacto = false } = {}) {
     const lineas = [];
     let bytes = 0;
     for (const { f, seg } of items) {
@@ -912,7 +917,8 @@ function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = 
             bytes += 3;
             continue;
         }
-        const { cmds } = compilar({ notas: notasDe(f, seg), pasos: pasosDeFuncion(f.pasos, giro90, bpm, seg), bpm, vel, continuo: true });
+        const notas = notasDe(f, seg);
+        const { cmds } = compilar({ notas, pasos: pasosDeFuncion(f.pasos, giro90, bpm, seg, exacto && !notas.length), bpm, vel, continuo: true });
         const p = programaParaRobot(cmds);
         lineas.push(...p.lineas, 'PADD S');
         bytes += p.bytes + 1;
@@ -1435,6 +1441,7 @@ const S = {
     fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
     fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
     fwPark: false,            // su INFO trae PARK=1: tiene el modo 7 (acercarse a la pared) y las series guardadas (PADD O)
+    fwGiro: false,            // su INFO trae GIRO=1: el giroscopio responde y la orden G gira los grados exactos
     serie: [], serieAuto: false, serieOn: false, serieT: 0, serieK: -1,   // serie de demostración: [{ id, seg }]
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
@@ -1577,6 +1584,7 @@ function alLinea(l) {
         S.fwDir = kv.DIR === 1;
         S.fwLin = kv.LIN === 1;
         S.fwPark = kv.PARK === 1;
+        S.fwGiro = kv.GIRO === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
@@ -1870,9 +1878,10 @@ function funcionActual() {
 
 function armarFuncion(f, minS = 30) {
     mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
+    const notas = notasDeFuncion(f, minS);
     return compilar({
-        notas: notasDeFuncion(f, minS),
-        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, minS),
+        notas,
+        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, minS, S.fwGiro && !notas.length),
         bpm: S.bpm, vel: S.vel, continuo: true,
     });
 }
@@ -1956,7 +1965,8 @@ function guardarFuncion() {
         ordenes = ['MODE 4', 'SPD ' + velAuto()].concat(musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
-        const { cmds, ms } = compilar({ notas: notasDeFuncion(f, 0), pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
+        const notas = notasDeFuncion(f, 0);
+        const { cmds, ms } = compilar({ notas, pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0, S.fwGiro && !notas.length), bpm: S.bpm, vel: S.vel, continuo: true });
         if (!ms) return funInfo('Esa función no tiene pasos.', 'err');
         const prog = programaParaRobot(cmds);
         if (!prog.cabe) return funInfo(`Es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una canción más corta o quita la música.`, 'err');
@@ -2071,7 +2081,7 @@ function guardarSerie() {
     if (!items.length) return serieInfo('Añade al menos una función a la serie.', 'err');
     if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
     if (!S.fwPark) return serieInfo('El programa que lleva el robot no sabe guardar series: instálalo otra vez en Conexión.', 'err');
-    const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion });
+    const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion, exacto: S.fwGiro });
     if (!prog.cabe) return serieInfo(`La serie es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): quita funciones o baja los segundos.`, 'err');
     if (S.corriendoFuncion || S.actuando || S.serieOn) paro();
     S.guardarEn = 0;

@@ -204,19 +204,19 @@ El USB solo sirve para subir el programa desde la computadora; después la app s
   cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
   nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
   `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
-  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 15 888 bytes de los 16 384 y se compila con
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 15 752 bytes de los 16 384 y se compila con
   `-mcall-prologues` (`--build-property compiler.cpp.extra_flags=-mcall-prologues` y lo mismo con `compiler.c.extra_flags`);
-  sin esa bandera ya no cabe.
+  sin esa bandera ya no cabe. Tampoco se usan `digitalWrite`, `pinMode` ni `analogWrite` (pesan ~700 bytes): los motores, el zumbador, el anillo y los sensores van por registros (PORTL, PORTB, PORTK, PINF, PINK, OCR1A/OCR2A).
 - **Serie de demostración:** en Funciones se arma una lista (función + segundos) que la página reproduce sola o guarda
   como un único show en el robot (`PADD O modo s` para las de sensor, órdenes `M`/`W`/`T` para las demás). El robot la
   repite hasta cortarla con el botón o un `!`. Modo 7 = «Acercarse a la pared» (se detiene a 10 cm pitando más rápido).
   `INFO` trae `PARK=1` cuando el programa los entiende.
-- **Giro con giroscopio:** no cabe en la flash de esta placa (~900 bytes); los giros siguen siendo por tiempo (`giro90`).
+- **Giro con giroscopio:** `G n` gira n grados (positivo = derecha) leyendo el MPU6050 (0x69) por I2C a mano; `PADD G n` lo guarda en el show. `INFO` trae `GIRO=1` si el chip responde. La página lo usa en las funciones sin música (con música los giros siguen por tiempo, `giro90`, porque `G` bloquea las notas).
 - **Pruebas:** `node test/robot.test.js`.
 
 ## Pendiente
 
-- El firmware ocupa 15 888 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
+- El firmware ocupa 15 752 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
 
 ## Alumnos: instalable, sin conexión, modo oscuro y calendario
 
