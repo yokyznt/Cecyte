@@ -137,7 +137,7 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 
 - **Horario:** Horarios (con el botón *Nueva Materia / Bloque* y la importación), Grupos y Alertas.
 - **Timbre:** Timbre, Ritmo y ESP32.
-- **Robot:** Música (canción, teclado y melodía de un audio), Baile, Funciones, Luces e Instalar.
+- **Robot:** Música (canción, teclado y cántalo), Baile, Funciones, Luces e Instalar.
   La conexión, el paro, el progreso y la batería están siempre arriba. El volumen del robot está en Música.
   - **Batería:** barra con el porcentaje, el voltaje y cuánto va a durar. El robot manda su voltaje al
     conectar (`INFO ... BAT=`) y la página se lo pregunta (`BAT`) cada 10 s cuando está quieto; con los
@@ -157,19 +157,17 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 Se puede abrir una sección directo con `#admin-<sección>` (por ejemplo `#admin-robot-luces`;
 `#admin-robot` abre Música). `node test/admin-secciones.test.js` revisa que el HTML y el script coincidan.
 
-Todo lo del robot ocurre entre el navegador y el robot por USB (Web Serial, Chrome o Edge en una
-computadora); no usa Vercel ni variables nuevas.
+El robot se controla solo desde la app del celular, por Bluetooth (la pestaña Robot no aparece en la web
+y ya no hay Web Serial); no usa Vercel ni variables nuevas.
 
 Una sola vez hay que subirle al robot `robot/mbot_ranger_web/mbot_ranger_web.ino`
 con el IDE de Arduino (placa "Arduino Mega or Mega 2560", librería Makeblock). Es el
 sketch del tanquecito con los modos del botón más el modo 4, el de la página.
-Después, al abrir la pestaña con el robot enchufado, se conecta solo.
+El USB solo sirve para subir el programa desde la computadora; después la app se conecta por Bluetooth.
 
 - **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`). También
   acepta milisegundos (`A5:120 R:300`).
-- **Audio a ritmo:** se sube un MP3/WAV/OGG o un MIDI, se detectan los golpes (la misma
-  detección que usa el ritmo del timbre) y quedan como notas editables. Los ritmos y las
-  canciones se guardan con nombre en el navegador.
+- **Canciones guardadas:** las canciones y los ritmos se guardan con nombre en el celular. Ya no se importan audios ni MIDI; lo que sí queda es «Cántalo» (grabar la voz y convertirla en pitidos) y el teclado.
 - **Luces:** los 12 LEDs del anillo, brillo y efectos; se aplican al instante. El efecto
   corre solo dentro del robot (no se traba mientras suena) y se guarda en su EEPROM: sigue
   igual al desconectarlo del USB y vuelve solo al encenderlo.
@@ -181,11 +179,9 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
 - **Funciones guardadas:** en Funciones, "Guardar la función en el robot" deja la función (con la canción y las luces
   marcadas) en su EEPROM y la hace sin USB: con el botón de la placa o, si lo marcas, sola 2,5 s después de
   encenderlo. Cada guardado reemplaza al anterior. Úsalo con las baterías puestas y el interruptor encendido.
-- **Melodía de un audio:** además del ritmo, "Sacar la melodía" sigue la línea dominante
-  (la voz si la canción la tiene, o el instrumento principal si es solo instrumental): suma los
-  armónicos de cada altura posible y un Viterbi elige el camino que más suena y menos salta.
-  Se afina con el registro (medio, agudo, grave) y la sensibilidad; las notas se ajustan a la
-  tonalidad y se suben al registro donde el zumbador suena bien. En un MIDI se ignora la batería.
+- **Tolerancias de voz de Yokis:** el nombre se acepta por cómo suena («yakis», «yo kiss», «jockeys», «yo que is»…, hasta tres palabras) y las palabras casi iguales a un comando («abanza», «izquirda», «lus», «cucarracha») se corrigen por fonética + distancia de edición (`quitarNombre` y `corregirVocabulario` en `robot.js`). Las palabras comunes protegidas no se tocan. Sin nombre no obedece.
+- **IA de respaldo (opcional, gratis):** en Yokis, «IA de respaldo», se pega una llave de Gemini (aistudio.google.com/apikey; queda solo en el celular). Si el intérprete local no entiende, la app manda las alternativas del micrófono a `gemini-2.5-flash-lite` (y `gemini-2.5-flash` si falla) y solo ejecuta la respuesta si `validarOrdenIA` la reconoce: acciones, funciones y canciones fuera de lista y números fuera de rango se descartan. Sin llave no hace nada.
+- **Cántalo:** la voz grabada con el micrófono se convierte en notas siguiendo la línea dominante: suma los armónicos de cada altura posible y un Viterbi elige el camino que más suena y menos salta. Se ajusta a la tonalidad y se sube al registro donde el zumbador suena bien.
 - **Teclado:** tocas con el ratón o con Z X C V B N M / Q W E R T Y U (y S D G H J / 2 3 5 6 7
   para las negras); "Grabar" registra cada nota con su duración y sus silencios en tiempo real,
   y la grabación se usa como canción o se guarda con nombre en la biblioteca.
@@ -204,22 +200,21 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
   nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
   `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
-  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 16 090 bytes de los 16 384 y se compila con
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 16 170 bytes de los 16 384 y se compila con
   `-mcall-prologues` (`--build-property compiler.cpp.extra_flags=-mcall-prologues` y lo mismo con `compiler.c.extra_flags`);
-  sin esa bandera ya no cabe.
+  sin esa bandera ya no cabe. Tampoco se usan `digitalWrite`, `pinMode` ni `analogWrite` (pesan ~700 bytes): los motores, el zumbador, el anillo y los sensores van por registros (PORTL, PORTB, PORTK, PINF, PINK, OCR1A/OCR2A).
 - **Serie de demostración:** en Funciones se arma una lista (función + segundos) que la página reproduce sola o guarda
   como un único show en el robot (`PADD O modo s` para las de sensor, órdenes `M`/`W`/`T` para las demás). El robot la
   repite hasta cortarla con el botón o un `!`. Modo 7 = «Acercarse a la pared» (se detiene a 10 cm pitando más rápido).
   `INFO` trae `PARK=1` cuando el programa los entiende.
-- **Giro con giroscopio:** no cabe en la flash de esta placa (~900 bytes); los giros siguen siendo por tiempo (`giro90`).
+- **Giro con giroscopio:** `G n` gira n grados (positivo = derecha) leyendo el MPU6050 (0x69) por I2C a mano; `PADD G n` lo guarda en el show. `INFO` trae `GIRO=1` si el chip responde. La página lo usa en las funciones sin música (con música los giros siguen por tiempo, `giro90`, porque `G` bloquea las notas).
+- **Mando (agrupado):** la barra de arriba tiene tres grupos: sesión (cerrar, estado, Bluetooth), información (distancia y avisos) y herramientas (recorridos, alinear, estilo de control, turbo). El botón del celular tiene tres estados: control normal → inclinar el celular → modo dirección → normal. El botón de estilo cambia entre **palanca**, **flechas** (cuatro, se pueden sostener dos a la vez para avanzar y girar) y **pedales** (dos de dirección a la izquierda y dos de aceleración a la derecha; con pedales las cuatro acciones —claxon, música, luces y celular— pasan al centro, debajo del paro). Flechas y pedales aceleran poco a poco al sostenerlos y frenan al soltar; la palanca y el teléfono inclinado también se suavizan. El estilo se recuerda.
+- **Modo dirección:** la palanca (o las flechas o los pedales) es **relativa al teléfono**: arriba = hacia donde apunta el teléfono, atrás = hacia ti. El teléfono lee su brújula (`deviceorientationabsolute`) todo el tiempo y en cada revisión (~15 veces por segundo) la app manda `H grados v` con `grados = brújula del teléfono + ángulo − brújula al alinear`. El robot corrige su rumbo por su cuenta (cada 20 ms, con la velocidad de giro del giroscopio como freno), así que gira suave, avanza mientras se acomoda y no hace zigzag. Al activar el modo se alinea solo (supone que el robot mira hacia donde apunta el teléfono) y el botón «Alinear» lo repite. `H0` calibra el giroscopio con el robot quieto y toma el rumbo actual como cero, `H1` apaga el modo, y cualquier paro (`!`, `S`, `M`, el seguro de 3 segundos) cancela el control de rumbo. Sin brújula usa un rumbo fijo y el botón del celular muestra un puntito rojo. Sin freno por obstáculo en este modo. En el firmware se quitó el modo 3 del botón (test de motores) para ganar espacio.
 - **Pruebas:** `node test/robot.test.js`.
 
 ## Pendiente
 
-- **Seguir la línea:** se quitó del robot y de la página (el módulo Me Line Follower en el puerto 9 comparte pin con el
-  botón de la placa y con solo dos sensores no se distingue "centrada" de "perdida"). Se retomará al armar el Dashing
-  Raptor. El historial de git (PR #16, #28 a #31) conserva el código, con el registro `LOG` para afinarlo.
-- El firmware ocupa 16 090 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
+- El firmware ocupa 16 170 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
 
 ## Alumnos: instalable, sin conexión, modo oscuro y calendario
 

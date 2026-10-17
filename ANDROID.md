@@ -1,7 +1,7 @@
 # App de Android (CECyTE 18)
 
 La app es la misma web empaquetada con **Capacitor 8**: un solo código para el sitio y el APK. El robot entra al APK desde la 1.1.0 y se
-conecta por Bluetooth LE; en la web de escritorio sigue por USB.
+conecta por Bluetooth LE; en la web ya no se puede controlar.
 
 ## Qué cambia entre la web y el APK
 
@@ -12,7 +12,7 @@ conecta por Bluetooth LE; en la web de escritorio sigue por USB.
 | Sesión de admin | cookie HttpOnly | token Bearer (`js/api.js`), solo en el APK |
 | Avisos | Web Push + service worker | notificaciones locales (`js/avisos-nativos.js`) |
 | Sin conexión | service worker | copia local del horario y de los grupos |
-| Robot | sí, por USB (Web Serial) | sí, por Bluetooth LE (`js/robot-bluetooth.js`) con mando en horizontal (`js/robot-control.js`) |
+| Robot | no (la pestaña solo sale en la app) | sí, por Bluetooth LE (`js/robot-bluetooth.js`) con mando en horizontal (`js/robot-control.js`) |
 
 ## Estructura
 

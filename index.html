@@ -54,6 +54,10 @@
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
         <symbol id="i-fn-mano" viewBox="0 0 24 24"><!-- @robot:line --><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6"/><path d="M11 10V4a1.5 1.5 0 0 1 3 0v7"/><path d="M14 10V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-3a1.5 1.5 0 0 1 2.5-1.5L8 15"/></symbol>
+        <symbol id="i-estilo-palanca" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></symbol>
+        <symbol id="i-estilo-flechas" viewBox="0 0 24 24"><path d="m9 6 3-3 3 3"/><path d="m9 18 3 3 3-3"/><path d="m6 9-3 3 3 3"/><path d="m18 9 3 3-3 3"/></symbol>
+        <symbol id="i-estilo-pedales" viewBox="0 0 24 24"><rect x="4" y="5" width="6" height="14" rx="2"/><rect x="14" y="9" width="6" height="10" rx="2"/></symbol>
+        <symbol id="i-direccion" viewBox="0 0 24 24"><path d="M12 3v3"/><circle cx="12" cy="12" r="8"/><path d="m12 7.5 3 8-3-1.8-3 1.8z"/></symbol>
         <symbol id="i-fn-estacionar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="12" height="5" x="6" y="3" rx="1"/><path d="M12 10v7"/><path d="m8 14 4 4 4-4"/><path d="M4 21h16"/></symbol>
         <symbol id="i-fn-sirena" viewBox="0 0 24 24"><!-- @robot:line --><path d="M7 17v-5a5 5 0 0 1 10 0v5"/><path d="M5 17h14v4H5z"/><path d="M12 3v2"/><path d="m4.5 6.5 1.5 1.5"/><path d="m19.5 6.5-1.5 1.5"/></symbol>
         <symbol id="i-fn-cuadrado" viewBox="0 0 24 24"><!-- @robot:line --><rect width="14" height="14" x="5" y="5" rx="2"/><path d="m12 2 3 3-3 3"/></symbol>
@@ -304,7 +308,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span>Timbre</span>
                         </button>
 <!-- @robot:start -->
-                        <button type="button" role="tab" id="tab-ap-robot" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                        <button type="button" role="tab" id="tab-ap-robot" data-solo="android" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
                         </button>
 <!-- @robot:end -->
@@ -709,7 +713,7 @@
                     </div>
 
 <!-- @robot:start -->
-                    <!-- Apartado Robot: mBot Ranger por USB -->
+                    <!-- Apartado Robot: mBot Ranger por Bluetooth (solo en la app) -->
                     <div class="admin-top rb-apartado" id="sec-robot" data-apartado="robot" hidden>
 
                         <!-- Conexión: siempre a la vista dentro del apartado Robot -->
@@ -738,13 +742,21 @@
                                 <div class="rb-mando__gira" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-gira"/></svg></div>
 
                                 <header class="rb-mando__barra">
-                                    <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
-                                    <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
-                                    <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
-                                    <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
-                                    <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
-                                    <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
-                                    <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
+                                    <div class="rb-grupo rb-grupo--sesion">
+                                        <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                        <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
+                                        <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
+                                    </div>
+                                    <div class="rb-grupo rb-grupo--info">
+                                        <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
+                                        <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
+                                    </div>
+                                    <div class="rb-grupo rb-grupo--herr">
+                                        <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
+                                        <button type="button" id="rb-dir-cal" class="rb-btn rb-btn--chico rb-dir-cal" aria-label="Alinear: el robot mira hacia donde apunta el teléfono" title="Alinear"><svg class="icon" aria-hidden="true"><use href="#i-centrar"/></svg></button>
+                                        <button type="button" id="rb-estilo" class="rb-btn rb-btn--chico rb-estilo" data-estilo="palanca" aria-label="Estilo de control: palanca. Toca para cambiar a flechas" title="Estilo de control"><svg class="icon ico-palanca" aria-hidden="true"><use href="#i-estilo-palanca"/></svg><svg class="icon ico-flechas" aria-hidden="true"><use href="#i-estilo-flechas"/></svg><svg class="icon ico-pedales" aria-hidden="true"><use href="#i-estilo-pedales"/></svg></button>
+                                        <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
+                                    </div>
                                 </header>
 
                                 <div class="rb-mando__cuerpo">
@@ -763,6 +775,18 @@
                                         <span id="rb-incl-estado" class="rb-incl__txt"></span>
                                     </div>
 
+                                    <div class="rb-flechas" id="rb-flechas" role="group" aria-label="Flechas: mantén una para ir hacia allá">
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--arriba" data-pad="0,1" aria-label="Adelante"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--izq" data-pad="-1,0" aria-label="Izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--der" data-pad="1,0" aria-label="Derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--abajo" data-pad="0,-1" aria-label="Atrás"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                    </div>
+
+                                    <div class="rb-pedales rb-pedales--dir" id="rb-pedales-dir" role="group" aria-label="Pedales de dirección">
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--izq" data-pad="-1,0" aria-label="Girar a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--der" data-pad="1,0" aria-label="Girar a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                    </div>
+
                                     <div class="rb-centro">
                                         <button type="button" id="rb-ctl-paro" class="rb-paro-gran" aria-label="Paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg></button>
                                         <div class="rb-vel">
@@ -776,7 +800,12 @@
                                         <button type="button" id="rb-claxon" class="rb-btn rb-cara rb-cara--claxon" aria-label="Claxon: mantenlo pulsado para que siga sonando"><svg class="icon" aria-hidden="true"><use href="#i-altavoz"/></svg></button>
                                         <button type="button" class="rb-btn rb-cara rb-cara--musica" data-abre="rb-menu-musica" aria-label="Canciones" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg></button>
                                         <button type="button" class="rb-btn rb-cara rb-cara--luces" data-abre="rb-menu-luces" aria-label="Luces" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-foco"/></svg></button>
-                                        <button type="button" id="rb-incl-on" class="rb-btn rb-cara rb-cara--incl" aria-pressed="false" aria-label="Manejar inclinando el celular"><svg class="icon" aria-hidden="true" style="rotate:-25deg"><use href="#i-celular"/></svg></button>
+                                        <button type="button" id="rb-incl-on" class="rb-btn rb-cara rb-cara--incl" aria-pressed="false" data-modo="0" aria-label="Manejar inclinando el celular"><svg class="icon ico-cel" aria-hidden="true" style="rotate:-25deg"><use href="#i-celular"/></svg><svg class="icon ico-dir" aria-hidden="true"><use href="#i-direccion"/></svg></button>
+                                    </div>
+
+                                    <div class="rb-pedales rb-pedales--gas" id="rb-pedales-gas" role="group" aria-label="Pedales de aceleración">
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--acel" data-pad="0,1" aria-label="Acelerar hacia adelante"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--rev" data-pad="0,-1" aria-label="Reversa"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
                                     </div>
                                 </div>
 
@@ -867,67 +896,6 @@
                                             <span id="rb-cant-tiempo" class="rb-ent-tiempo">0:00</span>
                                         </div>
                                         <p id="rb-cant-info" class="msg" role="status"></p>
-                                    </div>
-                                </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Agregar canciones</h4>
-                                    <div class="stack">
-                                        <label class="rb-soltar" for="rb-audio">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-                                            <span>Elegir audio o MIDI</span>
-                                        </label>
-                                        <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" multiple class="sr-only">
-                                        <progress id="rb-aud-prog" class="rb-aud-prog" max="1" value="0" hidden></progress>
-                                        <ul id="rb-aud-lista" class="rb-aud-lista" aria-live="polite"></ul>
-                                        <p id="rb-aud-info" class="msg" role="status"></p>
-                                        <details class="rb-avanzado">
-                                            <summary>Ajustes manuales</summary>
-                                            <div class="stack">
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-que">Qué sacar</label>
-                                                    <select id="rb-aud-que" class="select">
-                                                        <option value="melodia">La melodía: voz o instrumento principal (recomendado)</option>
-                                                        <option value="ritmo">Solo el ritmo (golpes)</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-reg">Registro de la melodía</label>
-                                                    <select id="rb-aud-reg" class="select">
-                                                        <option value="voz">Voz y melodía (medio)</option>
-                                                        <option value="agudo">Agudo (flauta, violín, voz aguda)</option>
-                                                        <option value="grave">Grave (bajo, voz grave)</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="btn-row">
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-tonal" checked><span>Ajustar las notas a la tonalidad</span></label>
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-subir" checked><span>Subir al registro donde suena bien el zumbador</span></label>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-ini">Empezar en (segundos)</label>
-                                                    <input type="number" id="rb-aud-ini" class="input" min="0" step="0.5" value="0"></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-dur">Duración (máximo 60 s)</label>
-                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="30"></div>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-modo">Cómo convertir el ritmo</label>
-                                                    <select id="rb-aud-modo" class="select">
-                                                        <option value="golpes">Un toque por cada golpe (recomendado)</option>
-                                                        <option value="sostenido">Seguir el volumen</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-tono">Tonos del robot</label>
-                                                    <select id="rb-aud-tono" class="select">
-                                                        <option value="alterna">Alterna 4 tonos (las luces cambian de color)</option>
-                                                        <option value="agudo">Un solo tono agudo</option>
-                                                        <option value="grave">Un solo tono grave</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-aud-sens">Sensibilidad: <span id="rb-aud-sens-v">50</span></label>
-                                                <input type="range" id="rb-aud-sens" min="0" max="100" value="50">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir</button>
-                                            </div>
-                                            </div>
-                                        </details>
                                     </div>
                                 </div>
                                 <div class="rb-card rb-card--ancho">
@@ -1147,6 +1115,16 @@
                                         <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
+                                    <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se mueva al contestar (un meneo corto en su sitio, solo si está libre)</span></label>
+                                    <h4 class="rb-fn-t">«Yokis, tírate un fact»</h4>
+                                    <div class="field">
+                                        <label class="field__label" for="rb-fact-texto">Lo que dice (un fact por línea; elige uno al azar)</label>
+                                        <textarea id="rb-fact-texto" class="textarea" rows="4" spellcheck="true"></textarea>
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-fact-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                        <button type="button" id="rb-fact-restaurar" class="btn btn--secondary btn--sm">Volver a los de fábrica</button>
+                                    </div>
                                     <h4 class="rb-fn-t">La voz de Yokis</h4>
                                     <div class="rb-calib">
                                         <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
@@ -1157,6 +1135,13 @@
                                         <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
                                     </div>
                                     <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
+                                    <h4 class="rb-fn-t">IA de respaldo (gratis)</h4>
+                                    <p class="hint">Yokis ya corrige solo lo que el micrófono oye mal. Si aun así no entiende, puede preguntarle a Gemini, que es gratis: consigue una llave en aistudio.google.com/apikey y pégala aquí. Sin llave funciona igual, solo sin este respaldo. Solo se manda lo que dijiste.</p>
+                                    <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                    </div>
+                                    <p id="rb-ia-estado" class="hint" role="status"></p>
                                     <h4 class="rb-fn-t">Voces entrenadas</h4>
                                     <p class="hint">Entrena una voz con un amigo: lee unas frases, la guardas con un nombre y Yokis habla con ella. Con su propia voz solo dice las frases que se grabaron; en lo demás ajusta la voz del teléfono al tono de tu amigo. No es una clonación perfecta.</p>
                                     <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
@@ -1255,16 +1240,18 @@
                                     <div class="rb-leds">
                                         <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
                                         <div class="stack">
-                                            <div class="field">
-                                                <label class="field__label" for="rb-led-color">Color del LED elegido</label>
-                                                <input type="color" id="rb-led-color" class="rb-color">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos de ese color</button>
+                                            <div class="rb-led-sel" role="group" aria-label="LED elegido">
+                                                <button type="button" id="rb-led-ant" class="rb-led-sel__paso" aria-label="LED anterior"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+                                                <div class="rb-led-sel__info" role="status" aria-live="polite"><span class="rb-led-sel__dot" id="rb-led-dot"></span><span><b id="rb-led-nombre">LED 1</b><small id="rb-led-color-nombre"></small></span></div>
+                                                <button type="button" id="rb-led-sig" class="rb-led-sel__paso" aria-label="LED siguiente"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
                                             </div>
                                             <div>
-                                                <span class="field__label" id="rb-paleta-label">Colores rápidos (pintan todos)</span>
-                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"></div>
+                                                <span class="field__label" id="rb-paleta-label">Toca un color para pintar ese LED</span>
+                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"><label class="rb-sw rb-sw--otro" title="Otro color"><input type="color" id="rb-led-color" class="sr-only" aria-label="Otro color para el LED"><span class="rb-sw__dot rb-sw__dot--arco"></span><span class="rb-sw__name">Otro</span></label></div>
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos así</button>
+                                                <button type="button" id="rb-led-apagar" class="btn btn--secondary btn--sm">Apagar este LED</button>
                                             </div>
                                             <div class="field">
                                                 <label class="field__label" for="rb-brillo">Brillo: <span id="rb-brillo-v"></span></label>
@@ -1291,31 +1278,17 @@
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Conexión</h4>
                                     <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (se llama «Makeblock_LE…»). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
-                                    <p class="hint" data-solo="web">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
                                     <div class="btn-row">
                                     <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
                                     <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
-                                    <p class="hint" data-solo="web"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Enlace Bluetooth</h4>
                                     <p class="hint">Aquí aparece lo que el módulo Bluetooth del robot ofrece (servicio, escritura y avisos). Si algo no conecta, mándame este texto.</p>
                                     <pre id="rb-bt-info" class="rb-bt-info">Sin conectar todavía.</pre>
-                                </div>
-
-                                <div class="rb-card rb-card--ancho" data-solo="web">
-                                    <details id="rb-instalar" class="rb-instalar" open>
-                                    <summary>Instalar el programa en el robot (una sola vez)</summary>
-                                    <ol>
-                                        <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
-                                        <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
-                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página. Si ya tenías una versión anterior, vuelve a subirlo para que las luces corran solas y se queden guardadas.</li>
-                                        <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
-                                    </ol>
-                                </details>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho">
@@ -1340,7 +1313,6 @@
                                         <div class="btn-row"><button type="button" id="rb-bat-borrar" class="btn btn--secondary btn--sm">Borrar el historial de consumo</button></div>
                                     </div>
                                 </details>
-                                    <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
                                 </div>
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Sesión</h4>
@@ -1351,10 +1323,12 @@
                             </div>
                         </section>
 
+                        <div id="rb-toast" class="rb-toast" role="status" aria-live="polite"></div>
+
                         <!-- Barra fija del apartado Robot: parar y reproducir lo de la sección -->
                         <div class="rb-barra" role="toolbar" aria-label="Controles generales del robot">
-                            <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar todo</button>
-                            <button type="button" id="rb-barra-play" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Reproducir</button>
+                            <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro rb-barra__cuadro" aria-label="Parar todo" title="Parar todo"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg></button>
+                            <button type="button" id="rb-barra-play" class="btn btn--primary rb-barra__cuadro" aria-label="Reproducir" title="Reproducir"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
                             <span class="rb-barra__que">Reproduce: <b id="rb-barra-que">la canción</b></span>
                             <progress id="rb-prog" class="rb-prog" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
                             <p id="rb-msg" class="msg" role="status"></p>
@@ -1443,10 +1417,7 @@
     <script src="calendario.js"></script>
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
-    <script src="robot.js"></script> <!-- @robot:line -->
-    <script src="js/robot-bluetooth.js"></script> <!-- @robot:line -->
-    <script src="js/robot-control.js"></script> <!-- @robot:line -->
-    <script src="js/robot-extras.js"></script> <!-- @robot:line -->
+    <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

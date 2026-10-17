@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null };
 
     const enlace = () => raiz.RobotEnlace || null;
     const control = () => raiz.RobotControl || null;
@@ -448,10 +448,50 @@
         $('rb-voz-rapido').value = a.rate;
     }
 
-    function hablar(texto) {
+    const CLAVE_MENEO = 'cecyte_yokis_meneo';
+    const meneoActivo = () => { try { return localStorage.getItem(CLAVE_MENEO) !== '0'; } catch (e) { return true; } };
+
+    function detenerMeneo() {
+        const G = E.meneo;
+        if (!G) return;
+        clearInterval(G.timer);
+        E.meneo = null;
+        if (listo()) enlace().mover(0, 0);
+    }
+
+    // Mientras contesta, el robot hace un meneo corto en su sitio (un giro a cada lado, sin avanzar): como si hablara.
+    // La duración se calcula por el largo del texto; con la voz nativa, que avisa cuándo termina, se corta ahí.
+    function meneoHablar(texto, fin) {
+        if (!meneoActivo() || E.corrida || E.radar || E.guardia || !listo() || !enlace().libre()) return;
+        detenerMeneo();
+        const t0 = Date.now(), G = { hasta: t0 + Math.min(9000, Math.max(700, texto.length * 62)), ult: '' };
+        fin.then(() => { if (E.meneo === G && Date.now() - t0 > 700) G.hasta = Date.now(); });
+        G.timer = setInterval(() => {
+            const t = Date.now();
+            if (t >= G.hasta || !listo() || E.corrida) { detenerMeneo(); return; }
+            const f = (t - t0) % 520;
+            const v = f < 110 ? [130, -130] : f >= 260 && f < 370 ? [-130, 130] : [0, 0];
+            const clave = v.join(',');
+            if (clave !== G.ult) { enlace().mover(v[0], v[1]); G.ult = clave; }
+        }, 40);
+        E.meneo = G;
+    }
+
+    function iniciarMeneo() {
+        const c = $('rb-habla-mueve');
+        if (!c) return;
+        c.checked = meneoActivo();
+        c.addEventListener('change', () => {
+            try { localStorage.setItem(CLAVE_MENEO, c.checked ? '1' : '0'); } catch (e) { /* sin guardado */ }
+            if (!c.checked) detenerMeneo();
+        });
+    }
+
+    function hablar(texto, quieto) {
         aviso(texto);
         historial('yokis', texto);
-        voz(texto);
+        const fin = voz(texto);
+        if (!quieto) meneoHablar(texto, fin);
     }
 
     const di = (tipo, datos) => {
@@ -460,7 +500,7 @@
             const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
             if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
         }
-        hablar(t || raiz.Robot.frase(tipo, datos));
+        hablar(t || raiz.Robot.frase(tipo, datos), tipo === 'paro');
     };
 
     function calibra() {
@@ -508,6 +548,7 @@
         if (!listo()) { di('sinRobot'); return false; }
         if (!recorrido) { di('fallo'); return false; }
         if (E.corrida) { di('ocupado'); return false; }
+        detenerMeneo();
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
         if (control() && control().pantalla) control().pantalla(true, 'ruta');
         pasoCorrida();
@@ -582,7 +623,7 @@
         if (!listo()) { di('sinRobot'); return; }
         const t = control() ? control().trayecto() : { pasos: [], ms: 0 };
         const r = raiz.Robot.inversoDeRecorrido(t.pasos, t.ms, 'Casa');
-        if (!r) { hablar('No tengo nada que deshacer, compa. Maneja un poco con el mando primero.'); return; }
+        if (!r) { hablar('No tengo nada que deshacer, we. Maneja un poco con el mando primero.'); return; }
         if (correr(r, 'casa')) control().marcarCasa();
     }
 
@@ -620,7 +661,7 @@
 
     async function radar(callado) {
         if (E.radar) { E.radarCancelado = true; return; }
-        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo, compa.'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo, we.'); return; }
         E.radar = true;
         E.radarCancelado = false;
         pintarRadarBtn();
@@ -644,7 +685,7 @@
         if (E.radarCancelado) { aviso('Radar cancelado.'); return; }
         if (lecturas.length === 12) {
             const cerca = Math.min.apply(null, lecturas), i = lecturas.indexOf(cerca);
-            hablar(`Radar listo, compa. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
+            hablar(`Radar listo, we. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
         }
     }
 
@@ -665,7 +706,7 @@
         b.setAttribute('aria-pressed', String(si));
         b.textContent = si ? 'Apagar guardia' : 'Armar guardia';
         if (!si) { if (callado) aviso('Guardia apagada.'); else di('guardiaOff'); return; }
-        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo, compa.'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo, we.'); return; }
         const G = { base: [], enfria: 0, timer: null };
         G.timer = setInterval(() => {
             if (!listo()) { ponerGuardia(false, true); return; }
@@ -684,7 +725,29 @@
         if (callado) aviso('Guardia armada.'); else di('guardiaOn');
     }
 
+    const CLAVE_FACTS = 'cecyte_yokis_facts';
+    function leerFacts() {
+        let t = '';
+        try { t = localStorage.getItem(CLAVE_FACTS) || ''; } catch (e) { /* sin guardado */ }
+        const lista = t.split('\n').map(x => x.trim()).filter(Boolean);
+        return lista.length ? lista : raiz.Robot.FRASES.fact;
+    }
+    function tirarFact() {
+        const l = leerFacts();
+        hablar(l[Math.floor(Math.random() * l.length)]);
+    }
+    function iniciarFacts() {
+        const caja = $('rb-fact-texto');
+        if (!caja) return;
+        try { caja.value = localStorage.getItem(CLAVE_FACTS) || ''; } catch (e) { /* sin guardado */ }
+        caja.placeholder = raiz.Robot.FRASES.fact.join('\n');
+        caja.addEventListener('change', () => { try { localStorage.setItem(CLAVE_FACTS, caja.value); } catch (e) { /* sin guardado */ } });
+        $('rb-fact-probar').addEventListener('click', () => { caja.dispatchEvent(new Event('change')); tirarFact(); });
+        $('rb-fact-restaurar').addEventListener('click', () => { caja.value = ''; caja.dispatchEvent(new Event('change')); });
+    }
+
     function charla(t) {
+        if (t === 'fact') { tirarFact(); return; }
         const ahora = new Date();
         const datos = {
             hora: ahora.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
@@ -699,7 +762,7 @@
         if (o.a === 'sinNombre') { di('sinNombre'); return; }
         if (o.a === 'charla') { charla(o.t); return; }
         if (o.a === 'saludo') { di('saludo'); return; }
-        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); di('paro'); return; }
+        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -749,6 +812,56 @@
         return bueno || lista[0] || '';
     }
 
+    const CLAVE_IA = 'cecyte_yokis_ia';
+    const MODELOS_IA = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+
+    function llaveIA() {
+        try { return (localStorage.getItem(CLAVE_IA) || '').trim(); } catch (e) { return ''; }
+    }
+
+    async function consultarIA(alternativas) {
+        const llave = llaveIA();
+        if (!llave || !alternativas.length) return null;
+        const cuerpo = JSON.stringify({
+            systemInstruction: { parts: [{ text: raiz.Robot.promptIA() }] },
+            contents: [{ role: 'user', parts: [{ text: alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n') }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+        });
+        for (const modelo of MODELOS_IA) {
+            const corte = new AbortController();
+            const reloj = setTimeout(() => corte.abort(), 6000);
+            try {
+                const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, body: cuerpo, signal: corte.signal,
+                });
+                if (!r.ok) continue;
+                const j = await r.json();
+                const o = raiz.Robot.validarOrdenIA(JSON.parse(j.candidates[0].content.parts[0].text));
+                if (o) return o;
+            } catch (e) {
+                continue;
+            } finally {
+                clearTimeout(reloj);
+            }
+        }
+        return null;
+    }
+
+    function iniciarIA() {
+        const campo = $('rb-ia-llave');
+        if (!campo) return;
+        campo.value = llaveIA();
+        campo.addEventListener('change', () => {
+            try { localStorage.setItem(CLAVE_IA, campo.value.trim()); } catch (e) { return; }
+            $('rb-ia-estado').textContent = campo.value.trim() ? 'IA de respaldo activada.' : 'IA de respaldo apagada.';
+        });
+        $('rb-ia-probar').addEventListener('click', async () => {
+            campo.dispatchEvent(new Event('change'));
+            const o = await consultarIA(['yakis avanza dos metros', 'yo kiss avanza dos metros']);
+            $('rb-ia-estado').textContent = o && o.a === 'mover' ? 'Funciona: la IA entendió «yakis avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
+        });
+    }
+
     async function escuchar() {
         if (E.escuchando) return;
         const SR = raiz.Plataforma && raiz.Plataforma.plugin('SpeechRecognition');
@@ -758,27 +871,33 @@
         boton.classList.add('is-activo');
         aviso('Escuchando…');
         try {
-            let texto = '';
+            let lista = [];
             if (SR) {
                 const p = await SR.requestPermissions();
                 if (p.speechRecognition !== 'granted') { di('sinMicro'); return; }
-                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, compa', partialResults: false, popup: true });
-                texto = elegirTexto(r.matches);
+                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, we', partialResults: false, popup: true });
+                lista = (r.matches || []).filter(Boolean);
             } else if (Web) {
-                texto = await new Promise((res, rej) => {
+                lista = await new Promise((res, rej) => {
                     const rec = new Web();
                     rec.lang = 'es-MX';
                     rec.maxAlternatives = 5;
-                    rec.onresult = e => res(elegirTexto(Array.from(e.results[0]).map(x => x.transcript)));
+                    rec.onresult = e => res(Array.from(e.results[0]).map(x => x.transcript).filter(Boolean));
                     rec.onerror = e => rej(e);
-                    rec.onend = () => res('');
+                    rec.onend = () => res([]);
                     rec.start();
                 });
             } else { di('sinVoz'); return; }
+            const texto = elegirTexto(lista);
             if (!texto) { di('nada'); return; }
             historial('yo', texto);
             aviso('«' + texto + '»');
-            ejecutar(raiz.Robot.ordenDeVoz(texto));
+            let orden = raiz.Robot.ordenDeVoz(texto);
+            if (!orden || orden.a === 'sinNombre') {
+                const ia = await consultarIA(lista.slice(0, 4));
+                if (ia) orden = ia;
+            }
+            ejecutar(orden);
         } catch (e) {
             di('fallo');
         } finally {
@@ -800,7 +919,10 @@
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
         $('rb-jarvis').addEventListener('click', escuchar);
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
-        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, compa! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
+        iniciarFacts();
+        iniciarIA();
+        iniciarMeneo();
+        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {

@@ -1,5 +1,5 @@
 // ==================== Robot mBot Ranger (panel de admin) ====================
-// La página habla por USB (Web Serial, Chrome o Edge) con el programa robot/mbot_ranger_web.
+// La app habla por Bluetooth con el programa robot/mbot_ranger_web (el robot ya no se maneja desde la web).
 // Le manda notas, movimientos y colores como líneas de texto y espera el "OK" de cada una.
 //
 // La primera mitad es lógica pura (leer canciones, compilar a órdenes, cola con confirmaciones)
@@ -9,7 +9,6 @@
 (function (raiz) {
 'use strict';
 
-const BAUDIOS = 115200;
 const VEL_MAX = 180;          // lo mismo que VEL_MAX del firmware
 const VEL_TURBO = 235;        // tope de la orden M en modo turbo (VEL_TURBO del firmware); el firmware sube en rampa, sin tirón de corriente
 const ARTICULACION = 0.9;     // cuánto de cada nota suena; el resto es el silencio entre notas
@@ -114,7 +113,7 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
             let u = c * ciclo;
             for (const p of pasos) {
                 const a = R(u), b = Math.min(R(u + p.beats * beatMs), limite);
-                if (b > a) baile.push({ a, b, mov: p.mov });
+                if (b > a) baile.push({ a, b, mov: p.mov, grados: p.grados });
                 u += p.beats * beatMs;
                 if (u >= limite) break;
             }
@@ -135,6 +134,11 @@ function compilar({ notas = [], pasos = [], bpm = 120, vel = 110, luz = null, co
         if (luz && s && s.hz > 0 && s.a === a) {
             const h = luz(s.i, s.hz);
             if (h) cmds.push({ l: 'LS ' + h, ms: 0, ex: true });
+        }
+        if (d && d.grados && !s && a === d.a && b === d.b) {
+            movPrev = null;
+            cmds.push({ l: `G ${d.mov === 'GD' ? d.grados : -d.grados}`, ms: b - a });
+            continue;
         }
         if (d && d.mov !== movPrev) {
             movPrev = d.mov;
@@ -169,6 +173,39 @@ function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
     izq /= m; der /= m;
     const V = Math.round(clamp(Number(vmax) || 0, 0, 100) / 100 * clamp(Number(tope) || VEL_MAX, 0, VEL_TURBO));
     return { izq: Math.round(izq * V), der: Math.round(der * V) };
+}
+
+// Modo dirección: la palanca marca un rumbo (0 = arriba, 90 = derecha, 180 = atrás, -90 = izquierda) y v es la velocidad.
+// El robot gira hacia ese rumbo (con el giroscopio) y avanza; si la palanca apunta atrás, da la vuelta en vez de retroceder.
+function rumboDeJoystick(x, y, vmax, tope = VEL_MAX) {
+    x = clamp(Number(x) || 0, -1, 1);
+    y = clamp(Number(y) || 0, -1, 1);
+    const mag = Math.hypot(x, y), ZONA = 0.08;
+    if (mag < ZONA) return { grados: 0, v: 0 };
+    const k = Math.min(1, (mag - ZONA) / (1 - ZONA));
+    return { grados: Math.round(Math.atan2(x, y) * 180 / Math.PI), v: Math.round(k * clamp(Number(vmax) || 0, 0, 100) / 100 * clamp(Number(tope) || VEL_MAX, 0, VEL_TURBO)) };
+}
+
+// Hacia dónde apunta el teléfono (0 a 360, 0 = norte, a la derecha crece) a partir de los ángulos de deviceorientationabsolute.
+// Parado o inclinado manda la parte trasera (la normal -Z); casi plano, el borde de arriba de la pantalla (corregido por la
+// rotación de pantalla: el mando va en horizontal). Matriz ZXY del W3C: columnas = ejes del teléfono en (este, norte, arriba).
+function rumboDeOrientacion(alfa, beta, gama, pantalla = 0) {
+    const rad = Math.PI / 180, a = alfa * rad, b = beta * rad, g = gama * rad;
+    const sA = Math.sin(a), cA = Math.cos(a), sB = Math.sin(b), cB = Math.cos(b), sG = Math.sin(g), cG = Math.cos(g);
+    const X = [cA * cG - sA * sB * sG, cG * sA + cA * sB * sG];
+    const Y = [-cB * sA, cA * cB];
+    const atras = [-(cG * sA * sB + cA * sG), -(sA * sG - cA * cG * sB)];
+    const arriba = { 0: Y, 90: X, 180: [-Y[0], -Y[1]], 270: [-X[0], -X[1]] }[((Math.round(pantalla / 90) * 90) % 360 + 360) % 360] || Y;
+    const v = Math.hypot(atras[0], atras[1]) >= 0.5 ? atras : arriba;
+    if (Math.hypot(v[0], v[1]) < 0.05) return null;
+    return (Math.atan2(v[0], v[1]) / rad + 360) % 360;
+}
+
+// Rumbo que debe llevar el robot: hacia dónde apunta el teléfono ahora, más el ángulo de la palanca, contado desde donde
+// apuntaba al alinear (fi0). Da -180 a 180.
+function rumboRelativo(fiActual, theta, fi0) {
+    const r = Math.round(fiActual + theta - fi0);
+    return ((r % 360) + 540) % 360 - 180;
 }
 
 const GIRO_DIRECCIONAL = 0.6;
@@ -263,7 +300,7 @@ function crearCola(escribir, crudo) {
     };
 }
 
-// Junta los pedazos que llegan por USB en líneas completas (sin el basura que sale al reiniciar).
+// Junta los pedazos que llegan por Bluetooth en líneas completas (sin el basura que sale al reiniciar).
 function crearLector(alLinea) {
     let resto = '';
     return function (trozo) {
@@ -279,13 +316,6 @@ function crearLector(alLinea) {
 }
 
 // ---------- LEDs ----------
-
-function hsv(h, s, v) {
-    const i = Math.floor(h * 6) % 6, f = h * 6 - Math.floor(h * 6);
-    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
-    const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i];
-    return [r * 255, g * 255, b * 255];
-}
 
 function hexARgb(hex) {
     const n = parseInt(String(hex).replace('#', ''), 16) || 0;
@@ -415,18 +445,18 @@ const GRUPOS_FN = [
 
 // Pasos de una función ya en tiempos del bpm dado (para que compilar() los pueda mezclar con una canción)
 // y repetidos hasta cubrir al menos minS segundos, así la página no tiene que reiniciarlos a cada rato.
-function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30) {
+function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30, exacto = false) {
     const base = [];
     for (const m of String(texto).matchAll(/\b(AD|AT|GI|GD|PA|CI|CD)\s+(\d+(?:\.\d+)?)(°?)/g)) {
         const n = Number(m[2]);
-        base.push({ mov: m[1], s: m[3] ? n / 90 * giro90 / 1000 : n });
+        base.push(m[3] && exacto ? { mov: m[1], s: n / 90 * giro90 / 1000, grados: n } : { mov: m[1], s: m[3] ? n / 90 * giro90 / 1000 : n });
     }
     const ciclo = base.reduce((a, p) => a + p.s, 0);
     if (!(ciclo > 0)) return [];
     const veces = Math.min(200, Math.max(1, Math.ceil(minS / ciclo)));
     const porSegundo = bpm / 60;
     const pasos = [];
-    for (let i = 0; i < veces; i++) for (const p of base) pasos.push({ mov: p.mov, beats: p.s * porSegundo });
+    for (let i = 0; i < veces; i++) for (const p of base) pasos.push(p.grados ? { mov: p.mov, beats: p.s * porSegundo, grados: p.grados } : { mov: p.mov, beats: p.s * porSegundo });
     return pasos;
 }
 
@@ -442,29 +472,6 @@ const PALETA = [
     ['#00ffff', 'Cian'], ['#0000ff', 'Azul'], ['#8000ff', 'Morado'], ['#ffffff', 'Blanco'], ['#000000', 'Apagado'],
 ];
 const COLOR_INICIAL = '#00ff00';
-
-// Tonos con los que suenan los golpes de un ritmo. "Alterna" cambia de tono en cada golpe, y así
-// el efecto de luces "por nota" también cambia de color.
-const TONOS_RITMO = {
-    alterna: ['C5', 'E5', 'G5', 'C6'],
-    agudo: ['A5'],
-    grave: ['A4'],
-};
-
-// [[inicio, fin], ...] en ms -> texto de notas con duración en milisegundos: "C5:120 R:300 E5:90"
-function ritmoATexto(intervalos, tonos = TONOS_RITMO.alterna) {
-    const out = [];
-    let t = 0, k = 0;
-    for (const [s, e] of intervalos) {
-        if (out.length >= MAX_NOTAS - 2) break;
-        const pausa = Math.round(s - t);
-        if (pausa >= 10) out.push('R:' + Math.min(pausa, 60000));
-        const dur = Math.min(60000, Math.max(10, Math.round(e - s)));
-        out.push(`${tonos[k++ % tonos.length]}:${dur}`);
-        t = Math.max(t, s) + dur;
-    }
-    return out.join(' ');
-}
 
 // ---------- Melodía de un audio o de un MIDI ----------
 // El buzzer toca una nota a la vez, así que de una canción se queda la línea principal (la voz o el
@@ -664,7 +671,7 @@ function cortesDe(midi, amp) {
 //  4. Viterbi: elige el camino de alturas que más suena y menos salta, con un estado "sin
 //     melodía" para los silencios y las partes sin línea clara.
 // Es un generador: va cediendo el progreso (0 a 1) para que la página pueda mostrarlo sin congelarse.
-// Devuelve { midi, amp, energia, hopMs, o } con un valor por cuadro (midi NaN = sin melodía) o null si no hay audio.
+// Devuelve { midi, amp, hopMs, o } con un valor por cuadro (midi NaN = sin melodía) o null si no hay audio.
 function* rastrearMelodia(x, sr, op = {}) {
     const o = Object.assign({ fMin: 110, fMax: 1000, sens: 50, estacionario: 0.7 }, op);
     const k = Math.max(1, Math.round(sr / 16000)), sr2 = sr / k;
@@ -817,9 +824,8 @@ function* rastrearMelodia(x, sr, op = {}) {
         v.sort((p, q) => p - q);
         liso[f] = v[v.length >> 1];
     }
-    const en = Float32Array.from(energia, v => (maxE ? v / maxE : 0));
     yield 1;
-    return { midi: liso, amp, energia: en, hopMs, o };
+    return { midi: liso, amp, hopMs, o };
 }
 
 // Pedazo [ini, ini + dur] en ms ya rastreado -> texto de notas
@@ -837,58 +843,10 @@ function melodiaDeAudio(x, sr, op = {}) {
     return correrSync(melodiaDeAudioGen(x, sr, op));
 }
 
-// Modo automático: rastrea TODA la canción con un registro amplio y se queda con el pedazo de durSeg segundos donde la
-// melodía suena más clara, más fuerte y menos fragmentada (así se salta intros y partes sin melodía).
-// Devuelve lo mismo que melodiaDeAudio más ini y dur (en segundos) del pedazo elegido y voz (0 a 1, qué tanta melodía clara hay).
-function* melodiaAutoGen(x, sr, op = {}) {
-    const o = Object.assign({ fMin: 110, fMax: 1400, sens: 50, durSeg: 30 }, op);
-    const r = yield* rastrearMelodia(x, sr, o);
-    if (!r) return Object.assign(VACIO(), { ini: 0, dur: 0, voz: 0 });
-    const n = r.midi.length, hopMs = r.hopMs;
-    const L = Math.min(n, Math.max(8, Math.round(o.durSeg * 1000 / hopMs)));
-    const cuentaVoz = new Float32Array(n + 1), cuentaAmp = new Float32Array(n + 1), cuentaEn = new Float32Array(n + 1);
-    for (let f = 0; f < n; f++) {
-        const v = !Number.isNaN(r.midi[f]);
-        cuentaVoz[f + 1] = cuentaVoz[f] + (v ? 1 : 0);
-        cuentaAmp[f + 1] = cuentaAmp[f] + (v ? r.amp[f] : 0);
-        cuentaEn[f + 1] = cuentaEn[f] + r.energia[f];
-    }
-    const paso = Math.max(1, Math.round(500 / hopMs));
-    let mejor = -1, mejorF = 0, mejorVoz = 0;
-    for (let f0 = 0; f0 + L <= n; f0 += paso) {
-        const voz = (cuentaVoz[f0 + L] - cuentaVoz[f0]) / L;
-        const conf = voz ? (cuentaAmp[f0 + L] - cuentaAmp[f0]) / (cuentaVoz[f0 + L] - cuentaVoz[f0]) : 0;
-        const fuerza = (cuentaEn[f0 + L] - cuentaEn[f0]) / L;
-        const intro = f0 * hopMs < 8000 ? 0.85 : 1;                  // los primeros segundos suelen ser intro
-        const puntos = voz * Math.min(1, conf) * (0.6 + 0.4 * Math.min(1, fuerza * 2)) * intro;
-        if (puntos > mejor) { mejor = puntos; mejorF = f0; mejorVoz = voz; }
-    }
-    const t = textoDeRastro(r, mejorF, mejorF + L);
-    return Object.assign(t, { ini: mejorF * hopMs / 1000, dur: L * hopMs / 1000, voz: mejorVoz });
-}
-
-function melodiaAuto(x, sr, op = {}) {
-    return correrSync(melodiaAutoGen(x, sr, op));
-}
-
-// notas: [{ s, e, p }] en ms y p = número MIDI. Si suenan varias a la vez, se queda la más aguda.
-function melodiaDeMidi(notas, op = {}) {
-    const hopMs = 20;
-    const fin = notas.reduce((m, n) => Math.max(m, n.e), 0);
-    const n = Math.ceil(fin / hopMs);
-    const midi = new Float32Array(n).fill(NaN);
-    for (const t of notas) {
-        for (let f = Math.floor(t.s / hopMs); f < Math.min(n, Math.ceil(t.e / hopMs)); f++) {
-            if (Number.isNaN(midi[f]) || t.p > midi[f]) midi[f] = t.p;
-        }
-    }
-    return melodiaATexto(midi, hopMs, Object.assign({ minNotaMs: 40, tonalidad: false }, op));
-}
-
 // Show guardado en el robot: la canción y el baile compilados, para que los haga solo, sin la página.
 // Espacio en su EEPROM: nota 5 bytes, espera 3, motores 3, parar 1 (igual que PGM_MAX del firmware).
 const PGM_MAX = 2800;
-const BYTES_ORDEN = { T: 5, W: 3, M: 3, S: 1 };
+const BYTES_ORDEN = { T: 5, W: 3, M: 3, S: 1, G: 3 };
 
 function programaParaRobot(cmds) {
     const lineas = [];
@@ -902,7 +860,7 @@ function programaParaRobot(cmds) {
     return { lineas, bytes, cabe: bytes <= PGM_MAX };
 }
 
-const SIRENA_COLORES = Array.from({ length: LEDS }, (_, i) => (i < LEDS / 2 ? [255, 0, 0] : [0, 0, 255]));
+const SIRENA_COLORES = Array.from({ length: LEDS }, (_, i) => (i >= 2 && i < 8 ? [255, 0, 0] : [0, 0, 255]));
 const SERIE_MAX = 30;
 
 function itemsDeSerie(serie, variante) {
@@ -914,7 +872,7 @@ function itemsDeSerie(serie, variante) {
     return items;
 }
 
-function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = () => [] } = {}) {
+function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = () => [], exacto = false } = {}) {
     const lineas = [];
     let bytes = 0;
     for (const { f, seg } of items) {
@@ -923,7 +881,8 @@ function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = 
             bytes += 3;
             continue;
         }
-        const { cmds } = compilar({ notas: notasDe(f, seg), pasos: pasosDeFuncion(f.pasos, giro90, bpm, seg), bpm, vel, continuo: true });
+        const notas = notasDe(f, seg);
+        const { cmds } = compilar({ notas, pasos: pasosDeFuncion(f.pasos, giro90, bpm, seg, exacto && !notas.length), bpm, vel, continuo: true });
         const p = programaParaRobot(cmds);
         lineas.push(...p.lineas, 'PADD S');
         bytes += p.bytes + 1;
@@ -1165,49 +1124,50 @@ function figura(nombre, lado) {
 function sinAcentos(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
 const FRASES = {
-    saludo: ['¡Qué onda, compa! Aquí andamos, listo para lo que sea.', '¡Quihubo! Dime qué hacemos.', '¡Ey, mi buen! ¿Qué se te antoja hacer?'],
-    estado: ['Todo chido, compa, con la batería llena de ganas. ¿Y tú qué tal?', 'Al cien, carnal. Listo para rodar.', 'De lujo, aquí echando relajo con mis ruedas. ¿Qué hacemos?'],
-    gracias: ['¡De nada, compa! Para eso estamos.', 'No hay de qué, carnal.', 'Siempre a la orden, mi buen.'],
-    elogio: ['¡Ay, gracias, compa! Tú tampoco estás nada mal.', 'Me vas a hacer sonrojar, carnal.', '¡Eso! Tú y yo somos el mejor equipo.'],
-    queja: ['Uy, perdón, compa. Dime cómo lo arreglo.', 'Oye, no me regañes. Dime qué necesitas y le echo ganas.'],
-    adios: ['¡Nos vemos, compa! Aquí me quedo cuidando.', 'Cuídate, carnal. Cuando quieras me llamas.'],
-    quien: ['Soy tu robot y tu compa, el mBot que te sigue la corriente. Tú dime Yokis cuando me hables.', 'Soy tu amigo de ruedas, compa. Pa lo que se ofrezca.'],
-    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar y cuidar con la guardia. Solo empieza diciendo Yokis.'],
-    chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, compa.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
-    hora: ['Son las {hora}, compa.', 'Ya van siendo las {hora}.'],
-    fecha: ['Hoy es {fecha}, compa.', 'Estamos a {fecha}.'],
-    ruleta: ['¡Va! A girar la ruleta, compa. Hagan sus apuestas.', 'Hagan sus apuestas… ¡y ahí va la bolita!'],
-    ruletaFin: ['¡Cayó en el {num}, {color}! ¿Le apostaste a ese?', '¡{color}! La bolita se quedó en el {num}, compa.', 'Y la ganadora es el {num}, {color}. ¡Qué emoción!'],
-    paro: ['¡Alto ahí, compa! Ya me frené.', 'Listo, me quedé quieto.', 'Va, me detengo.'],
+    saludo: ['¡Qué onda, we! Aquí andamos, listo para lo que sea.', '¡Quihubo! Dime qué hacemos.', '¡Ey, mi buen! ¿Qué se te antoja hacer?'],
+    estado: ['Todo chido, we, con la batería llena de ganas. ¿Y tú qué tal?', 'Al cien, carnal. Listo para rodar.', 'De lujo, aquí echando relajo con mis ruedas. ¿Qué hacemos?'],
+    gracias: ['¡De nada, we! Para eso estamos.', 'No hay de qué, carnal.', 'Siempre a la orden, mi buen.'],
+    elogio: ['¡Ay, gracias, we! Tú tampoco estás nada mal.', 'Me vas a hacer sonrojar, carnal.', '¡Eso! Tú y yo somos el mejor equipo.'],
+    queja: ['Uy, perdón, we. Dime cómo lo arreglo.', 'Oye, no me regañes. Dime qué necesitas y le echo ganas.'],
+    adios: ['¡Nos vemos, we! Aquí me quedo cuidando.', 'Cuídate, carnal. Cuando quieras me llamas.'],
+    quien: ['Soy tu robot y tu amigo, el mBot que te sigue la corriente. Tú dime Yokis cuando me hables.', 'Soy tu amigo de ruedas, we. Pa lo que se ofrezca.'],
+    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar, cuidar con la guardia y tirarme un fact. Solo empieza diciendo Yokis.'],
+    fact: ['Fact: los pulpos tienen tres corazones y sangre azul.', 'Fact: las abejas pueden reconocer caras humanas.', 'Fact: la miel nunca se echa a perder; la han encontrado comestible en tumbas de miles de años.', 'Fact: un día en Venus dura más que un año en Venus.', 'Fact: el primer robot industrial se instaló en 1961 y levantaba piezas calientes.', 'Fact: el zumbador de tu robot suena porque un pedacito de metal vibra miles de veces por segundo.'],
+    chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, we.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
+    hora: ['Son las {hora}, we.', 'Ya van siendo las {hora}.'],
+    fecha: ['Hoy es {fecha}, we.', 'Estamos a {fecha}.'],
+    ruleta: ['¡Va! A girar la ruleta, we. Hagan sus apuestas.', 'Hagan sus apuestas… ¡y ahí va la bolita!'],
+    ruletaFin: ['¡Cayó en el {num}, {color}! ¿Le apostaste a ese?', '¡{color}! La bolita se quedó en el {num}, we.', 'Y la ganadora es el {num}, {color}. ¡Qué emoción!'],
+    paro: ['¡Alto ahí, we! Ya me frené.', 'Listo, me quedé quieto.', 'Va, me detengo.'],
     mover: ['Va, ahí voy.', '¡Órale, a rodar!', 'Simón, avanzando.'],
-    reversa: ['Reversa, compa. Cuidado con la cola.', 'Va, me echo para atrás.'],
+    reversa: ['Reversa, we. Cuidado con la cola.', 'Va, me echo para atrás.'],
     giro: ['A la orden, girando.', 'Va, doy la vuelta.', 'Órale, ahí voy dando vuelta.'],
     figura: ['¡Va! Voy a dibujar {f}. Mira nomás qué arte.', 'Órale, {f} va saliendo.'],
     funcion: ['Va, arrancando {nombre}.', '¡Órale! {nombre}, ahí te va.'],
     cancion: ['¡Va! Ahí va la música.', 'Música, maestro. ¡Dale!'],
     cancionParar: ['Va, ya no más música.', 'Listo, silencio.'],
-    baile: ['¡Eso! A bailar, compa.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
+    baile: ['¡Eso! A bailar, we.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
     luces: ['¡Luces listas, mira qué chidas!', 'Va, a iluminar el cuarto.'],
     lucesOff: ['Listo, luces apagadas.'],
     casa: ['Va, me regreso a casa.', 'Órale, de vuelta a casa.'],
-    radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, compa.'],
+    radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, we.'],
     guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
     guardiaOff: ['Listo, ya dejé de vigilar.'],
-    alerta: ['¡Alerta, compa! Algo se acercó.', '¡Ojo! Alguien anda cerca.'],
+    alerta: ['¡Alerta, we! Algo se acercó.', '¡Ojo! Alguien anda cerca.'],
     claxon: ['¡Beep beep!', '¡Pi pi! A ver quién se quita.'],
-    turbo: ['El turbo solo lo uso con el mando abierto, compa.'],
-    bateria: ['Traigo la batería al {pct}, compa.', 'Ando con {pct} de batería.'],
-    sinBateria: ['No sé cuánta batería traigo ahorita, compa.'],
-    sinNombre: ['Oye, primero dime Yokis, así sé que me hablas a mí.', 'Compa, empieza diciendo Yokis, para saber que es conmigo.'],
-    noEntendi: ['No te cacho, compa. ¿Me lo repites de otra forma?', 'Uy, no te entendí. Dime otra vez, más despacito.'],
-    sinRobot: ['Primero conéctame, compa, y le damos. Está en el apartado Conexión.', 'No me veo conectado. Conéctame en Conexión y arrancamos.'],
-    ocupado: ['Espérame tantito, compa, sigo con lo anterior. O dime para y lo cortamos.'],
-    sinFuncion: ['Esa función no me la sé, compa.'],
-    sinCancion: ['Esa canción no la tengo, compa.', 'No encontré esa rola.'],
-    sinMicro: ['Necesito permiso del micrófono para escucharte, compa.'],
-    sinVoz: ['Este celular no me deja escucharte aquí, compa.'],
-    nada: ['No escuché nada, compa. Inténtalo otra vez.'],
-    fallo: ['Se me fue la onda. Inténtalo otra vez, compa.'],
+    turbo: ['El turbo solo lo uso con el mando abierto, we.'],
+    bateria: ['Traigo la batería al {pct}, we.', 'Ando con {pct} de batería.'],
+    sinBateria: ['No sé cuánta batería traigo ahorita, we.'],
+    sinNombre: ['Oye, primero dime Yokis, así sé que me hablas a mí.', 'We, empieza diciendo Yokis, para saber que es conmigo.'],
+    noEntendi: ['No te cacho, we. ¿Me lo repites de otra forma?', 'Uy, no te entendí. Dime otra vez, más despacito.'],
+    sinRobot: ['Primero conéctame, we, y le damos. Está en el apartado Conexión.', 'No me veo conectado. Conéctame en Conexión y arrancamos.'],
+    ocupado: ['Espérame tantito, we, sigo con lo anterior. O dime para y lo cortamos.'],
+    sinFuncion: ['Esa función no me la sé, we.'],
+    sinCancion: ['Esa canción no la tengo, we.', 'No encontré esa rola.'],
+    sinMicro: ['Necesito permiso del micrófono para escucharte, we.'],
+    sinVoz: ['Este celular no me deja escucharte aquí, we.'],
+    nada: ['No escuché nada, we. Inténtalo otra vez.'],
+    fallo: ['Se me fue la onda. Inténtalo otra vez, we.'],
 };
 
 function frase(tipo, datos, azar) {
@@ -1240,7 +1200,7 @@ function numerosEnPalabras(t) {
     return sal.join(' ');
 }
 
-const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas|que onda|quihubo)\s+)?(?:(?:y|ll|j)o ?(?:k|qu|ck|c)[iey]s?z?)\b[,.]?\s*/;
+const SALUDOS_VOZ = /^(?:(?:oye|hey|ey|ok|okay|hola|eh|buenas|que onda|quihubo|quiubo|escucha|pues|bueno|a ver|dime)\s+)+/;
 const COLORES_VOZ = {
     rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
     verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
@@ -1260,13 +1220,75 @@ const CANCIONES_VOZ = [
     ['alegria', /alegria|beethoven/], ['jingle', /jingle|navidad|campanas/], ['elisa', /elisa/], ['santiago', /santiago|fray/], ['escala', /escala|afinar/],
 ];
 
+function fonetica(p) {
+    return String(p || '').replace(/ch/g, '#').replace(/ll/g, 'y').replace(/qu/g, 'k').replace(/gu([ei])/g, 'g$1').replace(/g([ei])/g, 'j$1')
+        .replace(/c([ei])/g, 's$1').replace(/c/g, 'k').replace(/z/g, 's').replace(/v/g, 'b').replace(/h/g, '').replace(/x/g, 'ks')
+        .replace(/w/g, 'u').replace(/(.)\1+/g, '$1');
+}
+
+function distancia(a, b) {
+    let fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        const nueva = [i];
+        for (let j = 1; j <= b.length; j++) nueva[j] = Math.min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        fila = nueva;
+    }
+    return fila[b.length];
+}
+
+function quitarNombre(t) {
+    const sin = t.replace(SALUDOS_VOZ, '');
+    const w = sin.split(' ');
+    if (!/^(y|j|ll)/.test(w[0])) return null;
+    for (let n = 1; n <= 3 && n <= w.length; n++) {
+        const f = fonetica(w.slice(0, n).join('')).replace(/^j/, 'y');
+        if (/^y[aou]?[kg][ie]{1,2}y?s?$/.test(f)) return w.slice(n).join(' ');
+    }
+    return null;
+}
+
+const VOCABULARIO_VOZ = (
+    'avanza avanzar adelante atras reversa retrocede retroceder camina caminar anda andar sigue seguir derecho recto muevete mover hacia ' +
+    'metro metros centimetros segundo segundos medio vuelta gira girar gire giro voltea voltear dobla doblar rota rotar vira virar ' +
+    'izquierda izquierdo derecha grados completa para alto detente detener frena frenar stop basta quieto quieta espera ' +
+    'luz luces foco focos ilumina enciende prende apaga apagar quita quitar desactiva activa activar rojo roja rojas rojos azul azules verde verdes ' +
+    'amarillo amarilla naranja morado morada rosa blanco blanca respira respirar pulso persecucion arcoiris ' +
+    'baila bailar baile bailando cancion canciones musica melodia toca tocar pon poner reproduce canta cantar suena estrellita cumpleanos ' +
+    'cucaracha alegria jingle navidad elisa santiago escala esquivar esquiva obstaculos evita sigueme linea lineas seguidor trompo zigzag ' +
+    'slalom derrape arrancon vigilante circulos circulo pajarito patrulla cuadrada cuadrado triangulo estrella funcion modo inicia iniciar ' +
+    'ejecuta empieza arranca guardia vigila vigilar radar escanea escaner turbo casa claxon pito bocina bateria pilas carga ruleta casino ' +
+    'apuesta chiste chistes hora fecha gracias adios fact facto dato curioso hola quien eres ayuda comandos presentate'
+).split(' ');
+const VOCABULARIO_CLAVES = VOCABULARIO_VOZ.map(w => [w, fonetica(w)]);
+const PROTEGIDAS_VOZ = new Set(Object.keys(NUMEROS_VOZ).concat((
+    'para por favor que como cual cuando cuanta cuantas cuanto cuantos tienes tiene quedan queda falta donde esta estas estoy este esto eso esa ese una uno unos unas los las del con sin sobre tras hasta desde ' +
+    'entre mas menos muy tan tanto pero porque pues tambien ahora antes luego siempre nunca algo nada todo toda todos cada otra otro tiene tienes ' +
+    'tengo puedo puedes quiero quieres dame hazme hace haces hacer dice dices dijo vamos mismo misma poco mucho mucha bien mejor peor buen buena ' +
+    'dias hoy manana noche tarde tardes noches nombre amigo robot carro cosa cosas pasos lado lados arriba abajo cerca lejos dentro fuera aqui ' +
+    'alli alla veces vez rato momento primero segunda tercero luego despues enfrente atras'
+).split(' ')));
+
+function corregirPalabra(w) {
+    if (w.length < 3 || VOCABULARIO_VOZ.includes(w) || PROTEGIDAS_VOZ.has(w)) return w;
+    const k = fonetica(w), tope = k.length >= 8 ? 2 : k.length >= 5 ? 1 : 0;
+    let mejor = null, d = tope + 1, empate = false;
+    for (const [v, kv] of VOCABULARIO_CLAVES) {
+        if (Math.abs(kv.length - k.length) > tope) continue;
+        const x = distancia(k, kv);
+        if (x < d) { d = x; mejor = v; empate = false; } else if (x === d && v !== mejor) empate = true;
+    }
+    return mejor && d <= tope && !(empate && d > 0) ? mejor : w;
+}
+
+function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
+
 function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
-    const nombre = t.match(NOMBRE_VOZ);
-    if (!nombre) return { a: 'sinNombre' };
-    t = t.slice(nombre[0].length)
+    const resto = quitarNombre(t);
+    if (resto === null) return { a: 'sinNombre' };
+    t = corregirVocabulario(resto
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
-        .replace(/\s+/g, ' ').trim();
+        .replace(/\s+/g, ' ').trim());
     if (!t) return { a: 'saludo' };
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
@@ -1274,6 +1296,7 @@ function ordenDeVoz(texto) {
     if (dice0(/ruleta|casino|apuesta|apuestas/)) return quita ? { a: 'paro' } : { a: 'ruleta' };
     if (dice0(/\b(gracias|grax)\b/)) return { a: 'charla', t: 'gracias' };
     if (dice0(/como estas|como andas|como te va|como amaneciste|que onda|que tal|como te sientes/)) return { a: 'charla', t: 'estado' };
+    if (dice0(/\b(facto|fact|facts|fax)\b|dato curioso|un dato\b/)) return { a: 'charla', t: 'fact' };
     if (dice0(/chiste|chistes|hazme reir|hacerme reir|algo gracioso/)) return { a: 'charla', t: 'chiste' };
     if (dice0(/que hora|la hora/)) return { a: 'charla', t: 'hora' };
     if (dice0(/que dia|la fecha|a cuanto estamos|que fecha/)) return { a: 'charla', t: 'fecha' };
@@ -1340,6 +1363,58 @@ function ordenDeVoz(texto) {
     return null;
 }
 
+const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
+const CHARLAS_IA = ['gracias', 'estado', 'chiste', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja', 'fact'];
+const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
+const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
+
+function promptIA() {
+    return [
+        'Eres el intérprete de voz de Yokis, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores).',
+        'El robot solo obedece si la frase empieza llamándolo «Yokis». El micrófono lo escribe como: yakis, yo kiss, yoquis, jokis, llokis, yoki, jockeys, yo que is. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
+        'Contesta SOLO un JSON con una de estas acciones (sin texto extra):',
+        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
+        '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
+        '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
+        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
+        '{"a":"turbo","on":true|false} · {"a":"guardia","on":true|false}',
+        '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"' + COLORES_IA.join('|') + '|apagado"}  el color solo va con el efecto fijo',
+        '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
+        '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
+        '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
+        '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación: gracias, cómo estás, chiste, hora, fecha, quién eres, ayuda, adiós, elogio, queja, un fact o dato curioso',
+        'Si la frase tiene el nombre pero no pide nada que el robot pueda hacer, contesta {"a":"noEntendi"}.',
+    ].join('\n');
+}
+
+function validarOrdenIA(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    const a = String(o.a);
+    const num = (v, lo, hi) => { const n = Number(v); return v !== null && v !== undefined && Number.isFinite(n) ? clamp(n, lo, hi) : null; };
+    switch (a) {
+        case 'mover': return { a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) };
+        case 'giro': { const g = num(o.grados, -720, 720); return g ? { a, grados: Math.round(g) } : null; }
+        case 'figura': return FIGURAS_IA.includes(o.f) ? { a, f: o.f } : null;
+        case 'casa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
+        case 'turbo': case 'guardia': return { a, on: o.on !== false };
+        case 'luces': {
+            if (!EFECTOS_IA.includes(o.efecto)) return null;
+            if (o.efecto !== 'fijo') return { a, efecto: o.efecto };
+            const c = sinAcentos(o.color);
+            const color = c === 'apagado' ? '#000000' : Object.prototype.hasOwnProperty.call(COLORES_VOZ, c) ? COLORES_VOZ[c] : null;
+            return color ? { a, efecto: 'fijo', color } : null;
+        }
+        case 'baile': return { a, id: BAILES_VOZ.some(b => b[0] === o.id) ? o.id : null, cancion: CANCIONES_VOZ.some(c => c[0] === o.cancion) ? o.cancion : null };
+        case 'funcion': return FUNCIONES.some(f => f.id === o.id) ? { a, id: o.id } : null;
+        case 'cancion': {
+            const id = CANCIONES_VOZ.some(c => c[0] === o.id) ? o.id : null;
+            return id ? { a, id } : { a, id: null, q: sinAcentos(o.q).slice(0, 40) };
+        }
+        case 'charla': return CHARLAS_IA.includes(o.t) ? { a, t: o.t } : null;
+        default: return null;
+    }
+}
+
 // ---------- Freno por obstáculo del mando ----------
 // Si va hacia adelante y las dos últimas lecturas de DIST están más cerca que el umbral (15 cm; 35 en turbo, que frena peor),
 // no avanza. Retroceder y girar en el sitio siguen permitidos. Una lectura vieja (el robot dejó de contestar) no frena:
@@ -1399,13 +1474,13 @@ function ruletaColores(pos, bola) {
 const lib = {
     ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
-    RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
+    rumboDeJoystick, RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
-    BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
+    VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
-    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
-    melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, senalesDeMovimiento,
+    hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
+    melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
 };
 
@@ -1418,11 +1493,10 @@ if (typeof document === 'undefined') return;
 
 const $ = id => document.getElementById(id);
 const LLAVE = 'cecyte_robot_v1';
-const VID_CH340 = 0x1A86;
 
 const S = {
     estado: 'desconectado',   // desconectado | conectando | listo | sinprograma
-    transporte: null, juntar: null, vioArranque: false,
+    transporte: null, juntar: null,
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
@@ -1442,11 +1516,8 @@ const S = {
     salirModo: false,         // al llegar ABORTED, sacar al robot de ese modo (MODE 4)
     musicaIds: [],            // temporizadores de la música que la página manda nota a nota en las funciones autónomas
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
-    fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
-    fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
-    fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
-    fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
-    fwPark: false,            // su INFO trae PARK=1: tiene el modo 7 (acercarse a la pared) y las series guardadas (PADD O)
+    fwNuevo: false,           // su INFO trae PARK=1: el robot tiene el programa de esta versión (BAT, DIST, DIR, línea, modo 7 y series)
+    fwGiro: false,            // su INFO trae GIRO=1: el giroscopio responde y la orden G gira los grados exactos
     serie: [], serieAuto: false, serieOn: false, serieT: 0, serieK: -1,   // serie de demostración: [{ id, seg }]
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
@@ -1455,9 +1526,15 @@ const S = {
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
 const MAX_GUARDADAS = 40;
-let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (no se guarda)
 
+let guardarT = 0;
 function guardar() {
+    clearTimeout(guardarT);
+    guardarT = setTimeout(guardarYa, 300);
+}
+
+function guardarYa() {
+    clearTimeout(guardarT);
     try {
         const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto } = S;
         localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto }));
@@ -1515,7 +1592,17 @@ function cargar() {
     S.serieOn = false;
 }
 
-function mensaje(texto, tipo) {
+function aviso(texto, tipo) {
+    const el = $('rb-toast');
+    clearTimeout(aviso.t);
+    if (!texto || $('sec-robot').hidden) { el.classList.remove('is-visible'); return; }
+    el.textContent = texto;
+    el.className = 'rb-toast is-visible' + (tipo === 'err' ? ' rb-toast--err' : '');
+    aviso.t = setTimeout(() => el.classList.remove('is-visible'), tipo === 'err' ? 4500 : 2600);
+}
+
+function mensaje(texto, tipo, rapido) {
+    if (rapido) aviso(texto, tipo);
     const el = $('rb-msg');
     el.textContent = texto || '';
     el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
@@ -1546,14 +1633,11 @@ function ponEstado(est) {
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar', 'rb-serie-play', 'rb-serie-guardar', 'rb-serie-borrar']) $(id).disabled = est !== 'listo';
-    if (est === 'sinprograma') {
-        if ($('rb-instalar')) $('rb-instalar').open = true;
-        if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
-    }
+    if (est === 'sinprograma' && typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });
 }
 
-// ---------- Transporte: USB (Web Serial) o Bluetooth (BLE) ----------
-// Un transporte es { tipo: 'serial' | 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
+// ---------- Transporte: Bluetooth (BLE) ----------
+// Un transporte es { tipo: 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
 // entra por entregar(texto), que junta los trozos en líneas y las manda a alLinea.
 
 function crudo(texto) {
@@ -1585,29 +1669,15 @@ function alLinea(l) {
             document.dispatchEvent(new CustomEvent('robot-distancia'));
         }
     } else if (/^INFO /.test(l)) {
-        // "INFO BOOT=2 BTN=0 RUN=3 MIN=5.4 BAT=7.42" al encender: lo que el robot anotó solo desde que
-        // se borró el aviso. BOOT cuenta cada arranque, y conectarlo por USB también reinicia la placa
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
-        S.fwNuevo = true;                  // este programa ya entiende la orden BAT
-        S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
-        S.fwDir = kv.DIR === 1;
-        S.fwLin = kv.LIN === 1;
-        S.fwPark = kv.PARK === 1;
+        S.fwNuevo = kv.PARK === 1;
+        S.fwGiro = kv.GIRO === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
-        const cosas = [];
-        if (kv.BOOT > 1) cosas.push(`${kv.BOOT} arranques (conectarlo por USB cuenta uno; si lo probaste solo, los demás fueron reinicios)`);
-        if (kv.BTN) cosas.push(`${kv.BTN} cambio(s) de modo con el botón`);
-        if (kv.RUN) cosas.push(`${kv.RUN} pasada(s) del show`);
-        if (kv.MIN) cosas.push(`voltaje más bajo con las ruedas andando: ${kv.MIN.toFixed(1)} V`);
-        $('rb-diag-txt').textContent = cosas.length ? 'Desde la última vez que lo borraste: ' + cosas.join(', ') + '.' : '';
-        $('rb-diag').hidden = !cosas.length;
     } else if (/^PONG mbot-web/.test(l) || /mBot Ranger web .*listo/.test(l)) {
         if (S.estado === 'conectando') alListo();
-    } else if (/mBot Ranger listo/.test(l)) {
-        S.vioArranque = true;   // el programa viejo (tanquecito): no habla con la página
     } else if (l === 'ABORTED') {
         S.cola.abortado();
         if (S.salirModo) { S.salirModo = false; crudo('MODE 4\n'); }   // "!" para y ya, pero esquivar/seguir seguirían: se le quita el modo
@@ -1678,70 +1748,28 @@ function alListo() {
     clearInterval(S.saludo);
     ponEstado('listo');
     S.cola.enviar([{ l: 'MODE 4', ex: true }]);     // lo guardado que arranca solo no corre mientras la página lo controla
-    mensaje('Listo. Lo que cambies aquí se aplica en el robot al instante.', 'ok');
+    mensaje('Robot conectado', 'ok', true);
     S.cola.enviar(['MODE 4', 'INFO']);              // por Bluetooth la placa no se reinicia, así que no manda su INFO sola: se la pedimos
     S.sucio = true;
 }
 
-// Empieza a hablar con el robot: saluda con PING hasta que contesta PONG.
-// Por USB la placa se reinicia al abrir el puerto (hay que esperar); por Bluetooth no se reinicia.
 function iniciarSesion(t) {
     S.transporte = t;
     S.juntar = crearLector(alLinea);
-    S.vioArranque = false;
     S.cola.reiniciar();
     ponEstado('conectando');
-    const ble = t.tipo === 'ble';
-    mensaje(ble ? 'Conectando por Bluetooth…' : 'Conectando… (la placa se reinicia y suena una vez)');
+    mensaje('Conectando por Bluetooth…');
     let intentos = 0;
-    const espera = ble ? 0 : 2, tope = ble ? 12 : 14;
     S.saludo = setInterval(() => {
         if (S.estado !== 'conectando') return clearInterval(S.saludo);
-        if (++intentos > tope) {
+        if (++intentos > 12) {
             clearInterval(S.saludo);
             ponEstado('sinprograma');
-            mensaje(ble
-                ? 'Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.'
-                : S.vioArranque
-                    ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
-                    : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
-        } else if (intentos > espera) {
+            mensaje('Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.', 'err');
+        } else {
             crudo('PING\n');
         }
     }, 400);
-}
-
-async function abrirSerie(puerto) {
-    try {
-        await puerto.open({ baudRate: BAUDIOS });
-    } catch (e) {
-        mensaje('No pude abrir el puerto. Si el IDE de Arduino o mBlock lo tienen abierto, ciérralos y vuelve a intentar.', 'err');
-        return;
-    }
-    const escritor = puerto.writable.getWriter();
-    const lector = puerto.readable.getReader();
-    const t = {
-        tipo: 'serial',
-        escribir: txt => escritor.write(new TextEncoder().encode(txt)),
-        async cerrar() {
-            try { await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
-            try { lector.releaseLock(); } catch (e) { /* idem */ }
-            try { escritor.releaseLock(); } catch (e) { /* idem */ }
-            try { await puerto.close(); } catch (e) { /* idem */ }
-        },
-    };
-    iniciarSesion(t);
-    (async () => {
-        const dec = new TextDecoder();
-        try {
-            for (;;) {
-                const { value, done } = await lector.read();
-                if (done) break;
-                entregar(dec.decode(value, { stream: true }));
-            }
-        } catch (e) { /* se desenchufó */ }
-        if (S.transporte === t) cerrar();
-    })();
 }
 
 async function cerrar() {
@@ -1760,9 +1788,7 @@ async function cerrar() {
     if (t) { try { await t.cerrar(); } catch (e) { /* ya estaba cerrado */ } }
     ponEstado('desconectado');
     progreso(0);
-    if (era === 'listo') mensaje(t && t.tipo === 'ble'
-        ? 'Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.'
-        : 'El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+    if (era === 'listo') mensaje('Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.');
 }
 
 const hayBluetooth = () => !!(raiz.RobotBluetooth && raiz.RobotBluetooth.disponible());
@@ -1785,33 +1811,14 @@ async function conectarBluetooth(recordado) {
     }
 }
 
-async function conectar(todos) {
-    if (hayBluetooth()) return conectarBluetooth(false);
-    if (!('serial' in navigator)) {
-        mensaje('Este navegador no puede hablar con el robot. Abre la página en Chrome o Edge desde una computadora.', 'err');
-        return;
-    }
-    if (S.estado !== 'desconectado') { await cerrar(); return; }
-    try {
-        const filtros = todos ? [] : [{ usbVendorId: VID_CH340 }];
-        await abrirSerie(await navigator.serial.requestPort({ filters: filtros }));
-    } catch (e) {
-        if (e && e.name !== 'NotFoundError') mensaje('No se pudo conectar: ' + e.message, 'err');
-    }
+async function conectar() {
+    if (!hayBluetooth()) return mensaje('El robot solo se controla desde la app del celular.', 'err');
+    return conectarBluetooth(false);
 }
 
-// Si ya diste permiso antes, se conecta solo al abrir la pestaña (USB: también al enchufar el cable)
-async function conectarSolo() {
-    if (S.estado !== 'desconectado' || $('sec-robot').hidden) return;
-    if (hayBluetooth()) {
-        if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
-        return;
-    }
-    if (!('serial' in navigator)) return;
-    try {
-        const p = (await navigator.serial.getPorts()).find(x => (x.getInfo().usbVendorId || 0) === VID_CH340);
-        if (p) await abrirSerie(p);
-    } catch (e) { /* sin permiso todavía: espera al botón */ }
+function conectarSolo() {
+    if (S.estado !== 'desconectado' || $('sec-robot').hidden || !hayBluetooth()) return;
+    if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
 }
 
 // ---------- Sonido en el navegador (escuchar sin robot) ----------
@@ -1959,9 +1966,10 @@ function funcionActual() {
 
 function armarFuncion(f, minS = 30) {
     mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
+    const notas = notasDeFuncion(f, minS);
     return compilar({
-        notas: notasDeFuncion(f, minS),
-        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, minS),
+        notas,
+        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, minS, S.fwGiro && !notas.length),
         bpm: S.bpm, vel: S.vel, continuo: true,
     });
 }
@@ -1991,8 +1999,7 @@ function iniciarFuncion(reinicio) {
         return esperarYTocar({ fn: true });
     }
     S.guardarEn = 0;                       // unas luces apagadas por la función no se guardan en el robot
-    if (f.modo === 6 && !S.fwLin) return mensaje('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
-    if (f.modo === 7 && !S.fwPark) return mensaje('El programa que lleva el robot no trae esta función: instálalo otra vez en Conexión.', 'err');
+    if (f.modo && !S.fwNuevo) return mensaje('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
     if (f.modo) {
         S.actuando = false;
         S.corriendoFuncion = true;
@@ -2045,7 +2052,8 @@ function guardarFuncion() {
         ordenes = ['MODE 4', 'SPD ' + velAuto()].concat(musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
-        const { cmds, ms } = compilar({ notas: notasDeFuncion(f, 0), pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
+        const notas = notasDeFuncion(f, 0);
+        const { cmds, ms } = compilar({ notas, pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0, S.fwGiro && !notas.length), bpm: S.bpm, vel: S.vel, continuo: true });
         if (!ms) return funInfo('Esa función no tiene pasos.', 'err');
         const prog = programaParaRobot(cmds);
         if (!prog.cabe) return funInfo(`Es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una canción más corta o quita la música.`, 'err');
@@ -2146,8 +2154,7 @@ function iniciarSerie(listo) {
         paro();
         return esperarYSerie();
     }
-    if (items.some(x => x.f.modo === 6) && !S.fwLin) return serieInfo('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
-    if (items.some(x => x.f.modo === 7) && !S.fwPark) return serieInfo('El programa que lleva el robot no trae «Acercarse a la pared»: instálalo otra vez en Conexión.', 'err');
+    if (!S.fwNuevo) return serieInfo('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
     S.guardarEn = 0;
     S.corriendoFuncion = true;
     S.serieOn = true;
@@ -2159,8 +2166,8 @@ function guardarSerie() {
     const items = itemsDeSerie(S.serie, S.variante);
     if (!items.length) return serieInfo('Añade al menos una función a la serie.', 'err');
     if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
-    if (!S.fwPark) return serieInfo('El programa que lleva el robot no sabe guardar series: instálalo otra vez en Conexión.', 'err');
-    const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion });
+    if (!S.fwNuevo) return serieInfo('El programa que lleva el robot es viejo: instálale el nuevo desde la computadora.', 'err');
+    const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion, exacto: S.fwGiro });
     if (!prog.cabe) return serieInfo(`La serie es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): quita funciones o baja los segundos.`, 'err');
     if (S.corriendoFuncion || S.actuando || S.serieOn) paro();
     S.guardarEn = 0;
@@ -2449,7 +2456,7 @@ function pintarFunciones() {
     $('rb-fn-vel').value = S.vel;
     $('rb-fn-vel-v').textContent = S.vel;
     $('rb-ln').hidden = !(f && f.modo === 6);
-    $('rb-ln-aviso').hidden = S.fwLin || S.estado !== 'listo';
+    $('rb-ln-aviso').hidden = S.fwNuevo || S.estado !== 'listo';
     $('rb-ln-vel').value = S.linea.vel;
     $('rb-ln-vel-v').textContent = S.linea.vel;
     $('rb-ln-giro').value = S.linea.giro;
@@ -2552,7 +2559,7 @@ function pintarAnillo() {
             b.className = 'rb-led';
             b.dataset.i = i;
             b.textContent = i + 1;
-            const ang = (i / LEDS) * 2 * Math.PI - Math.PI / 2;
+            const ang = ((i - 2) / LEDS) * 2 * Math.PI - Math.PI / 2;
             b.style.left = (50 + 38 * Math.cos(ang)) + '%';
             b.style.top = (50 + 38 * Math.sin(ang)) + '%';
             b.setAttribute('aria-label', 'LED ' + (i + 1));
@@ -2563,7 +2570,17 @@ function pintarAnillo() {
         b.style.setProperty('--c', S.leds[i]);
         b.setAttribute('aria-pressed', String(i === S.sel));
     });
-    $('rb-led-color').value = S.leds[S.sel];
+    const c = S.leds[S.sel];
+    $('rb-led-color').value = c;
+    $('rb-led-dot').style.setProperty('--c', c);
+    $('rb-led-nombre').textContent = 'LED ' + (S.sel + 1);
+    $('rb-led-color-nombre').textContent = nombreColor(c);
+    document.querySelectorAll('#rb-paleta button.rb-sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c.toLowerCase() === c.toLowerCase())));
+}
+
+function nombreColor(hex) {
+    const p = PALETA.find(x => x[0].toLowerCase() === String(hex).toLowerCase());
+    return p ? p[1] : String(hex).toUpperCase();
 }
 
 function pintarTodo() {
@@ -2606,32 +2623,7 @@ function pintarCanciones() {
     $('rb-cancion').value = S.cancion;
 }
 
-// ---------- Audio o MIDI -> ritmo ----------
-// Reutiliza la detección de golpes de timbre.js (la misma del ritmo del timbre) y deja el
-// resultado como texto de notas con milisegundos, para poder editarlo, escucharlo y guardarlo.
-
-function infoAudio(texto, tipo) {
-    const el = $('rb-aud-info');
-    el.textContent = texto || '';
-    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
-}
-
-async function leerArchivoMusica(f) {
-    const buf = await f.arrayBuffer();
-    if (/\.midi?$/i.test(f.name)) {
-        const notas = parseMidi(new Uint8Array(buf));
-        if (!notas.length) throw new Error('el MIDI no trae notas');
-        return { tipo: 'midi', notas, dur: notas[notas.length - 1].e / 1000 };
-    }
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new Ctx();
-    try {
-        const buffer = await ctx.decodeAudioData(buf);
-        return { tipo: 'audio', buffer, dur: buffer.duration };
-    } finally {
-        ctx.close();
-    }
-}
+// ---------- Cantar: la voz del micrófono -> notas ----------
 
 // Pedazo [ini, ini + dur] segundos, mezclado a mono
 function monoVentana(buffer, ini, dur) {
@@ -2658,65 +2650,6 @@ function estimarBpm(intervalos) {
     while (bpm > 200) bpm /= 2;
     while (bpm < 70) bpm *= 2;
     return Math.round(bpm);
-}
-
-// Registro donde buscar la melodía: [Hz mínimo, Hz máximo]
-const REGISTROS = { voz: [130, 1000], agudo: [260, 1800], grave: [60, 350] };
-
-function convertirAudio() {
-    if (!musicaCargada) return infoAudio('Primero elige un archivo de audio o un MIDI.', 'err');
-    const ini = clamp(Number($('rb-aud-ini').value) || 0, 0, Math.max(0, musicaCargada.dur - 1));
-    const dur = clamp(Number($('rb-aud-dur').value) || 20, 1, 60);
-    const desde = ini * 1000, hasta = (ini + dur) * 1000;
-    const melodia = $('rb-aud-que').value === 'melodia';
-    let texto, intervalos, aviso = '';
-
-    if (melodia) {
-        // la línea melódica dominante: la voz si la hay, o el instrumento principal si es solo instrumental
-        const reg = REGISTROS[$('rb-aud-reg').value] || REGISTROS.voz;
-        const op = { fMin: reg[0], fMax: reg[1], sens: Number($('rb-aud-sens').value), tonalidad: $('rb-aud-tonal').checked, subir: $('rb-aud-subir').checked };
-        let r;
-        if (musicaCargada.tipo === 'midi') {
-            const notas = musicaCargada.notas
-                .filter(n => n.c !== 9 && n.p !== undefined && n.e > desde && n.s < hasta)       // sin la batería
-                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p }));
-            r = melodiaDeMidi(notas, op);
-        } else {
-            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
-            r = melodiaDeAudio(x, sr, op);
-        }
-        texto = r.texto;
-        intervalos = r.intervalos;
-        if (r.tonalidad && texto) aviso = ' Tonalidad: ' + r.tonalidad + '.';
-        if (r.truncado) aviso += ' Se cortó en ' + MAX_NOTAS + ' notas.';
-        if (!texto) return infoAudio('No encontré una melodía clara en ese pedazo. Sube la sensibilidad, cambia el registro o elige otra parte.', 'err');
-    } else {
-        const op = { modo: $('rb-aud-modo').value, sens: Number($('rb-aud-sens').value), golpe: 120, sep: 120 };
-        if (musicaCargada.tipo === 'midi') {
-            const notas = musicaCargada.notas
-                .filter(n => n.e > desde && n.s < hasta)
-                .map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde }));
-            intervalos = midiARitmo(notas, op).intervalos;
-        } else {
-            const { x, sr } = monoVentana(musicaCargada.buffer, ini, dur);
-            intervalos = audioARitmo(x, sr, op).intervalos;
-        }
-        texto = ritmoATexto(intervalos, TONOS_RITMO[$('rb-aud-tono').value] || TONOS_RITMO.alterna);
-        if (!texto) return infoAudio('No encontré golpes en ese pedazo. Sube la sensibilidad o elige otra parte.', 'err');
-    }
-
-    const n = leerNotas(texto).notas;
-    const total = n.reduce((suma, x) => suma + (x.ms || 0), 0);
-    const bpm = estimarBpm(intervalos);
-    S.notas = texto;
-    S.cancion = 'propia';
-    if (bpm) S.bpm = bpm;
-    $('rb-nombre').value = '';
-    pintarCanciones();
-    pintarTodo();
-    cambio('cancion');
-    const que = melodia ? n.filter(x => x.hz > 0).length + ' notas' : intervalos.length + ' golpes';
-    infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
 }
 
 const REGISTROS_CANTO = { hombre: [80, 400], media: [120, 700], aguda: [200, 1000] };
@@ -2809,122 +2742,6 @@ async function alternarCanto() {
         }
     };
     rec.start();
-}
-
-// Corre un generador cediendo el hilo entre pasos, para mostrar el avance sin congelar la página
-async function correrAsync(gen, alAvance) {
-    let r = gen.next();
-    while (!r.done) {
-        if (alAvance) alAvance(r.value);
-        await new Promise(ok => setTimeout(ok, 0));
-        r = gen.next();
-    }
-    return r.value;
-}
-
-// «Mi canción (Official Video) [HD].mp3» -> «Mi canción»
-function nombreDeArchivo(archivo, n) {
-    let t = archivo.slice(0, archivo.lastIndexOf('.') > 0 ? archivo.lastIndexOf('.') : archivo.length);
-    for (const [a, b] of [['(', ')'], ['[', ']']]) {
-        for (let i = t.indexOf(a); i >= 0; i = t.indexOf(a)) {
-            const j = t.indexOf(b, i);
-            t = t.slice(0, i) + (j > i ? t.slice(j + 1) : '');
-        }
-    }
-    t = t.split('_').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 40).trim();
-    return t || 'Canción ' + n;
-}
-
-// Un archivo -> { texto, bpm, notas, seg, ritmo } o null si no se pudo sacar nada
-async function convertirArchivoAuto(f, durSeg, alAvance) {
-    const m = await leerArchivoMusica(f);
-    let r, ritmo = false, intervalos = [];
-    const dur = clamp(durSeg, 10, 60);
-    if (m.tipo === 'midi') {
-        const utiles = m.notas.filter(n => n.c !== 9 && n.p !== undefined);
-        const desde = utiles.length ? Math.min(...utiles.map(n => n.s)) : 0, hasta = desde + dur * 1000;
-        r = melodiaDeMidi(utiles.filter(n => n.e > desde && n.s < hasta).map(n => ({ s: Math.max(0, n.s - desde), e: Math.min(hasta, n.e) - desde, p: n.p })), {});
-        intervalos = r.intervalos;
-    } else {
-        const { x, sr } = monoVentana(m.buffer, 0, Math.min(m.dur, 600));
-        r = await correrAsync(melodiaAutoGen(x, sr, { durSeg: dur, sens: Number($('rb-aud-sens').value) || 50 }), alAvance);
-        intervalos = r.intervalos;
-        if (!r.texto || r.voz < 0.15) {                        // sin melodía clara: se queda el ritmo del mejor pedazo
-            const w = monoVentana(m.buffer, r.ini || 0, dur);
-            const rit = audioARitmo(w.x, w.sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
-            const texto = ritmoATexto(rit.intervalos, TONOS_RITMO.alterna);
-            if (texto) { r = { texto, notas: rit.intervalos.length, ms: 0, intervalos: rit.intervalos }; ritmo = true; intervalos = rit.intervalos; }
-        }
-    }
-    if (!r || !r.texto) return null;
-    const n = leerNotas(r.texto).notas;
-    const ms = n.reduce((suma, q) => suma + (q.ms || 0), 0);
-    return { texto: r.texto, bpm: estimarBpm(intervalos) || 110, notas: n.filter(q => q.hz > 0).length, seg: ms / 1000, ritmo };
-}
-
-function guardarConNombre(nombre, texto, bpm) {
-    let g = S.guardadas.find(x => x.nombre.toLowerCase() === nombre.toLowerCase());
-    if (g) { g.texto = texto; g.bpm = bpm; }
-    else {
-        if (S.guardadas.length >= MAX_GUARDADAS) return null;
-        g = { id: Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), nombre, texto, bpm };
-        S.guardadas.push(g);
-    }
-    return g;
-}
-
-let agregando = false;
-async function agregarAutomatico(archivos) {
-    if (agregando) return;
-    agregando = true;
-    const lista = $('rb-aud-lista'), barra = $('rb-aud-prog');
-    lista.textContent = '';
-    infoAudio('');
-    barra.hidden = false;
-    let ultimo = null, bien = 0;
-    const durSeg = Number($('rb-aud-dur').value) || 30;
-    try {
-        for (let i = 0; i < archivos.length; i++) {
-            const f = archivos[i];
-            const li = document.createElement('li');
-            li.className = 'rb-aud-item';
-            const nom = document.createElement('b');
-            nom.textContent = nombreDeArchivo(f.name, S.guardadas.length + 1);
-            const est = document.createElement('span');
-            est.textContent = 'Analizando…';
-            li.append(nom, est);
-            lista.appendChild(li);
-            barra.value = i / archivos.length;
-            try {
-                const r = await convertirArchivoAuto(f, durSeg, p => { barra.value = (i + p) / archivos.length; });
-                if (!r) { li.className += ' is-error'; est.textContent = 'No encontré una melodía'; continue; }
-                const g = guardarConNombre(nom.textContent, r.texto, r.bpm);
-                if (!g) { li.className += ' is-error'; est.textContent = 'Ya tienes ' + MAX_GUARDADAS + ' guardadas'; continue; }
-                li.className += ' is-ok';
-                est.textContent = (r.ritmo ? 'Solo ritmo · ' : '') + r.notas + ' notas · ' + Math.round(r.seg) + ' s';
-                ultimo = g;
-                bien++;
-            } catch (err) {
-                li.className += ' is-error';
-                est.textContent = 'No pude leer el archivo';
-            }
-        }
-    } finally {
-        barra.hidden = true;
-        agregando = false;
-    }
-    if (ultimo) {
-        S.cancion = 'g:' + ultimo.id;
-        S.notas = ultimo.texto;
-        S.bpm = ultimo.bpm;
-        $('rb-nombre').value = ultimo.nombre;
-        pintarCanciones();
-        pintarTodo();
-        guardar();
-        infoAudio(bien === 1 ? 'Guardada. Ya sale en la lista de canciones.' : bien + ' canciones guardadas.', 'ok');
-    } else {
-        infoAudio('No se pudo agregar ninguna canción.', 'err');
-    }
 }
 
 function guardarCancion() {
@@ -3222,8 +3039,9 @@ function iniciarBarraYBateria() {
     $('rb-badge').addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irAConectar(); }
     });
-    $('rb-barra-paro').addEventListener('click', pararTodo);
-    $('rb-barra-play').addEventListener('click', reproducirGeneral);
+    const pulso = b => { b.classList.remove('is-pulso'); void b.offsetWidth; b.classList.add('is-pulso'); };
+    $('rb-barra-paro').addEventListener('click', () => { pulso($('rb-barra-paro')); pararTodo(); });
+    $('rb-barra-play').addEventListener('click', () => { pulso($('rb-barra-play')); reproducirGeneral(); });
     document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); cascada(); });
     pintarBarra();
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto
@@ -3266,14 +3084,12 @@ function iniciar() {
     opciones($('rb-baile'), BAILES, 'Mi baile');
     $('rb-efecto').innerHTML = EFECTOS.map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
     $('rb-fn-var').innerHTML = VARIANTES.map(v => `<option value="${v.id}">${v.nombre}</option>`).join('');
-    $('rb-paleta').innerHTML = PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-label="Pintar todos de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join('');
+    $('rb-paleta').insertAdjacentHTML('afterbegin', PALETA.map(([c, n]) => `<button type="button" class="rb-sw" data-c="${c}" aria-pressed="false" aria-label="Pintar el LED de ${n}" title="${n}"><span class="rb-sw__dot" style="--c:${c}"></span><span class="rb-sw__name">${n}</span></button>`).join(''));
     pintarTodo();
     ponEstado('desconectado');
 
-    $('rb-conectar').addEventListener('click', () => conectar(false));
-    if ($('rb-todos')) $('rb-todos').addEventListener('click', () => conectar(true));
+    $('rb-conectar').addEventListener('click', conectar);
     $('rb-paro').addEventListener('click', paro);
-    $('rb-diag-borrar').addEventListener('click', () => { S.cola.enviar(['DIAG0']); $('rb-diag').hidden = true; });
     $('rb-tocar').addEventListener('click', () => actuar(true, false));
     $('rb-bailar').addEventListener('click', () => actuar(true, true));
     $('rb-escuchar').addEventListener('click', escucharAqui);
@@ -3301,17 +3117,6 @@ function iniciar() {
     $('rb-guardar').addEventListener('click', guardarCancion);
     $('rb-borrar').addEventListener('click', borrarCancion);
 
-    // Elegir archivos los convierte y los guarda solos; el último queda en la pantalla y también cargado para los ajustes manuales
-    $('rb-audio').addEventListener('change', async e => {
-        const archivos = Array.from(e.target.files || []).slice(0, 12);
-        musicaCargada = null;
-        if (!archivos.length) return infoAudio('');
-        try { musicaCargada = await leerArchivoMusica(archivos[archivos.length - 1]); $('rb-aud-ini').value = 0; } catch (err) { /* lo dirá el automático */ }
-        await agregarAutomatico(archivos);
-        e.target.value = '';
-    });
-    $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
-    $('rb-aud-convertir').addEventListener('click', convertirAudio);
     $('rb-cant-grabar').addEventListener('click', alternarCanto);
     $('rb-bpm').addEventListener('input', e => {
         S.bpm = Number(e.target.value);
@@ -3452,11 +3257,14 @@ function iniciar() {
         pintarAnillo();
     });
     $('rb-led-color').addEventListener('input', e => { S.leds[S.sel] = e.target.value; pintarAnillo(); cambio('led'); });
-    $('rb-led-todos').addEventListener('click', () => { S.leds.fill($('rb-led-color').value); pintarAnillo(); cambio('led'); });
+    $('rb-led-todos').addEventListener('click', () => { S.leds.fill(S.leds[S.sel]); pintarAnillo(); cambio('led'); });
+    $('rb-led-apagar').addEventListener('click', () => { S.leds[S.sel] = '#000000'; pintarAnillo(); cambio('led'); });
+    $('rb-led-ant').addEventListener('click', () => { S.sel = (S.sel + LEDS - 1) % LEDS; pintarAnillo(); });
+    $('rb-led-sig').addEventListener('click', () => { S.sel = (S.sel + 1) % LEDS; pintarAnillo(); });
     $('rb-paleta').addEventListener('click', e => {
-        const b = e.target.closest('.rb-sw');
+        const b = e.target.closest('button.rb-sw');
         if (!b) return;
-        S.leds.fill(b.dataset.c);
+        S.leds[S.sel] = b.dataset.c;
         pintarAnillo();
         cambio('led');
     });
@@ -3482,17 +3290,13 @@ function iniciar() {
 
     setInterval(tickLeds, 100);
 
-    // Conectarse solo al abrir la pestaña y al enchufar el cable
-    new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
-    if (hayBluetooth()) {
-        mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
-    } else if ('serial' in navigator) {
-        navigator.serial.addEventListener('connect', conectarSolo);
-        navigator.serial.addEventListener('disconnect', () => { if (S.estado !== 'desconectado') cerrar(); });
-    } else {
-        mensaje('Para controlar el robot abre esta página en Chrome o Edge desde una computadora.', 'err');
-    }
-    window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+    new MutationObserver(() => {
+        if (!$('sec-robot').hidden && S.estado === 'listo') mensaje('Robot conectado', 'ok', true);
+        conectarSolo();
+    }).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
+    if (hayBluetooth()) mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
+    window.addEventListener('pagehide', () => { guardarYa(); if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) guardarYa(); });
 
     // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
     raiz.RobotUI = { cerrarSuave };
@@ -3500,10 +3304,14 @@ function iniciar() {
         estado: () => S.estado,
         listo: () => S.estado === 'listo',
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
+        libre: () => S.estado === 'listo' && !S.actuando && !S.corriendoFuncion && !S.serieOn && !S.ruleta,
+        soportaRumbo: () => S.estado === 'listo' && S.fwGiro,
+        rumboIniciar(si) { if (S.estado === 'listo' && S.fwGiro) S.cola.enviar([{ l: si ? 'H0' : 'H1', ex: true }]); },
+        rumbo(grados, v) { if (S.estado === 'listo' && S.fwGiro) { S.ultimaActividad = Date.now(); S.cola.ultimo('H', 'H ' + grados + ' ' + v); } },
         paro: pararTodo,
         // Distancia al obstáculo de enfrente (firmware con DIST): el mando pregunta ~3 veces por segundo, nunca con la cola ocupada
-        soportaDistancia: () => S.estado === 'listo' && S.fwDist,
-        pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
+        soportaDistancia: () => S.estado === 'listo' && S.fwNuevo,
+        pedirDistancia() { if (S.estado === 'listo' && S.fwNuevo && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
         distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
         giro90: () => S.giro90,
         funcionPorId(id) {
@@ -3535,8 +3343,8 @@ function iniciar() {
         },
         canciones: () => CANCIONES.map(c => ({ id: c.id, nombre: c.nombre })).concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre }))),
         cancionActual: () => S.cancion,
-        soportaSenal: () => S.estado === 'listo' && S.fwDir,
-        senal(tipo, v) { if (S.estado === 'listo' && S.fwDir) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
+        soportaSenal: () => S.estado === 'listo' && S.fwNuevo,
+        senal(tipo, v) { if (S.estado === 'listo' && S.fwNuevo) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
         luzAhora: () => ({ efecto: S.efecto, leds: S.leds.slice() }),
         ponerLuz(o) {

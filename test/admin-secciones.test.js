@@ -51,12 +51,12 @@ assert(toolbar.includes('openAddModal()') && toolbar.includes('Nueva Materia'), 
     const fin = html.indexOf('class="rb-barra"');
     assert(ini > 0 && fin > ini);
     const instalar = html.slice(ini, fin);
-    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-todos', 'rb-bat-quim', 'rb-bat-cap', 'rb-bat-borrar', 'rb-diag']) {
+    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-bat-quim', 'rb-bat-cap', 'rb-bat-borrar']) {
         assert(instalar.includes(`id="${id}"`), `${id} debe estar en Instalar`);
         assert.strictEqual(html.split(`id="${id}"`).length - 1, 1, `${id} solo una vez`);
     }
     const cab = html.slice(html.indexOf('<section class="panel rb-conexion"'), html.indexOf('id="sec-robot-musica"'));
-    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-todos', 'rb-msg']) assert(!cab.includes(`id="${id}"`), `${id} no va en la cabecera`);
+    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-msg']) assert(!cab.includes(`id="${id}"`), `${id} no va en la cabecera`);
     for (const id of ['rb-bat', 'rb-badge', 'robot-heading']) assert(cab.includes(`id="${id}"`), `${id} sí va en la cabecera`);
     // el mensaje y el avance acompañan a la barra fija, que se ve en todas las secciones del robot
     const barra = html.slice(fin);

@@ -165,7 +165,6 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.marcoHex(blanco, 100), 'ffffff'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 0), '000000'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 50).slice(0, 6), '808080');
-    assert.deepStrictEqual(R.hsv(0, 1, 1).map(Math.round), [255, 0, 0]);
     assert.deepStrictEqual(R.hexARgb('#ff8000'), [255, 128, 0]);
     // FX: modo, brillo y los 12 colores base SIN brillo (lo aplica el robot)
     const azul = Array.from({ length: 12 }, () => [0, 0, 255]);
@@ -187,30 +186,6 @@ for (const c of R.CANCIONES) {
     const b = R.compilar({ notas: R.leerNotas('A5:200 R:100').notas, bpm: 240 });
     assert.deepStrictEqual(a.cmds.map(c => c.l), b.cmds.map(c => c.l));
     assert.strictEqual(a.ms, 300);
-    // intervalos -> texto: pausas, tonos que alternan y duración mínima
-    const txt = R.ritmoATexto([[0, 100], [250, 350], [600, 605]]);
-    assert.strictEqual(txt, 'C5:100 R:150 E5:100 R:250 G5:10');
-    assert.deepStrictEqual(R.leerNotas(txt).errores, []);
-    assert.strictEqual(R.ritmoATexto([[200, 300]], R.TONOS_RITMO.agudo), 'R:200 A5:100');
-    // un audio larguísimo nunca pasa del máximo de notas
-    const muchos = Array.from({ length: 1000 }, (_, i) => [i * 100, i * 100 + 50]);
-    assert.deepStrictEqual(R.leerNotas(R.ritmoATexto(muchos)).errores, []);
-}
-
-// 16d) Audio -> ritmo del robot con la detección de golpes de timbre.js (8 golpes sintéticos cada 500 ms)
-{
-    const T = require('../timbre.js');
-    const sr = 8000, x = new Float32Array(sr * 4);
-    for (let c = 0; c < 8; c++) for (let i = 0; i < 240; i++) x[c * 4000 + 800 + i] = Math.sin(i * 0.9) * Math.exp(-i / 60);
-    const { intervalos } = T.audioARitmo(x, sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
-    assert.strictEqual(intervalos.length, 8);
-    const { notas, errores } = R.leerNotas(R.ritmoATexto(intervalos));
-    assert.deepStrictEqual(errores, []);
-    assert.strictEqual(notas.filter(n => n.hz > 0).length, 8);
-    const total = notas.reduce((s, n) => s + n.ms, 0);
-    assert(Math.abs(total - intervalos[7][1]) <= 60, 'dura lo mismo que el audio: ' + total);
-    const { cmds, ms } = R.compilar({ notas });
-    assert.strictEqual(cmds.reduce((s, c) => s + c.ms, 0), ms);
 }
 
 // 16f) Cola: una orden de luces que llega rota (ERR) se reintenta UNA vez; las de tiempo (T, W, M) no
@@ -284,9 +259,6 @@ for (const c of R.CANCIONES) {
     }
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ff0000')), 40).slice(0, 6), '660000');
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ffffff')), 40).slice(0, 6), '666666');
-    // el arcoíris también usa primarios puros
-    assert.deepStrictEqual(R.hsv(1 / 3, 1, 1).map(Math.round), [0, 255, 0]);
-    assert.deepStrictEqual(R.hsv(2 / 3, 1, 1).map(Math.round), [0, 0, 255]);
 }
 
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)
@@ -317,9 +289,7 @@ for (const c of R.CANCIONES) {
     }
     assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
     // diagnóstico que la página lee al conectar
-    assert(ino.includes('F(" BAT=")'), 'INFO sin BAT=');
-    assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
-    assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
+    assert(ino.includes('F("INFO BAT=")') && ino.includes('strcmp(cmd, "BAT")'), 'INFO y BAT con el voltaje');
     // el bootloader de esta placa puede dejar el watchdog armado: se apaga antes que nada (.init3),
     // y MCUSR ya no sirve para saber por que se reinicio (solo se limpia)
     assert(/section\("\.init3"\)/.test(ino) && /wdt_disable\(\)/.test(ino) && /MCUSR = 0;/.test(ino), 'el firmware apaga el watchdog al arrancar');
@@ -329,7 +299,7 @@ for (const c of R.CANCIONES) {
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`VEL_TURBO = ${R.VEL_TURBO};`).test(ino), 'VEL_TURBO distinto entre página y firmware');
-    assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
+    assert(/Serial\.begin\(115200\)/.test(ino), 'baudios distintos');
 }
 
 // 18) Melodía de un audio: se recuperan las notas, un salto normal no se "corrige" y un salto de
@@ -361,10 +331,6 @@ for (const c of R.CANCIONES) {
     const grave = R.melodiaDeAudio(tono([[48, 0.3], [52, 0.3], [55, 0.3], [52, 0.3]]), sr, { fMin: 80, fMax: 400, tonalidad: false });
     assert.deepStrictEqual(nombres(grave).map(n => n.replace(/\d/, '')), ['C', 'E', 'G', 'E'], grave.texto);
     assert(nombres(grave).every(n => /[5-6]$/.test(n)), grave.texto);
-
-    // un MIDI se convierte igual, y a la vez suena la más aguda
-    const m = R.melodiaDeMidi([{ s: 0, e: 200, p: 60 }, { s: 0, e: 200, p: 48 }, { s: 200, e: 400, p: 64 }], { subir: false });
-    assert.deepStrictEqual(nombres(m), ['C4', 'E4'], m.texto);
 
     // y la ficha resultante es una canción que la página sabe tocar
     assert(R.leerNotas(r1.texto).notas.length === 6);
@@ -582,9 +548,75 @@ for (const c of R.CANCIONES) {
     assert(Math.abs(fin.x) < 25 && Math.abs(fin.y) < 25, 'el cuadrado vuelve cerca del inicio');
     assert.strictEqual(R.trazoDeSerie(R.itemsDeSerie([{ id: 'esquivar', seg: 20 }], 'tanque')).length, 1, 'las de sensor no se pueden predecir');
 
+    const exacto = R.pasosDeFuncion('AD 1 GD 90° GI 45°', 500, 120, 0, true);
+    assert.deepStrictEqual(exacto.map(p => p.grados || 0), [0, 90, 45], 'con giroscopio los giros llevan sus grados');
+    assert.deepStrictEqual(R.pasosDeFuncion('AD 1 GD 90°', 500, 120, 0), [{ mov: 'AD', beats: 2 }, { mov: 'GD', beats: 1 }], 'sin giroscopio no cambia nada');
+    const girando = R.compilar({ pasos: R.pasosDeFuncion('AD 1 GD 90° GI 45° AD 1', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert.deepStrictEqual(girando.filter(l => l[0] !== 'W'), ['M 110 110', 'G 90', 'G -45', 'M 110 110'], 'los giros salen como G grados y las rectas se reanudan después');
+    const conMusica = R.compilar({ notas: R.leerNotas('C5/4 C5 C5 C5').notas, pasos: R.pasosDeFuncion('GD 90°', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert(!conMusica.some(l => l.startsWith('G ')), 'con música el giro sigue siendo por tiempo (la orden G bloquea las notas)');
+    const progG = R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110, exacto: true });
+    assert(progG.lineas.includes('PADD G 90'), 'la serie guarda el giro exacto');
+    assert(!R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110 }).lineas.some(l => l.startsWith('PADD G')), 'sin giroscopio no hay PADD G');
+
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(a, "G"\)/.test(ino) && /op == 6/.test(ino) && /strcmp\(cmd, "G"\)/.test(ino) && ino.includes('GIRO='), 'el firmware gira con el giroscopio (G, PADD G, INFO GIRO)');
+    assert(!/digitalWrite|digitalRead|pinMode|analogWrite/.test(ino.replace(/\/\/.*$/gm, '')), 'el firmware usa los registros directo (las funciones de pines pesan ~700 bytes)');
     assert(/strcmp\(a, "O"\)/.test(ino) && /pgmPon\(5\)/.test(ino), 'el firmware guarda PADD O');
     assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
+}
+
+// 23d) Modo dirección: la palanca marca un rumbo y el robot gira hacia él (atrás = da la vuelta, no retrocede)
+{
+    const D = R.rumboDeJoystick;
+    assert.deepStrictEqual(D(0, 1, 100), { grados: 0, v: 180 }, 'arriba: rumbo 0 a toda velocidad');
+    assert.deepStrictEqual(D(1, 0, 100), { grados: 90, v: 180 }, 'derecha: 90');
+    assert.deepStrictEqual(D(-1, 0, 100), { grados: -90, v: 180 }, 'izquierda: -90');
+    assert.deepStrictEqual(D(0, -1, 100), { grados: 180, v: 180 }, 'atrás: 180, es decir, da la vuelta');
+    assert.deepStrictEqual(D(0, -1, 60), { grados: 180, v: 108 }, '60 % de 180');
+    assert.deepStrictEqual(D(0.05, 0.05, 100), { grados: 0, v: 0 }, 'zona muerta: no se mueve');
+    assert.strictEqual(D(0.7, 0.7, 100).grados, 45, 'diagonal a la derecha');
+    assert.strictEqual(D(-0.7, -0.7, 100).grados, -135, 'diagonal atrás a la izquierda');
+    assert.strictEqual(D(0, 1, 100, R.VEL_TURBO).v, R.VEL_TURBO, 'el turbo sube el tope');
+    const O = R.rumboDeOrientacion;
+    const cerca = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180) < 0.5;
+    assert(cerca(O(0, 0, 0, 0), 0), 'plano con el borde de arriba al norte');
+    assert(cerca(O(270, 0, 0, 0), 90), 'plano con el borde de arriba al este');
+    assert(cerca(O(0, 90, 0, 0), 0), 'parado: la parte trasera mira al norte');
+    assert(cerca(O(90, 90, 0, 0), 270), 'parado y girado a la izquierda: la parte trasera mira al oeste');
+    assert(cerca(O(0, 0, 0, 90), 90), 'plano en horizontal: el borde de arriba de la pantalla es el lado derecho del teléfono');
+    assert.strictEqual(R.rumboRelativo(170, 30, 0), -160, 'se envuelve a -180..180');
+    assert.strictEqual(R.rumboRelativo(10, 0, 10), 0, 'sin girar el teléfono ni la palanca, el rumbo es 0');
+    assert.strictEqual(R.rumboRelativo(350, 0, 10), -20, 'si el teléfono giró 20° a la izquierda, el robot también');
+    assert.strictEqual(R.rumboRelativo(100, 90, 100), 90, 'la palanca a la derecha, con el teléfono donde se alineó, es 90');
+    assert.strictEqual(R.rumboRelativo(190, 90, 100), -180, 'si el teléfono giró 90° a la derecha y la palanca va a la derecha, el robot da la media vuelta (180° = -180°)');
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/\(rumbo \+ 65536L\) >> 17/.test(ino), 'el rumbo sube al girar a la derecha');
+    assert(/strcmp\(cmd, "H0"\)/.test(ino) && /strcmp\(cmd, "H1"\)/.test(ino) && /strcmp\(cmd, "H"\) && a && b/.test(ino) && /void rumboMueve/.test(ino), 'el firmware lleva el modo dirección (H0, H1, H)');
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const ctl = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8');
+    assert(/addEventListener\('deviceorientationabsolute'/.test(ctl) && /iniciarBrujula\(\);/.test(ctl) && /rumboRelativo\(hayBrujula\(\) \? C\.fiF : C\.fi0, r\.grados, C\.fi0\)/.test(ctl) && /\.es-incl \.rb-estilo \{ display: none; \}/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')) && /\.es-dir #rb-ctl-ruta, \.rb-mando\.es-dir \.rb-freno \{ display: none; \}/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'la brújula del teléfono se lee siempre y el rumbo que se manda la usa en cada revisión');
+    assert(/id="rb-dir-cal"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')) && /\$\('rb-dir-cal'\)\.addEventListener\('click', alinearRumbo\)/.test(ctl), 'hay un botón para alinear el teléfono con el robot');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const ctlLF = ctl.replace(/\r/g, '');
+    assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl), 'la app manda H con el rumbo de la palanca');
+    assert(!/id="rb-dir-on"/.test(html) && /ciclarCel\(\); \}\);/.test(ctl), 'el modo dirección ya no tiene botón propio: es el segundo estado del botón del celular');
+    assert(/if \(C\.dirModo\) \{ ponerRumbo\(false\); return; \}\n[^\n]*if \(C\.inclinar\) \{ ponerInclinar\(false\);[^\n]*ponerRumbo\(true\)[^\n]*\n[^\n]*ponerInclinar\(true\);/.test(ctlLF), 'el botón del celular pasa normal → inclinar → dirección → normal');
+    assert(/id="rb-estilo"/.test(html) && /const ESTILOS = \['palanca', 'flechas', 'pedales'\]/.test(ctl) && /class="rb-flechas"/.test(html) && /rb-pedales--dir/.test(html) && /rb-pedales--gas/.test(html) && (html.match(/data-pad="/g) || []).length === 8, 'hay botón de estilo de control con palanca, flechas (4) y pedales (2 de dirección y 2 de aceleración)');
+    assert(/if \(!f\.pad\) suavizar\(m\);/.test(ctl) && /C\.px \+= \(k1\(x\) - C\.px\) \* 0\.4;/.test(ctl), 'la palanca se suaviza y las flechas y pedales aceleran poco a poco');
+    assert(/rb-grupo--sesion/.test(html) && /rb-grupo--info/.test(html) && /rb-grupo--herr/.test(html), 'la barra del mando está agrupada en sesión, información y herramientas');
+    const fwc = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8').replace(/\r/g, '');
+    assert(/void parar\(\) \{[^}]*rumboV = 0;/.test(fwc) && /strcmp\(cmd, "M"\) && a && b\) \{[\s\S]{0,140}rumboV = 0;/.test(fwc), 'cualquier paro o una orden M cancela el control de rumbo del robot');
+    assert(/w = rumboW >> 7/.test(fwc) && /\(rumboV \* \(70 - a\)\) >> 6/.test(fwc), 'el rumbo se corrige dentro del robot, con freno por la velocidad de giro');
+}
+
+// 23c) El robot solo se controla desde la app: sin Web Serial y con la pestaña oculta en la web
+{
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!/navigator\.serial|requestPort|abrirSerie/.test(js), 'robot.js ya no usa Web Serial');
+    assert(/id="tab-ap-robot" data-solo="android"/.test(html), 'la pestaña Robot solo sale en la app');
+    assert(!/data-solo="web"/.test(html.slice(html.indexOf('id="sec-robot"'), html.indexOf('class="rb-barra"'))), 'sin instrucciones de USB en la sección del robot');
 }
 
 // 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz
@@ -609,8 +641,9 @@ for (const c of R.CANCIONES) {
     const lin = R.FUNCIONES.find(f => f.id === 'linea');
     assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
+    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw), 'el firmware lleva el seguidor');
     assert(/esquinaI/.test(fw) && /s == 5 && fase\) ledsTodos\(150, 0, 0\)/.test(fw), 'direccionales en las esquinas y reversa en rojo intermitente');
+    assert(/esquinaI\[4\] = \{ 0, 1, 9, 10 \}, esquinaD\[4\] = \{ 3, 4, 6, 7 \}/.test(fw), 'el LED 1 del anillo está 2 lugares a la izquierda del frente: los intermitentes de la derecha son los LED 4, 5, 7 y 8 (índices 3, 4, 6, 7)');
     assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
     assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
@@ -628,8 +661,8 @@ for (const c of R.CANCIONES) {
     assert(/strcmp\(cmd, "FSAVE"\)/.test(ino) && /strcmp\(cmd, "FCLR"\)/.test(ino) && /void fnCargar\(\)/.test(ino));
     const dir = Number(/const int FN_DIR = (\d+);/.exec(ino)[1]);
     const pgm = Number(/const int PGM_DIR = (\d+);/.exec(ino)[1]) + 4 + Number(/const int PGM_MAX = (\d+);/.exec(ino)[1]);
-    const diag = Number(/const int EE_BOOT = (\d+)/.exec(ino)[1]);
-    assert(dir >= pgm && dir + 4 <= diag, 'la función guardada no pisa el show ni los contadores');
+    const luces = Number(/const int EE_DIR = (\d+);/.exec(ino)[1]);
+    assert(dir >= pgm && dir + 4 <= luces, 'la función guardada no pisa el show ni las luces guardadas');
     assert(/if \(modo != 0\) fnEspera = 0;/.test(ino), 'si la página toma el control, la función no arranca sola');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');
@@ -732,13 +765,13 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(F(100, 100, [0, 0], 100, false).bloqueado, false, '0 no es una lectura');
     assert.strictEqual(F(100, 100, [5], 100, false).bloqueado, false, 'con una sola lectura todavía no frena');
     assert.strictEqual(F(100, 100, undefined, 0, false).bloqueado, false);
-    // el firmware responde a DIST, avisa DIST=1 en INFO y la página sabe leerlo
+    // el firmware responde a DIST y avisa PARK=1 en INFO: así la página sabe que es el programa de esta versión
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/!strcmp\(cmd, "DIST"\)/.test(ino) && /Serial\.print\(F\("DIST "\)\)/.test(ino), 'DIST en el firmware');
-    assert(/F\(" DIST=1/.test(ino), 'INFO avisa DIST=1');
-    assert(/DIST=1 DIR=1/.test(ino) && /!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
+    assert(/F\(" PARK=1/.test(ino), 'INFO avisa PARK=1');
+    assert(/!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
-    assert(/\^DIST /.test(js) && /kv\.DIST === 1/.test(js), 'la página lee DIST y DIST=1');
+    assert(/\^DIST /.test(js) && /kv\.PARK === 1/.test(js), 'la página lee DIST y PARK=1');
 }
 
 console.log('robot.test.js: todo bien');
@@ -825,6 +858,21 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('Yokis qué hora es'), { a: 'charla', t: 'hora' });
     assert.deepStrictEqual(V('Jarvis para'), { a: 'sinNombre' }, 'el nombre viejo ya no sirve');
     ['yokis', 'yoquis', 'yoki', 'joquis', 'llokis', 'yo kis', 'oye yoki', 'hola yoquis'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'nombre ' + n));
+    ['yakis', 'yo kiss', 'jockeys', 'yo que is', 'llokis', 'yoquiz', 'oye yakis', 'hey yo kis', 'yaquis', 'yoqui'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'oído como ' + n));
+    ['hola', 'amigo para', 'yate para', 'ya quiero que pares', 'jarvis avanza'].forEach(n => assert.strictEqual(V(n).a, 'sinNombre', 'sin nombre: ' + n));
+    assert.deepStrictEqual(V('yakis abanza dos metros'), V('Yokis avanza dos metros'));
+    assert.deepStrictEqual(V('yo kiss gira a la izquirda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('yokis enciende la lus roja'), V('Yokis enciende la luz roja'));
+    assert.deepStrictEqual(V('Yokis toca la cucarracha'), { a: 'cancion', id: 'cucaracha' });
+    assert.strictEqual(V('Yokis avanza dos metros').cm, 200, 'las palabras bien dichas no se tocan');
+    assert.strictEqual(R.corregirVocabulario('dos metros y medio'), 'dos metros y medio');
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'luces', efecto: 'fijo', color: 'Rojo' }), V('Yokis luz roja'));
+    assert.strictEqual(R.validarOrdenIA({ a: 'borrarTodo' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'funcion', id: 'inventada' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'luces', efecto: 'fijo', color: 'cafe' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'giro', grados: 99999 }).grados, 720);
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'mover', sentido: -1, cm: 'x' }), { a: 'mover', sentido: -1, cm: null, s: null });
+    assert.ok(R.promptIA().includes('circulos') && R.promptIA().includes('sinNombre'));
     assert.deepStrictEqual(V('Yokis baila'), { a: 'baile', id: null, cancion: null });
     assert.deepStrictEqual(V('Yokis ponte a bailar'), { a: 'baile', id: null, cancion: null });
     assert.deepStrictEqual(V('Yokis baila el zigzag con estrellita'), { a: 'baile', id: 'zigzag', cancion: 'estrellita' });
@@ -832,6 +880,14 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('Yokis deja de bailar'), { a: 'paro' });
     assert.deepStrictEqual(V('Yokis cómo estás'), { a: 'charla', t: 'estado' });
     assert.deepStrictEqual(V('Yokis cuéntame un chiste'), { a: 'charla', t: 'chiste' });
+    for (const d of ['Yokis tírate un facto', 'yokis tirate un fact', 'Yokis, tírate un fact por favor', 'Yokis dime un dato curioso', 'Yokis dame un dato']) {
+        assert.deepStrictEqual(V(d), { a: 'charla', t: 'fact' }, d);
+    }
+    assert(R.FRASES.fact.length >= 3, 'hay facts de fábrica');
+    const extras = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
+    assert(/function meneoHablar/.test(extras) && /enlace\(\)\.libre\(\)/.test(extras) && /E\.guardia/.test(extras.split('function meneoHablar')[1].split('function iniciarMeneo')[0]), 'Yokis menea al robot al contestar, solo si está libre y sin la guardia armada');
+    assert(/hablar\(t \|\| raiz\.Robot\.frase\(tipo, datos\), tipo === 'paro'\)/.test(extras), 'al decir «para» no se mueve');
+    assert(Object.values(R.FRASES).flat().every(f => !/\bcompa\b/i.test(f)), 'Yokis dice «we», no «compa»');
     assert.deepStrictEqual(V('Yokis gracias'), { a: 'charla', t: 'gracias' });
     assert.deepStrictEqual(V('Yokis quién eres'), { a: 'charla', t: 'quien' });
     assert.deepStrictEqual(V('Yokis qué puedes hacer'), { a: 'charla', t: 'ayuda' });
@@ -839,7 +895,7 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('Yokis adiós'), { a: 'charla', t: 'adios' });
     assert.strictEqual(V('Yokis cuántos planetas hay'), null);
     for (const tipo of Object.keys(R.FRASES)) assert(R.FRASES[tipo].length && R.FRASES[tipo].every(x => typeof x === 'string' && x.length > 3), 'frases de ' + tipo);
-    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., compa.');
+    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., we.');
     assert.strictEqual(R.frase('figura', { f: 'una estrella' }, () => 0.99), 'Órale, una estrella va saliendo.');
     assert(R.frase('noExiste').length > 3, 'tipo desconocido: contesta algo');
 }
@@ -959,6 +1015,16 @@ console.log('robot.test.js: todo bien');
     assert(/function moverEstadoRobot/.test(pl) && /function navAutoOcultar/.test(pl) && /toque\(8\)/.test(pl), 'en la app la batería sube al encabezado, las pestañas se esconden y los toques vibran');
     const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
     assert(/\.es-app \.admin-head__actions \{ display: none; \}/.test(css) && /\.es-app \.rb-barra__que \{ display: none; \}/.test(css), 'en la app no sale Cerrar sesión arriba y la barra de abajo es compacta');
+    assert(/\.es-app \.rb-barra \{[^}]*bottom: calc\(env\(safe-area-inset-bottom, 0px\) \+ 28px\)/.test(css) && /\.rb-barra \{[^}]*padding: 0; pointer-events: none;/.test(css), 'los botones de parar y reproducir suben un poco para que la barra del teléfono no los tape y van sueltos, sin recuadro');
+    const barra = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(/id="rb-barra-paro"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-stop"\/><\/svg><\/button>/.test(barra) && /id="rb-barra-play"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-play"\/><\/svg><\/button>/.test(barra), 'parar y reproducir son botones cuadrados solo con el símbolo');
+    assert(/\.es-app \{ -webkit-user-select: none; user-select: none; \}/.test(css) && /\.es-app, \.es-app \* \{ -webkit-tap-highlight-color: transparent;/.test(css) && /\.es-app ::selection \{ background: transparent; \}/.test(css) && /\.es-app input, \.es-app textarea, \.es-app \[contenteditable\] \{ -webkit-user-select: text;/.test(css), 'en la app no sale el cuadro azul al dejar presionado, pero se puede seleccionar el texto de los cuadros de escribir');
+    const rjs = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/S\.leds\[S\.sel\] = b\.dataset\.c;/.test(rjs) && !/S\.leds\.fill\(b\.dataset\.c\)/.test(rjs) && /id="rb-led-ant"/.test(barra) && /id="rb-led-sig"/.test(barra) && /id="rb-led-apagar"/.test(barra), 'tocar un color pinta solo el LED elegido; hay flechas para cambiar de LED y botón para apagarlo');
+    assert(/\.rb-paleta \.rb-sw \{[^}]*background: transparent/.test(css), 'los colores de la paleta de luces no heredan el estilo redondo del mando');
+    assert(/id="rb-toast"/.test(barra) && /\.rb-barra #rb-msg \{ display: none; \}/.test(css) && /function mensaje\(texto, tipo, rapido\) \{\s*if \(rapido\) aviso\(texto, tipo\);/.test(rjs), 'los mensajes no salen como aviso rápido arriba salvo que se pida, y nunca en la barra de abajo');
+    assert((rjs.match(/mensaje\([^;\n]*, true\)/g) || []).length === 2 && /mensaje\('Robot conectado', 'ok', true\)/.test(rjs), 'el único aviso rápido es «Robot conectado», al conectar o al entrar al robot ya conectado');
+    assert(/\.rb-barra__cuadro\.is-pulso::after \{ animation: rb-anillo/.test(css) && /classList\.add\('is-pulso'\)/.test(rjs), 'parar y reproducir tienen animación al tocarlos');
     const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
     assert(/android\.permission\.VIBRATE/.test(man), 'la app puede vibrar');
     assert(/pantallaViva\(true, 'ruleta'\)/.test(rj) && /razonesPantalla/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8')), 'la pantalla sigue encendida con el mando, la ruleta y las rutas');
