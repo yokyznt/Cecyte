@@ -17,6 +17,7 @@
     border-radius: 0;
     box-shadow: none;
 }
+.page .today-grid { padding-top: 20px; }
 .page .panel__head, .page .panel__body, .page .toolbar { padding-inline: 0; }
 .page .panel__body { padding-block: 20px 28px; }
 .page .notify { padding-block: 16px; }
@@ -116,7 +117,7 @@
 .now__next-label { color: var(--orange-800); }
 
 /* La acción que suena de verdad: naranja intenso, no negro */
-.btn--bell { background: var(--orange-700); box-shadow: 0 10px 22px -12px oklch(0.52 0.15 45 / 0.8); }
+.btn--bell { background: var(--orange-700); box-shadow: var(--shadow-2); }
 .btn--bell .icon { color: #fff; }
 .btn--bell:hover:not(:disabled) { background: var(--orange-800); }
 .notify__icon { background: var(--orange-100); color: var(--orange-700); }
