@@ -838,7 +838,7 @@ function programaParaRobot(cmds) {
     return { lineas, bytes, cabe: bytes <= PGM_MAX };
 }
 
-const SIRENA_COLORES = Array.from({ length: LEDS }, (_, i) => (i < LEDS / 2 ? [255, 0, 0] : [0, 0, 255]));
+const SIRENA_COLORES = Array.from({ length: LEDS }, (_, i) => (i >= 2 && i < 8 ? [255, 0, 0] : [0, 0, 255]));
 const SERIE_MAX = 30;
 
 function itemsDeSerie(serie, variante) {
@@ -1465,8 +1465,8 @@ function aviso(texto, tipo) {
     aviso.t = setTimeout(() => el.classList.remove('is-visible'), tipo === 'err' ? 4500 : 2600);
 }
 
-function mensaje(texto, tipo) {
-    aviso(texto, tipo);
+function mensaje(texto, tipo, rapido) {
+    if (rapido) aviso(texto, tipo);
     const el = $('rb-msg');
     el.textContent = texto || '';
     el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
@@ -1612,7 +1612,7 @@ function alListo() {
     clearInterval(S.saludo);
     ponEstado('listo');
     S.cola.enviar([{ l: 'MODE 4', ex: true }]);     // lo guardado que arranca solo no corre mientras la página lo controla
-    mensaje('Listo. Lo que cambies aquí se aplica en el robot al instante.', 'ok');
+    mensaje('Robot conectado', 'ok', true);
     S.cola.enviar(['MODE 4', 'INFO']);              // por Bluetooth la placa no se reinicia, así que no manda su INFO sola: se la pedimos
     S.sucio = true;
 }
@@ -2423,7 +2423,7 @@ function pintarAnillo() {
             b.className = 'rb-led';
             b.dataset.i = i;
             b.textContent = i + 1;
-            const ang = (i / LEDS) * 2 * Math.PI - Math.PI / 2;
+            const ang = ((i - 2) / LEDS) * 2 * Math.PI - Math.PI / 2;
             b.style.left = (50 + 38 * Math.cos(ang)) + '%';
             b.style.top = (50 + 38 * Math.sin(ang)) + '%';
             b.setAttribute('aria-label', 'LED ' + (i + 1));
@@ -3141,7 +3141,10 @@ function iniciar() {
 
     setInterval(tickLeds, 100);
 
-    new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
+    new MutationObserver(() => {
+        if (!$('sec-robot').hidden && S.estado === 'listo') mensaje('Robot conectado', 'ok', true);
+        conectarSolo();
+    }).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
     if (hayBluetooth()) mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
     window.addEventListener('pagehide', () => { guardarYa(); if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) guardarYa(); });

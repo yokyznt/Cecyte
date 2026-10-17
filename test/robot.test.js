@@ -618,6 +618,7 @@ for (const c of R.CANCIONES) {
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw), 'el firmware lleva el seguidor');
     assert(/esquinaI/.test(fw) && /s == 5 && fase\) ledsTodos\(150, 0, 0\)/.test(fw), 'direccionales en las esquinas y reversa en rojo intermitente');
+    assert(/esquinaI\[4\] = \{ 0, 1, 9, 10 \}, esquinaD\[4\] = \{ 3, 4, 6, 7 \}/.test(fw), 'el LED 1 del anillo está 2 lugares a la izquierda del frente: los intermitentes de la derecha son los LED 4, 5, 7 y 8 (índices 3, 4, 6, 7)');
     assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
     assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
@@ -978,7 +979,8 @@ console.log('robot.test.js: todo bien');
     const barra = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     assert(/id="rb-barra-paro"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-stop"\/><\/svg><\/button>/.test(barra) && /id="rb-barra-play"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-play"\/><\/svg><\/button>/.test(barra), 'parar y reproducir son botones cuadrados solo con el símbolo');
     const rjs = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
-    assert(/id="rb-toast"/.test(barra) && /\.rb-barra #rb-msg \{ display: none; \}/.test(css) && /function mensaje\(texto, tipo\) \{\s*aviso\(texto, tipo\);/.test(rjs), 'los mensajes salen como aviso rápido arriba, no en la barra de abajo');
+    assert(/id="rb-toast"/.test(barra) && /\.rb-barra #rb-msg \{ display: none; \}/.test(css) && /function mensaje\(texto, tipo, rapido\) \{\s*if \(rapido\) aviso\(texto, tipo\);/.test(rjs), 'los mensajes no salen como aviso rápido arriba salvo que se pida, y nunca en la barra de abajo');
+    assert((rjs.match(/mensaje\([^;\n]*, true\)/g) || []).length === 2 && /mensaje\('Robot conectado', 'ok', true\)/.test(rjs), 'el único aviso rápido es «Robot conectado», al conectar o al entrar al robot ya conectado');
     assert(/\.rb-barra__cuadro\.is-pulso::after \{ animation: rb-anillo/.test(css) && /classList\.add\('is-pulso'\)/.test(rjs), 'parar y reproducir tienen animación al tocarlos');
     const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
     assert(/android\.permission\.VIBRATE/.test(man), 'la app puede vibrar');

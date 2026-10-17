@@ -611,7 +611,7 @@ void senalPaso() {
   senalVista = s;
   senalFase = fase;
   ledsTodos(0, 0, 0);
-  static const uint8_t esquinaI[4] = { 10, 11, 7, 8 }, esquinaD[4] = { 1, 2, 4, 5 };
+  static const uint8_t esquinaI[4] = { 0, 1, 9, 10 }, esquinaD[4] = { 3, 4, 6, 7 };
   if ((s == 1 || s == 3) && fase) for (uint8_t i = 0; i < 4; i++) ledPon(esquinaI[i], 150, 60, 0);
   if ((s == 2 || s == 3) && fase) for (uint8_t i = 0; i < 4; i++) ledPon(esquinaD[i], 150, 60, 0);
   if (s == 5 && fase) ledsTodos(150, 0, 0);
