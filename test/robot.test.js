@@ -575,6 +575,8 @@ for (const c of R.CANCIONES) {
     assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
+    assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
+    assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
     assert.strictEqual(R.tiempoCarga({ pct: 50, capacidadMah: 2000, corrienteMa: 500, quimica: 'nimh' }), 168);
     assert.strictEqual(R.tiempoCarga({ pct: 100, capacidadMah: 2000, corrienteMa: 500 }), 0);
@@ -796,6 +798,8 @@ console.log('robot.test.js: todo bien');
     ['radar', 'escudo', 'casa', 'fig-circulo', 'fig-cuadrado', 'fig-triangulo', 'fig-estrella'].forEach(i => assert(html.includes(`id="i-${i}"`), 'icono ' + i));
     ['robot-jarvis', 'robot-dibujar', 'robot-funciones'].forEach(sec => assert(html.includes(`id="sec-${sec}"`) && html.includes(`id="tab-${sec}"`), 'sección ' + sec));
     assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Jarvis');
+    assert(html.includes('id="rb-baile-panel"') && !html.includes('id="tab-robot-baile"') && !html.includes('id="sec-robot-baile"'), 'el baile es una función de Funciones con su panel de ajustes');
+    assert(html.includes('id="i-fn-baile"'), 'icono del baile');
     const nav = fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8');
     assert(/'robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar'/.test(nav), 'Funciones va junto a Control');
 }

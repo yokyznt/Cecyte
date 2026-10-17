@@ -864,6 +864,24 @@ void fnCargar() {
 }
 
 // ---------- Órdenes ----------
+void imprimeInfo() {
+  uint8_t minimo = EEPROM.read(EE_MIN);
+  Serial.print(F("INFO BOOT="));
+  Serial.print(cuentaEE(EE_BOOT));
+  Serial.print(F(" BTN="));
+  Serial.print(cuentaEE(EE_BTN));
+  Serial.print(F(" RUN="));
+  Serial.print(cuentaEE(EE_RUN));
+  Serial.print(F(" MIN="));
+  imprimeDec(minimo == 0xFF ? 0 : minimo, 1);
+  Serial.print(F(" BAT="));
+  imprimeDec(bateriaCv(), 2);
+  Serial.print(F(" TRIM="));
+  Serial.print((int)trim);
+  Serial.print(F(" DIST=1 DIR=1 LIN=1"));
+  Serial.println();
+}
+
 void ok()  { Serial.println(F("OK")); }
 void err(const __FlashStringHelper *motivo) { Serial.print(F("ERR ")); Serial.println(motivo); }
 
@@ -959,6 +977,9 @@ void ejecuta(char *s) {
     const char k = a[0];
     luzSenal = k == 'f' ? 4 : k == 'r' ? 5 : 0;
     senalVence = millis() + 4000UL;
+    ok();
+  } else if (!strcmp(cmd, "INFO")) {
+    imprimeInfo();
     ok();
   } else if (!strcmp(cmd, "LINEA") && a && b) {
     lineaConfig(a, atoi(b));
@@ -1080,21 +1101,7 @@ void setup() {
   fnCargar();
   if (fnModo && EEPROM.read(FN_DIR + 2)) fnEspera = millis() + 2500;   // arranca sola, a los 2,5 s
   sumaEE(EE_BOOT);
-  uint8_t minimo = EEPROM.read(EE_MIN);
-  Serial.print(F("INFO BOOT="));
-  Serial.print(cuentaEE(EE_BOOT));
-  Serial.print(F(" BTN="));
-  Serial.print(cuentaEE(EE_BTN));
-  Serial.print(F(" RUN="));
-  Serial.print(cuentaEE(EE_RUN));
-  Serial.print(F(" MIN="));
-  imprimeDec(minimo == 0xFF ? 0 : minimo, 1);
-  Serial.print(F(" BAT="));
-  imprimeDec(bateriaCv(), 2);
-  Serial.print(F(" TRIM="));
-  Serial.print((int)trim);
-  Serial.print(F(" DIST=1 DIR=1 LIN=1"));            // este programa entiende las órdenes DIST, DIR y LUZ
-  Serial.println();
+  imprimeInfo();
   Serial.println(F("mBot Ranger web v1 listo"));
 }
 
