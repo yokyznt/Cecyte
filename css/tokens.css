@@ -55,9 +55,9 @@
     --r-lg: 18px;
     --r-xl: 26px;
 
-    --shadow-1: 0 1px 2px oklch(0.3 0.05 155 / 0.06), 0 4px 10px -6px oklch(0.3 0.05 155 / 0.14);
-    --shadow-2: 0 1px 2px oklch(0.3 0.05 155 / 0.07), 0 12px 18px -12px oklch(0.3 0.06 155 / 0.24);
-    --shadow-pop: 0 2px 4px oklch(0.2 0.04 160 / 0.10), 0 18px 40px -14px oklch(0.2 0.04 160 / 0.35);
+    --shadow-1: 0 1px 2px oklch(0.2 0 0 / 0.06), 0 4px 10px -6px oklch(0.2 0 0 / 0.14);
+    --shadow-2: 0 1px 2px oklch(0.2 0 0 / 0.07), 0 12px 18px -12px oklch(0.2 0 0 / 0.24);
+    --shadow-pop: 0 2px 4px oklch(0.2 0 0 / 0.10), 0 18px 40px -14px oklch(0.2 0 0 / 0.35);
 
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }

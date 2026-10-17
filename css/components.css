@@ -80,7 +80,7 @@
 }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-.btn--primary { background: var(--green-700); color: #fff; box-shadow: 0 6px 14px -8px oklch(0.47 0.12 153 / 0.7); }
+.btn--primary { background: var(--green-700); color: #fff; box-shadow: var(--shadow-1); }
 .btn--primary:hover:not(:disabled) { background: var(--green-800); }
 .btn--secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
 .btn--secondary:hover:not(:disabled) { background: var(--green-50); border-color: var(--green-600); }
@@ -251,7 +251,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .agenda__item.is-recess .agenda__subject { color: var(--green-900); font-weight: 700; letter-spacing: 0.04em; }
 
 /* Ahora: relleno verde sólido, texto blanco y sombra */
-.agenda__item.is-now { background: var(--green-700); box-shadow: 0 10px 20px -12px oklch(0.47 0.12 153 / 0.9); }
+.agenda__item.is-now { background: var(--green-700); box-shadow: var(--shadow-2); }
 .agenda__item.is-now .agenda__time, .agenda__item.is-now .agenda__subject { color: #fff; font-weight: 800; }
 .agenda__item.is-now .agenda__subject small { color: var(--green-100); font-weight: 600; }
 .agenda__item.is-now .agenda__tag { background: #fff; color: var(--green-800); }
@@ -348,7 +348,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .slot__subject { display: block; font-weight: 700; font-size: var(--fs-sm); line-height: 1.3; color: var(--ink); }
 .slot__teacher { display: flex; align-items: flex-start; gap: 6px; margin-top: 3px; font-size: var(--fs-cap); line-height: 1.35; color: var(--ink-2); }
 .slot__teacher .icon { margin-top: 1px; color: var(--green-700); }
-.slot.is-now { background: var(--green-700); border-color: var(--green-700); box-shadow: 0 8px 18px -10px oklch(0.47 0.12 153 / 0.9); }
+.slot.is-now { background: var(--green-700); border-color: var(--green-700); box-shadow: var(--shadow-2); }
 .slot.is-now .slot__subject { color: #fff; }
 .slot.is-now .slot__teacher { color: var(--green-100); }
 .slot.is-now .slot__teacher .icon { color: #fff; }
@@ -422,7 +422,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .data .cell-actions { text-align: right; white-space: nowrap; }
 .data .cell-actions .icon-btn + .icon-btn { margin-left: 6px; }
 .data .cell-empty { padding: 34px 16px; text-align: center; color: var(--ink-3); }
-.data-wrap { overflow-x: auto; }
+.data-wrap { overflow-x: auto; padding-top: 8px; }
 
 @media (max-width: 719px) {
     .data thead { display: none; }
