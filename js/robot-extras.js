@@ -63,7 +63,187 @@
         return mx.find(v => PISTAS_HOMBRE.test(v.nombre)) || lista.find(v => PISTAS_HOMBRE.test(v.nombre)) || mx[0] || lista[0] || null;
     }
 
+    const CLAVE_USAR = 'cecyte_voz_usar';
+    const ENT = { claves: new Set(), usar: false, audio: null, grabando: null, bd: null };
+    const PRIORIDAD_ENT = ['saludo', 'estado', 'paro', 'mover', 'giro', 'baile', 'ruleta', 'cancion', 'luces', 'casa', 'radar', 'guardiaOn', 'alerta', 'gracias', 'elogio', 'adios', 'claxon', 'sinNombre', 'noEntendi', 'sinRobot', 'cancionParar', 'lucesOff', 'guardiaOff', 'reversa', 'quien', 'queja', 'ocupado', 'nada', 'fallo'];
+
+    function abrirBD() {
+        if (ENT.bd) return ENT.bd;
+        ENT.bd = new Promise((res, rej) => {
+            const q = raiz.indexedDB.open('cecyte_voz_entrenada', 1);
+            q.onupgradeneeded = () => q.result.createObjectStore('f');
+            q.onsuccess = () => res(q.result);
+            q.onerror = () => rej(q.error);
+        });
+        return ENT.bd;
+    }
+
+    async function bd(modo, fn) {
+        const db = await abrirBD();
+        return new Promise((res, rej) => {
+            const t = db.transaction('f', modo), st = t.objectStore('f');
+            const r = fn(st);
+            t.oncomplete = () => res(r && r.result !== undefined ? r.result : undefined);
+            t.onerror = () => rej(t.error);
+        });
+    }
+
+    const bdGet = k => bd('readonly', st => st.get(k));
+    const bdPut = (k, blob) => bd('readwrite', st => st.put(blob, k));
+    const bdDel = k => bd('readwrite', st => st.delete(k));
+    const bdClaves = () => bd('readonly', st => st.getAllKeys());
+
+    function frasesEntrenables() {
+        const F = raiz.Robot.FRASES;
+        const tipos = PRIORIDAD_ENT.filter(t => F[t]).concat(Object.keys(F).filter(t => !PRIORIDAD_ENT.includes(t)));
+        return tipos.map(t => F[t].find(x => !x.includes('{'))).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i && x.length < 140);
+    }
+
+    async function reproducirGrabada(texto) {
+        try {
+            const blob = await bdGet(texto);
+            if (!blob) return false;
+            if (ENT.audio) ENT.audio.pause();
+            const a = new Audio(URL.createObjectURL(blob));
+            ENT.audio = a;
+            a.onended = () => URL.revokeObjectURL(a.src);
+            await a.play();
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function f0Medio(x, sr) {
+        const d = Math.max(1, Math.round(sr / 12000)), fs = sr / d;
+        const m = new Float32Array(Math.floor(x.length / d));
+        for (let i = 0; i < m.length; i++) m[i] = x[i * d];
+        const paso = Math.floor(fs * 0.04), minLag = Math.floor(fs / 400), maxLag = Math.floor(fs / 70), res = [];
+        for (let i = 0; i + paso + maxLag < m.length; i += paso) {
+            let e = 0;
+            for (let j = 0; j < paso; j++) e += m[i + j] * m[i + j];
+            if (e / paso < 1e-4) continue;
+            let mejor = 0, lag = 0;
+            for (let l = minLag; l <= maxLag; l++) {
+                let c = 0;
+                for (let j = 0; j < paso; j++) c += m[i + j] * m[i + j + l];
+                if (c > mejor) { mejor = c; lag = l; }
+            }
+            if (lag && mejor / e > 0.5) res.push(fs / lag);
+        }
+        if (!res.length) return 0;
+        res.sort((a, b) => a - b);
+        return res[Math.floor(res.length / 2)];
+    }
+
+    async function estimarTono() {
+        const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
+        if (!Ctx) return 0;
+        const ctx = new Ctx(), tonos = [];
+        try {
+            for (const k of [...ENT.claves].slice(0, 6)) {
+                const blob = await bdGet(k);
+                if (!blob) continue;
+                try {
+                    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+                    const f = f0Medio(buf.getChannelData(0), buf.sampleRate);
+                    if (f) tonos.push(f);
+                } catch (e) { /* esa grabación no se pudo analizar */ }
+            }
+        } finally {
+            ctx.close();
+        }
+        if (!tonos.length) return 0;
+        tonos.sort((a, b) => a - b);
+        return tonos[Math.floor(tonos.length / 2)];
+    }
+
+    function mensajeEnt(t) {
+        const el = $('rb-ent-msg');
+        if (el) el.textContent = t || '';
+    }
+
+    function pintarEntrena() {
+        const ol = $('rb-ent-lista');
+        if (!ol) return;
+        const lista = frasesEntrenables();
+        ol.innerHTML = lista.map((t, i) => {
+            const hecha = ENT.claves.has(t);
+            return `<li class="rb-ent-item${hecha ? ' is-lista' : ''}" data-i="${i}"><p>${t}</p>`
+                + `<button type="button" class="btn ${hecha ? 'btn--secondary' : 'btn--primary'} btn--sm" data-acc="grabar">${hecha ? 'Regrabar' : 'Grabar'}</button>`
+                + (hecha ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="oir">Oír</button><button type="button" class="btn btn--secondary btn--sm" data-acc="borrar">Borrar</button>' : '')
+                + '</li>';
+        }).join('');
+        $('rb-ent-cuenta').textContent = `${ENT.claves.size} de ${lista.length} grabadas`;
+    }
+
+    async function grabarFrase(texto, li) {
+        if (ENT.grabando) { ENT.grabando.stop(); return; }
+        if (!raiz.navigator.mediaDevices || !raiz.MediaRecorder) { mensajeEnt('Este celular no deja grabar audio aquí.'); return; }
+        let flujo;
+        try {
+            flujo = await raiz.navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        } catch (e) {
+            mensajeEnt('No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.');
+            return;
+        }
+        const trozos = [];
+        const rec = raiz.MediaRecorder.isTypeSupported && raiz.MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? new raiz.MediaRecorder(flujo, { mimeType: 'audio/webm;codecs=opus' }) : new raiz.MediaRecorder(flujo);
+        ENT.grabando = rec;
+        li.classList.add('is-grabando');
+        li.querySelector('[data-acc="grabar"]').textContent = 'Parar';
+        mensajeEnt('Grabando… que lea la frase y pulsa Parar.');
+        const tope = setTimeout(() => { if (rec.state === 'recording') rec.stop(); }, 15000);
+        rec.ondataavailable = e => { if (e.data && e.data.size) trozos.push(e.data); };
+        rec.onstop = async () => {
+            clearTimeout(tope);
+            flujo.getTracks().forEach(t => t.stop());
+            ENT.grabando = null;
+            const blob = new Blob(trozos, { type: rec.mimeType || 'audio/webm' });
+            if (blob.size < 2000) { mensajeEnt('No se oyó nada: intenta otra vez más cerca del micrófono.'); pintarEntrena(); return; }
+            await bdPut(texto, blob);
+            ENT.claves.add(texto);
+            pintarEntrena();
+            const f0 = await estimarTono();
+            if (f0) {
+                const a = ajustesVoz();
+                a.pitch = Math.min(1.5, Math.max(0.5, Math.round(f0 / 115 * 20) / 20));
+                try { localStorage.setItem(CLAVE_VOZ, JSON.stringify(a)); } catch (e) { /* sin guardado */ }
+                pintarVoces();
+                mensajeEnt(`Guardada. Tono medido de tu amigo: ${Math.round(f0)} Hz; ajusté la voz sintética para que se parezca.`);
+            } else mensajeEnt('Guardada.');
+        };
+        rec.start();
+    }
+
+    async function iniciarEntrena() {
+        if (!$('rb-ent-lista') || !raiz.indexedDB) return;
+        try { ENT.usar = localStorage.getItem(CLAVE_USAR) === '1'; } catch (e) { ENT.usar = false; }
+        $('rb-ent-usar').checked = ENT.usar;
+        $('rb-ent-usar').addEventListener('change', e => {
+            ENT.usar = e.target.checked;
+            try { localStorage.setItem(CLAVE_USAR, ENT.usar ? '1' : '0'); } catch (err) { /* sin guardado */ }
+        });
+        $('rb-ent-lista').addEventListener('click', async e => {
+            const b = e.target.closest('[data-acc]');
+            if (!b) return;
+            const li = b.closest('.rb-ent-item'), texto = frasesEntrenables()[Number(li.dataset.i)];
+            if (b.dataset.acc === 'grabar') await grabarFrase(texto, li);
+            else if (b.dataset.acc === 'oir') { if (!(await reproducirGrabada(texto))) mensajeEnt('No pude reproducir esa grabación.'); }
+            else if (b.dataset.acc === 'borrar') { await bdDel(texto); ENT.claves.delete(texto); pintarEntrena(); }
+        });
+        $('rb-ent-borrar').addEventListener('click', async () => {
+            for (const k of [...ENT.claves]) await bdDel(k);
+            ENT.claves.clear();
+            pintarEntrena();
+            mensajeEnt('Grabaciones borradas.');
+        });
+        try { (await bdClaves()).forEach(k => ENT.claves.add(k)); } catch (e) { /* sin base de datos */ }
+        pintarEntrena();
+    }
+
     async function voz(texto) {
+        if (ENT.usar && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
         try {
@@ -104,7 +284,14 @@
         voz(texto);
     }
 
-    const di = (tipo, datos) => hablar(raiz.Robot.frase(tipo, datos));
+    const di = (tipo, datos) => {
+        let t = null;
+        if (ENT.usar && !datos) {
+            const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
+            if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
+        }
+        hablar(t || raiz.Robot.frase(tipo, datos));
+    };
 
     function calibra() {
         const g = { vel: raiz.Robot.RUTA_CM_S, giro: 500 };
@@ -443,6 +630,7 @@
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
         $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, compa! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
+        iniciarEntrena();
         document.addEventListener('robot-paro', () => {
             detener(false);
             E.radarCancelado = true;

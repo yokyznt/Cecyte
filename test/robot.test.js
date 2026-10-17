@@ -846,7 +846,7 @@ console.log('robot.test.js: todo bien');
     assert(pasos[19] > pasos[99] - pasos[79], 'va desacelerando: en el primer 20 % avanza más que en el último');
     const col = R.ruletaColores(4, true);
     assert.strictEqual(col.length, 12);
-    assert.deepStrictEqual(col[4], [255, 255, 255], 'la bolita es blanca');
+    assert.deepStrictEqual(col[4], [0, 255, 60], 'la bolita es verde');
     assert(col[0][0] > 100 && col[0][1] === 0, 'las casillas pares son rojas');
     assert(col[1][0] < 20 && col[1][1] < 20, 'las impares son negras');
     assert.deepStrictEqual(R.ordenDeVoz('Yokis juega a la ruleta'), { a: 'ruleta' });
@@ -856,4 +856,13 @@ console.log('robot.test.js: todo bien');
     assert(['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido', 'rb-voz-probar'].every(id => html.includes(`id="${id}"`)), 'Yokis deja elegir su voz');
     const ex = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
     assert(/pitch: 0\.75/.test(ex) && /rate: 1\.15/.test(ex), 'voz grave y enérgica por defecto');
+}
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(['rb-fn-ventana', 'rb-fn-almacen', 'rb-fn-generico', 'rb-fn-ventana-cuerpo'].every(id => html.includes(`id="${id}"`)), 'los ajustes de cada función van en una ventana');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/function abrirVentanaFuncion/.test(rj) && /previo && c\.querySelector/.test(rj), 'tocar una función elegida abre su ventana');
+    assert(/\* 6000,/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
+    assert(['rb-ent-lista', 'rb-ent-usar', 'rb-ent-borrar', 'rb-ent-cuenta'].every(id => html.includes(`id="${id}"`)), 'Yokis puede entrenar una voz');
 }

@@ -1297,7 +1297,7 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
 }
 
 const RULETA_N = 12;
-const RULETA_ROJO = [170, 0, 0], RULETA_NEGRO = [6, 6, 6], RULETA_BOLA = [255, 255, 255];
+const RULETA_ROJO = [170, 0, 0], RULETA_NEGRO = [6, 6, 6], RULETA_BOLA = [0, 255, 60];
 
 function ruletaColor(i) { return i % 2 === 0 ? 'rojo' : 'negro'; }
 
@@ -1993,6 +1993,32 @@ function elegirBaile() {
     mensaje('Baile puesto: ajústalo abajo y pulsa Bailar y cantar.', 'ok');
 }
 
+function abrirVentanaFuncion() {
+    const d = $('rb-fn-ventana');
+    if (!d || d.open) return;
+    const f = funcionActual();
+    let titulo = '', ids = [];
+    if (S.modoRuleta && !S.funcion) { titulo = 'Ruleta de casino'; ids = ['rb-ruleta-panel']; }
+    else if (S.modoBaile && !S.funcion) { titulo = 'Baile'; ids = ['rb-baile-panel']; }
+    else if (f) { titulo = f.nombre; ids = f.modo === 6 ? ['rb-ln', 'rb-fn-generico'] : ['rb-fn-generico']; }
+    else return;
+    $('rb-fn-ventana-titulo').textContent = titulo;
+    const cuerpo = $('rb-fn-ventana-cuerpo');
+    ids.forEach(id => cuerpo.appendChild($(id)));
+    d.showModal();
+}
+
+function cerrarVentanaFuncion() {
+    const d = $('rb-fn-ventana');
+    if (d && d.open) d.close();
+}
+
+function guardarPanelesFuncion() {
+    const almacen = $('rb-fn-almacen'), cuerpo = $('rb-fn-ventana-cuerpo');
+    if ($('rb-fn-ventana').open) return;
+    [...cuerpo.children].forEach(n => almacen.appendChild(n));
+}
+
 function elegirRuleta() {
     if (S.corriendoFuncion || S.actuando) paro();
     S.funcion = '';
@@ -2019,7 +2045,7 @@ function girarRuleta(vueltas, alTerminar) {
     if (S.ruleta) return false;
     if (S.corriendoFuncion || S.actuando) paro();
     const plan = ruletaPlan(Math.random, vueltas || 3);
-    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 3, 1, 8)) * 3000, ult: -1, timer: null, parpadeo: null };
+    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 3, 1, 8)) * 6000, ult: -1, timer: null, parpadeo: null };
     S.ruleta = R;
     S.guardarEn = 0;
     $('rb-rul-girar').textContent = 'Parar';
@@ -2122,7 +2148,7 @@ function pintarFunciones() {
     const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === 'ruleta' ? S.modoRuleta && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile && !S.modoRuleta : x.id === S.funcion);
     const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${marca(x) ? ' checked' : ''}>`
         + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
-        + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}</label>`;
+        + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}${x.id === '' ? '' : '<span class="rb-fn__cfg">Toca otra vez para ajustar</span>'}</label>`;
     const ninguna = tarjeta({ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' });
     const grupos = GRUPOS_FN.map(g => {
         const fs = FUNCIONES.filter(x => x.v.includes(v.id) && g.ids.includes(x.id));
@@ -2950,6 +2976,23 @@ function iniciar() {
     $('rb-fn-vel').addEventListener('input', ponVel);
 
     // Funciones por modelo
+    let previo = false;
+    const listaFn = $('rb-fn-lista');
+    listaFn.addEventListener('pointerdown', e => {
+        const c = e.target.closest('.rb-fn');
+        previo = !!(c && c.querySelector('input').checked);
+    });
+    listaFn.addEventListener('click', e => {
+        const c = e.target.closest('.rb-fn');
+        if (c && previo && c.querySelector('input').value !== '') abrirVentanaFuncion();
+        previo = false;
+    });
+    listaFn.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.matches('input[type="radio"]') && e.target.checked && e.target.value !== '') abrirVentanaFuncion();
+    });
+    $('rb-fn-ventana-cerrar').addEventListener('click', cerrarVentanaFuncion);
+    $('rb-fn-ventana').addEventListener('close', guardarPanelesFuncion);
+    $('rb-fn-ventana').addEventListener('click', e => { if (e.target === $('rb-fn-ventana')) cerrarVentanaFuncion(); });
     $('rb-fn-modelos').addEventListener('click', e => {
         const b = e.target.closest('[data-v]');
         if (!b) return;

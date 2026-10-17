@@ -959,12 +959,33 @@
                                             <legend class="field__label">Función</legend>
                                             <div id="rb-fn-lista" class="rb-fn-lista"></div>
                                         </fieldset>
+                                        <div class="rb-herr">
+                                            <h4 class="rb-fn-t">Herramientas con el sensor</h4>
+                                            <div class="rb-herr__rejilla">
+                                                <div class="rb-herr__tarjeta">
+                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-radar"/></svg></span>
+                                                    <b>Radar 360°</b>
+                                                    <small>Gira en su sitio midiendo la distancia en 12 direcciones y dibuja el mapa aquí.</small>
+                                                    <button type="button" id="rb-radar" class="btn btn--secondary btn--sm">Escanear</button>
+                                                </div>
+                                                <div class="rb-herr__tarjeta">
+                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg></span>
+                                                    <b>Guardia</b>
+                                                    <small>Se queda quieto; si algo se le acerca, suena la alarma, parpadea y vibra el celular.</small>
+                                                    <button type="button" id="rb-guardia" class="btn btn--secondary btn--sm" aria-pressed="false">Armar guardia</button>
+                                                </div>
+                                            </div>
+                                            <canvas id="rb-radar-lienzo" class="rb-lienzo" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
+                                            <p id="rb-herr-msg" class="hint" role="status"></p>
+                                        </div>
+                                        <p class="hint">Toca una función para elegirla y tócala otra vez para abrir sus ajustes en una ventana.</p>
+                                        <div id="rb-fn-almacen" hidden>
                                         <div id="rb-ruleta-panel" class="rb-ln" hidden>
                                             <h4 class="rb-fn-t">Ruleta de casino</h4>
-                                            <p class="hint">Los 12 LEDs son la mesa, rojo y negro. Una bolita blanca gira, va frenando y cae en un número; esa casilla parpadea.</p>
+                                            <p class="hint">Los 12 LEDs son la mesa, rojo y negro. Una bolita verde gira, va frenando y cae en un número; esa casilla parpadea.</p>
                                             <div class="field">
                                                 <label class="field__label" for="rb-rul-dur">Qué tan larga</label>
-                                                <select id="rb-rul-dur" class="select"><option value="2">Corta (6 s)</option><option value="3" selected>Normal (9 s)</option><option value="5">Larga (15 s)</option></select>
+                                                <select id="rb-rul-dur" class="select"><option value="2">Corta (12 s)</option><option value="3" selected>Normal (18 s)</option><option value="5">Larga (30 s)</option></select>
                                             </div>
                                             <label class="rb-check"><input type="checkbox" id="rb-rul-sonido" checked><span>Con sonido de matraca</span></label>
                                             <div class="btn-row">
@@ -1026,25 +1047,7 @@
                                             </div>
                                             <p class="hint">El módulo va en el puerto 9. Con «Ver sensores» pasa una hoja blanca y una negra bajo cada sensor: el punto se enciende cuando ve la línea. Si no cambia, gira el potenciómetro del módulo.</p>
                                         </div>
-                                        <div class="rb-herr">
-                                            <h4 class="rb-fn-t">Herramientas con el sensor</h4>
-                                            <div class="rb-herr__rejilla">
-                                                <div class="rb-herr__tarjeta">
-                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-radar"/></svg></span>
-                                                    <b>Radar 360°</b>
-                                                    <small>Gira en su sitio midiendo la distancia en 12 direcciones y dibuja el mapa aquí.</small>
-                                                    <button type="button" id="rb-radar" class="btn btn--secondary btn--sm">Escanear</button>
-                                                </div>
-                                                <div class="rb-herr__tarjeta">
-                                                    <span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg></span>
-                                                    <b>Guardia</b>
-                                                    <small>Se queda quieto; si algo se le acerca, suena la alarma, parpadea y vibra el celular.</small>
-                                                    <button type="button" id="rb-guardia" class="btn btn--secondary btn--sm" aria-pressed="false">Armar guardia</button>
-                                                </div>
-                                            </div>
-                                            <canvas id="rb-radar-lienzo" class="rb-lienzo" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
-                                            <p id="rb-herr-msg" class="hint" role="status"></p>
-                                        </div>
+                                            <div id="rb-fn-generico" class="rb-fn-generico">
                                         <p class="hint">Al poner una función se quita el baile (los dos mueven las ruedas). Corre hasta pulsar Paro.</p>
                                         <div class="btn-row">
                                             <label class="rb-check"><input type="checkbox" id="rb-fn-luces"><span>Con luces</span></label>
@@ -1079,6 +1082,15 @@
                                             <p id="rb-fn-info" class="msg" role="status"></p>
                                         </div>
                                         <p class="hint">Esquivar obstáculos y Seguir mi mano las hace el robot solo con sus sensores: si cierras la página o desconectas el USB siguen hasta que pulses Paro o el botón de la placa.</p>
+                                            </div>
+                                        </div>
+                                        <dialog id="rb-fn-ventana" class="rb-ventana" aria-labelledby="rb-fn-ventana-titulo">
+                                            <header class="rb-ventana__cab">
+                                                <h3 id="rb-fn-ventana-titulo">Ajustes</h3>
+                                                <button type="button" id="rb-fn-ventana-cerrar" class="icon-btn" aria-label="Cerrar los ajustes"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                            </header>
+                                            <div id="rb-fn-ventana-cuerpo" class="rb-ventana__cuerpo"></div>
+                                        </dialog>
                                     </div>
                                 </div>
                             </div>
@@ -1104,6 +1116,17 @@
                                         <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
                                     </div>
                                     <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
+                                    <h4 class="rb-fn-t">Entrena la voz de un amigo</h4>
+                                    <p class="hint">Que tu amigo lea en voz alta cada frase. Yokis usa sus grabaciones cuando le toca decir esa frase y, para todo lo demás, ajusta la voz sintética al tono de tu amigo. No es una clonación perfecta: con su propia voz solo dice las frases que grabó.</p>
+                                    <div class="rb-ent-estado">
+                                        <span id="rb-ent-cuenta" class="rb-ent-cuenta">0 grabadas</span>
+                                        <label class="rb-check"><input type="checkbox" id="rb-ent-usar"><span>Hablar con la voz entrenada</span></label>
+                                    </div>
+                                    <ol id="rb-ent-lista" class="rb-ent-lista"></ol>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-ent-borrar" class="btn btn--secondary btn--sm">Borrar todas las grabaciones</button>
+                                    </div>
+                                    <p id="rb-ent-msg" class="msg" role="status"></p>
                                     <h4 class="rb-fn-t">Prueba con estas frases</h4>
                                     <ul class="rb-frases">
                                         <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
