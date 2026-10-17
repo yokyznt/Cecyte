@@ -3,6 +3,7 @@
     const CLAVE = 'cecyte_robot_calibra';
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
+    const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
     const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null };
 
     const enlace = () => raiz.RobotEnlace || null;
@@ -24,17 +25,29 @@
         while (ol.children.length > HIST_MAX) ol.removeChild(ol.firstChild);
     }
 
+    async function voz(texto) {
+        const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
+        try {
+            if (TTS) {
+                try { await TTS.stop(); } catch (e) { /* nada que parar */ }
+                await TTS.speak({ text: texto, lang: 'es-MX', rate: 1.05, pitch: 1.05, volume: 1, category: 'ambient' });
+            } else if (raiz.speechSynthesis) {
+                const u = new SpeechSynthesisUtterance(texto);
+                u.lang = 'es-MX';
+                u.rate = 1.05;
+                raiz.speechSynthesis.cancel();
+                raiz.speechSynthesis.speak(u);
+            }
+        } catch (e) { /* sin voz: queda el texto */ }
+    }
+
     function hablar(texto) {
         aviso(texto);
-        historial('jarvis', texto);
-        try {
-            if (!raiz.speechSynthesis) return;
-            const u = new SpeechSynthesisUtterance(texto);
-            u.lang = 'es-MX';
-            raiz.speechSynthesis.cancel();
-            raiz.speechSynthesis.speak(u);
-        } catch (e) { /* sin voz */ }
+        historial('yokis', texto);
+        voz(texto);
     }
+
+    const di = (tipo, datos) => hablar(raiz.Robot.frase(tipo, datos));
 
     function calibra() {
         const g = { vel: raiz.Robot.RUTA_CM_S, giro: 500 };
@@ -76,13 +89,14 @@
         if (alto && listo()) enlace().mover(0, 0);
     }
 
-    function correr(recorrido, texto) {
-        if (!listo()) { hablar('Conecta el robot primero (apartado Conexión).'); return false; }
-        if (!recorrido) { hablar('No pude armar ese recorrido.'); return false; }
-        if (E.corrida) { hablar('Espera a que termine el recorrido actual o pulsa Parar todo.'); return false; }
+    function correr(recorrido, habla, datos, texto) {
+        if (!listo()) { di('sinRobot'); return false; }
+        if (!recorrido) { di('fallo'); return false; }
+        if (E.corrida) { di('ocupado'); return false; }
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
         pasoCorrida();
-        if (texto) aviso(texto);
+        if (habla) di(habla, datos);
+        else if (texto) aviso(texto);
         return true;
     }
 
@@ -143,17 +157,17 @@
             guardaCalibra();
             const c = calibra();
             const pts = [{ x: 0, y: 0 }].concat(E.puntos.map(p => ({ x: (p.px - SALIDA.x) * CM_PX, y: (SALIDA.y - p.py) * CM_PX })));
-            correr(raiz.Robot.rutaARecorrido(pts, c.vel, c.giro, 'Dibujo'), 'En camino.');
+            correr(raiz.Robot.rutaARecorrido(pts, c.vel, c.giro, 'Dibujo'), null, null, 'En camino.');
         });
         pintarLienzo();
     }
 
     function regresarCasa() {
-        if (!listo()) { hablar('Conecta el robot primero (apartado Conexión).'); return; }
+        if (!listo()) { di('sinRobot'); return; }
         const t = control() ? control().trayecto() : { pasos: [], ms: 0 };
         const r = raiz.Robot.inversoDeRecorrido(t.pasos, t.ms, 'Casa');
-        if (!r) { hablar('No tengo nada que deshacer: maneja un poco con el mando primero.'); return; }
-        if (correr(r, 'Regresando a casa.')) control().marcarCasa();
+        if (!r) { hablar('No tengo nada que deshacer, compa. Maneja un poco con el mando primero.'); return; }
+        if (correr(r, 'casa')) control().marcarCasa();
     }
 
     function pintarRadar(lecturas) {
@@ -188,13 +202,13 @@
         $('rb-radar').textContent = E.radar ? 'Cancelar' : 'Escanear';
     }
 
-    async function radar() {
+    async function radar(callado) {
         if (E.radar) { E.radarCancelado = true; return; }
-        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo.'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo, compa.'); return; }
         E.radar = true;
         E.radarCancelado = false;
         pintarRadarBtn();
-        aviso('Escaneando…');
+        if (callado) aviso('Escaneando…'); else di('radar');
         const c = calibra(), lecturas = [];
         for (let i = 0; i < 12 && !E.radarCancelado && listo(); i++) {
             await esperar(350);
@@ -214,7 +228,7 @@
         if (E.radarCancelado) { aviso('Radar cancelado.'); return; }
         if (lecturas.length === 12) {
             const cerca = Math.min.apply(null, lecturas), i = lecturas.indexOf(cerca);
-            hablar(`Radar listo. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
+            hablar(`Radar listo, compa. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
         }
     }
 
@@ -228,17 +242,17 @@
         }, 400);
     }
 
-    function ponerGuardia(si) {
+    function ponerGuardia(si, callado) {
         const b = $('rb-guardia');
         if (E.guardia) clearInterval(E.guardia.timer);
         E.guardia = null;
         b.setAttribute('aria-pressed', String(si));
         b.textContent = si ? 'Apagar guardia' : 'Armar guardia';
-        if (!si) { aviso('Guardia apagada.'); return; }
-        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo.'); return; }
+        if (!si) { if (callado) aviso('Guardia apagada.'); else di('guardiaOff'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo, compa.'); return; }
         const G = { base: [], enfria: 0, timer: null };
         G.timer = setInterval(() => {
-            if (!listo()) { ponerGuardia(false); return; }
+            if (!listo()) { ponerGuardia(false, true); return; }
             enlace().pedirDistancia();
             const l = enlace().distancias().lecturas, cm = l.length ? l[l.length - 1] : 400;
             if (G.base.length < 6) { G.base.push(cm); return; }
@@ -246,48 +260,74 @@
             if (Date.now() < G.enfria) return;
             if (cm > 0 && cm < base - 25 && l.length > 1 && l[l.length - 2] < base - 25) {
                 G.enfria = Date.now() + 8000;
-                hablar('Alerta: algo se acercó.');
+                di('alerta');
                 alarma();
             }
         }, 350);
         E.guardia = G;
-        hablar('Modo guardia activado.');
+        if (callado) aviso('Guardia armada.'); else di('guardiaOn');
+    }
+
+    function charla(t) {
+        const ahora = new Date();
+        const datos = {
+            hora: ahora.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+            fecha: ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
+        };
+        di(t, datos);
     }
 
     function ejecutar(o) {
-        if (!o) { hablar('No entendí esa orden.'); return; }
+        if (!o) { di('noEntendi'); return; }
         const c = calibra();
-        if (o.a === 'sinNombre') { hablar('Para darme una orden empieza diciendo Jarvis.'); return; }
-        if (o.a === 'paro') { if (listo()) enlace().paro(); hablar('Detenido.'); return; }
-        if (o.a === 'saludo') { hablar('Hola, soy Jarvis. Dime qué hacer.'); return; }
-        if (o.a === 'bateria') { const p = $('rb-bat-pct'); hablar(p && /\d/.test(p.textContent) ? 'La batería está al ' + p.textContent.replace(/\s*%/, ' por ciento') : 'No sé cuánta batería tengo ahora.'); return; }
-        if (!listo()) { hablar('Conecta el robot primero (apartado Conexión).'); return; }
+        if (o.a === 'sinNombre') { di('sinNombre'); return; }
+        if (o.a === 'charla') { charla(o.t); return; }
+        if (o.a === 'saludo') { di('saludo'); return; }
+        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); di('paro'); return; }
+        if (o.a === 'bateria') {
+            const p = $('rb-bat-pct');
+            if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
+            else di('sinBateria');
+            return;
+        }
+        if (!listo()) { di('sinRobot'); return; }
         if (o.a === 'mover') {
             const ms = o.s ? o.s * 1000 : o.cm ? o.cm / c.vel * 1000 : 1500;
-            correr(raiz.Robot.movimientoARecorrido(o.sentido, ms), o.sentido > 0 ? 'Avanzo.' : 'Reversa.');
-        } else if (o.a === 'giro') correr(raiz.Robot.giroARecorrido(o.grados, c.giro), `Giro ${Math.abs(o.grados)} grados.`);
-        else if (o.a === 'figura') correr(figura(o.f), 'Dibujando ' + o.f + '.');
+            correr(raiz.Robot.movimientoARecorrido(o.sentido, ms), o.sentido > 0 ? 'mover' : 'reversa');
+        } else if (o.a === 'giro') correr(raiz.Robot.giroARecorrido(o.grados, c.giro), 'giro');
+        else if (o.a === 'figura') correr(figura(o.f), 'figura', { f: FIGURAS[o.f] || o.f });
         else if (o.a === 'casa') regresarCasa();
-        else if (o.a === 'radar') radar();
-        else if (o.a === 'guardia') ponerGuardia(o.on);
-        else if (o.a === 'turbo') hablar('El turbo solo se usa desde el mando.');
-        else if (o.a === 'claxon') enlace().nota(440, 500);
-        else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); hablar('Luces listas.'); }
-        else if (o.a === 'funcion') {
+        else if (o.a === 'radar') radar(false);
+        else if (o.a === 'guardia') ponerGuardia(o.on, false);
+        else if (o.a === 'turbo') di('turbo');
+        else if (o.a === 'claxon') { enlace().nota(440, 500); di('claxon'); }
+        else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); di(o.color === '#000000' ? 'lucesOff' : 'luces'); }
+        else if (o.a === 'baile') {
+            const r = enlace().bailar(o.id, o.cancion);
+            if (r) hablar(raiz.Robot.frase('baile') + ` Va con ${r.baile}${r.cancion ? ' y ' + r.cancion : ''}.`);
+            else di('fallo');
+        } else if (o.a === 'funcion') {
             const r = enlace().funcionPorId(o.id);
-            hablar(r ? `Iniciando ${r.nombre}.${r.modelo ? ' Cambié al modelo ' + r.modelo + '.' : ''}` : 'No encontré esa función.');
-        } else if (o.a === 'cancionParar') { enlace().detenerCancion(); hablar('Música detenida.'); }
+            if (r) hablar(raiz.Robot.frase('funcion', { nombre: r.nombre }) + (r.modelo ? ` Ojo, cambié al modelo ${r.modelo}.` : ''));
+            else di('sinFuncion');
+        } else if (o.a === 'cancionParar') { enlace().detenerCancion(); di('cancionParar'); }
         else if (o.a === 'cancion') {
             let id = o.id;
             if (!id && o.q) {
                 const q = raiz.Robot.sinAcentos(o.q);
-                const c = enlace().canciones().find(x => raiz.Robot.sinAcentos(x.nombre).includes(q) || q.includes(raiz.Robot.sinAcentos(x.nombre)));
-                id = c ? c.id : null;
-                if (!id) { hablar('No encontré esa canción.'); return; }
+                const cn = enlace().canciones().find(x => raiz.Robot.sinAcentos(x.nombre).includes(q) || q.includes(raiz.Robot.sinAcentos(x.nombre)));
+                id = cn ? cn.id : null;
+                if (!id) { di('sinCancion'); return; }
             }
             if (!id) id = enlace().cancionActual();
-            hablar(enlace().tocarCancion(id) ? 'Música en marcha.' : 'No pude tocar esa canción.');
+            if (enlace().tocarCancion(id)) di('cancion'); else di('sinCancion');
         }
+    }
+
+    function elegirTexto(matches) {
+        const lista = (matches || []).filter(Boolean);
+        const bueno = lista.find(m => { const o = raiz.Robot.ordenDeVoz(m); return o && o.a !== 'sinNombre'; });
+        return bueno || lista[0] || '';
     }
 
     async function escuchar() {
@@ -302,25 +342,26 @@
             let texto = '';
             if (SR) {
                 const p = await SR.requestPermissions();
-                if (p.speechRecognition !== 'granted') { hablar('Necesito permiso del micrófono para escucharte.'); return; }
-                const r = await SR.start({ language: 'es-MX', maxResults: 3, prompt: 'Dime qué hacer', partialResults: false, popup: true });
-                texto = (r.matches || [])[0] || '';
+                if (p.speechRecognition !== 'granted') { di('sinMicro'); return; }
+                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, compa', partialResults: false, popup: true });
+                texto = elegirTexto(r.matches);
             } else if (Web) {
                 texto = await new Promise((res, rej) => {
                     const rec = new Web();
                     rec.lang = 'es-MX';
-                    rec.onresult = e => res(e.results[0][0].transcript);
+                    rec.maxAlternatives = 5;
+                    rec.onresult = e => res(elegirTexto(Array.from(e.results[0]).map(x => x.transcript)));
                     rec.onerror = e => rej(e);
                     rec.onend = () => res('');
                     rec.start();
                 });
-            } else { hablar('Este celular no deja usar la voz aquí.'); return; }
-            if (!texto) { aviso('No escuché nada.'); return; }
+            } else { di('sinVoz'); return; }
+            if (!texto) { di('nada'); return; }
             historial('yo', texto);
             aviso('«' + texto + '»');
             ejecutar(raiz.Robot.ordenDeVoz(texto));
         } catch (e) {
-            aviso('No pude escuchar. Intenta otra vez.');
+            di('fallo');
         } finally {
             E.escuchando = false;
             boton.classList.remove('is-activo');
@@ -333,16 +374,16 @@
         $('rb-cal-vel').value = c.vel;
         $('rb-cal-giro').value = c.giro;
         ['rb-cal-vel', 'rb-cal-giro'].forEach(id => $(id).addEventListener('change', guardaCalibra));
-        document.querySelectorAll('[data-figura]').forEach(b => b.addEventListener('click', () => { guardaCalibra(); correr(figura(b.dataset.figura), 'Dibujando ' + b.dataset.figura + '.'); }));
+        document.querySelectorAll('[data-figura]').forEach(b => b.addEventListener('click', () => { guardaCalibra(); correr(figura(b.dataset.figura), null, null, 'Dibujando ' + b.dataset.figura + '.'); }));
         $('rb-casa-marca').addEventListener('click', () => { if (control()) control().marcarCasa(); aviso('Casa marcada: aquí empieza el regreso.'); });
         $('rb-casa-ir').addEventListener('click', regresarCasa);
-        $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(); });
-        $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true'));
+        $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(true); });
+        $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
         $('rb-jarvis').addEventListener('click', escuchar);
         document.addEventListener('robot-paro', () => {
             detener(false);
             E.radarCancelado = true;
-            if (E.guardia) ponerGuardia(false);
+            if (E.guardia) ponerGuardia(false, true);
         });
         iniciarLienzo();
     }

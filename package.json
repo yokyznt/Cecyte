@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@vercel/kv": "^1.0.1",
     "web-push": "^3.6.7"
   },

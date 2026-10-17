@@ -178,8 +178,7 @@ function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
     let dir = 'o', luz = 'o';
     if (bloqueado) dir = 'x';
     else if (V && Math.abs(izq - der) >= V * GIRO_DIRECCIONAL) dir = izq > der ? 'd' : 'i';
-    if (V === 0) luz = veniaEnMarcha ? 'f' : 'o';
-    else if (izq < 0 && der < 0) luz = 'r';
+    if (V !== 0 && izq < 0 && der < 0) luz = 'r';
     return { dir, luz };
 }
 
@@ -1107,6 +1106,56 @@ function figura(nombre, lado) {
 
 function sinAcentos(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
+const FRASES = {
+    saludo: ['¡Qué onda, compa! Aquí andamos, listo para lo que sea.', '¡Quihubo! Dime qué hacemos.', '¡Ey, mi buen! ¿Qué se te antoja hacer?'],
+    estado: ['Todo chido, compa, con la batería llena de ganas. ¿Y tú qué tal?', 'Al cien, carnal. Listo para rodar.', 'De lujo, aquí echando relajo con mis ruedas. ¿Qué hacemos?'],
+    gracias: ['¡De nada, compa! Para eso estamos.', 'No hay de qué, carnal.', 'Siempre a la orden, mi buen.'],
+    elogio: ['¡Ay, gracias, compa! Tú tampoco estás nada mal.', 'Me vas a hacer sonrojar, carnal.', '¡Eso! Tú y yo somos el mejor equipo.'],
+    queja: ['Uy, perdón, compa. Dime cómo lo arreglo.', 'Oye, no me regañes. Dime qué necesitas y le echo ganas.'],
+    adios: ['¡Nos vemos, compa! Aquí me quedo cuidando.', 'Cuídate, carnal. Cuando quieras me llamas.'],
+    quien: ['Soy tu robot y tu compa, el mBot que te sigue la corriente. Tú dime Yokis cuando me hables.', 'Soy tu amigo de ruedas, compa. Pa lo que se ofrezca.'],
+    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar y cuidar con la guardia. Solo empieza diciendo Yokis.'],
+    chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, compa.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
+    hora: ['Son las {hora}, compa.', 'Ya van siendo las {hora}.'],
+    fecha: ['Hoy es {fecha}, compa.', 'Estamos a {fecha}.'],
+    paro: ['¡Alto ahí, compa! Ya me frené.', 'Listo, me quedé quieto.', 'Va, me detengo.'],
+    mover: ['Va, ahí voy.', '¡Órale, a rodar!', 'Simón, avanzando.'],
+    reversa: ['Reversa, compa. Cuidado con la cola.', 'Va, me echo para atrás.'],
+    giro: ['A la orden, girando.', 'Va, doy la vuelta.', 'Órale, ahí voy dando vuelta.'],
+    figura: ['¡Va! Voy a dibujar {f}. Mira nomás qué arte.', 'Órale, {f} va saliendo.'],
+    funcion: ['Va, arrancando {nombre}.', '¡Órale! {nombre}, ahí te va.'],
+    cancion: ['¡Va! Ahí va la música.', 'Música, maestro. ¡Dale!'],
+    cancionParar: ['Va, ya no más música.', 'Listo, silencio.'],
+    baile: ['¡Eso! A bailar, compa.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
+    luces: ['¡Luces listas, mira qué chidas!', 'Va, a iluminar el cuarto.'],
+    lucesOff: ['Listo, luces apagadas.'],
+    casa: ['Va, me regreso a casa.', 'Órale, de vuelta a casa.'],
+    radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, compa.'],
+    guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
+    guardiaOff: ['Listo, ya dejé de vigilar.'],
+    alerta: ['¡Alerta, compa! Algo se acercó.', '¡Ojo! Alguien anda cerca.'],
+    claxon: ['¡Beep beep!', '¡Pi pi! A ver quién se quita.'],
+    turbo: ['El turbo solo lo uso con el mando abierto, compa.'],
+    bateria: ['Traigo la batería al {pct}, compa.', 'Ando con {pct} de batería.'],
+    sinBateria: ['No sé cuánta batería traigo ahorita, compa.'],
+    sinNombre: ['Oye, primero dime Yokis, así sé que me hablas a mí.', 'Compa, empieza diciendo Yokis, para saber que es conmigo.'],
+    noEntendi: ['No te cacho, compa. ¿Me lo repites de otra forma?', 'Uy, no te entendí. Dime otra vez, más despacito.'],
+    sinRobot: ['Primero conéctame, compa, y le damos. Está en el apartado Conexión.', 'No me veo conectado. Conéctame en Conexión y arrancamos.'],
+    ocupado: ['Espérame tantito, compa, sigo con lo anterior. O dime para y lo cortamos.'],
+    sinFuncion: ['Esa función no me la sé, compa.'],
+    sinCancion: ['Esa canción no la tengo, compa.', 'No encontré esa rola.'],
+    sinMicro: ['Necesito permiso del micrófono para escucharte, compa.'],
+    sinVoz: ['Este celular no me deja escucharte aquí, compa.'],
+    nada: ['No escuché nada, compa. Inténtalo otra vez.'],
+    fallo: ['Se me fue la onda. Inténtalo otra vez, compa.'],
+};
+
+function frase(tipo, datos, azar) {
+    const lista = FRASES[tipo] || FRASES.noEntendi;
+    const r = typeof azar === 'function' ? azar() : Math.random();
+    return lista[Math.min(lista.length - 1, Math.floor(r * lista.length))].replace(/\{(\w+)\}/g, (m, k) => (datos && datos[k] != null ? datos[k] : ''));
+}
+
 const NUMEROS_VOZ = {
     cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
     once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19,
@@ -1131,7 +1180,7 @@ function numerosEnPalabras(t) {
     return sal.join(' ');
 }
 
-const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas)\s+)?(?:jarvis|jarvi|jarbis|jarbi|yarvis|yarvi|yarbis|harvis|charvis|garvis|jarves|yarves|jarvin|jervis|yervis)\b\s*/;
+const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas|que onda|quihubo)\s+)?(?:(?:y|ll|j)o ?(?:k|qu|ck|c)[iey]s?z?)\b[,.]?\s*/;
 const COLORES_VOZ = {
     rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
     verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
@@ -1142,6 +1191,9 @@ const FUNCIONES_VOZ = [
     ['circulos', /\bcirculos\b|vueltas en circulo/], ['ocho', /figura de ocho|\bocho\b(?! centimetros| metros| segundos| grados)/], ['slalom', /slalom|eslalon/],
     ['derrape', /derrape|derrapa/], ['picoteo', /pajarito|picote/], ['paso', /paso de pajaro/], ['mirada', /mirar a los lados|mirada/],
     ['cuadrado', /patrulla|cuadrada/], ['avanzar', /seguir avanzando|avanza sin parar|avanza siempre|sin parar/],
+];
+const BAILES_VOZ = [
+    ['vaiven', /vaiven|vai ?ven|de un lado a otro/], ['trompo', /trompo|dando vueltas|girando/], ['zigzag', /zig ?zag/], ['cucaracha', /cucaracha/],
 ];
 const CANCIONES_VOZ = [
     ['estrellita', /estrellita|estrellita brillante/], ['cumple', /cumple|feliz cumple/], ['cucaracha', /cucaracha/],
@@ -1159,6 +1211,23 @@ function ordenDeVoz(texto) {
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
     const dice0 = r => r.test(tp);
+    if (dice0(/\b(gracias|grax)\b/)) return { a: 'charla', t: 'gracias' };
+    if (dice0(/como estas|como andas|como te va|como amaneciste|que onda|que tal|como te sientes/)) return { a: 'charla', t: 'estado' };
+    if (dice0(/chiste|chistes|hazme reir|hacerme reir|algo gracioso/)) return { a: 'charla', t: 'chiste' };
+    if (dice0(/que hora|la hora/)) return { a: 'charla', t: 'hora' };
+    if (dice0(/que dia|la fecha|a cuanto estamos|que fecha/)) return { a: 'charla', t: 'fecha' };
+    if (dice0(/quien eres|que eres|como te llamas|tu nombre|presentate/)) return { a: 'charla', t: 'quien' };
+    if (dice0(/que puedes hacer|que hacer|que sabes hacer|que haces|ayuda|ayudame|comandos|que te puedo decir/)) return { a: 'charla', t: 'ayuda' };
+    if (dice0(/adios|hasta luego|nos vemos|\bbye\b|chao|hasta manana|buenas noches amigo/)) return { a: 'charla', t: 'adios' };
+    if (dice0(/eres (el )?(mejor|crack|genial|chido|grande|increible|bueno|padre)|te quiero|te amo|buen trabajo|bien hecho|muy bien|buen chico|felicidades|eres un crack/)) return { a: 'charla', t: 'elogio' };
+    if (dice0(/\b(tonto|inutil|malo|menso|estupido|bobo|feo|torpe)\b/)) return { a: 'charla', t: 'queja' };
+    const verboBaile = /\b(baila|bailar|bailes|baile|bailando|bailemos|bailamos)\b|ponte a bailar|a bailar/.test(tp);
+    if (verboBaile) {
+        if (quita) return { a: 'paro' };
+        const bl = BAILES_VOZ.find(x => x[1].test(tp));
+        const cn = CANCIONES_VOZ.find(x => x[1].test(tp));
+        return { a: 'baile', id: bl ? bl[0] : null, cancion: cn ? cn[0] : null };
+    }
     if (dice0(/\b(cancion|canciones|musica|melodia)\b/) && quita) return { a: 'cancionParar' };
     const cancion = CANCIONES_VOZ.find(c => c[1].test(tp));
     const verboCancion = /\b(toca|tocar|pon|poner|reproduce|reproducir|canta|cantar|suena|sonar|escuchar|cancion|musica|melodia)\b/.test(tp);
@@ -1191,7 +1260,7 @@ function ordenDeVoz(texto) {
     if (dice(/turbo/)) return { a: 'turbo', on: !quita };
     if (dice(/bateria|pilas|carga|energia/)) return { a: 'bateria' };
     if (dice(/claxon|pito|pitar|bocina|pitido/)) return { a: 'claxon' };
-    if (dice(/\b(hola|quien eres|que eres|presentate|como estas|estas ahi|buenos dias|buenas tardes|buenas noches)\b/)) return { a: 'saludo' };
+    if (dice(/\b(hola|holi|ey|buenas|estas ahi|buenos dias|buenas tardes|buenas noches|presente|despierta)\b/)) return { a: 'saludo' };
     const fig = dice(/circulo|redondo|redonda/) ? 'circulo' : dice(/cuadrado|cuadro/) ? 'cuadrado' : dice(/triangulo/) ? 'triangulo' : dice(/estrella/) ? 'estrella' : null;
     if (fig) return { a: 'figura', f: fig };
     const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
@@ -1227,7 +1296,7 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
 const lib = {
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
-    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
@@ -2899,6 +2968,22 @@ function iniciar() {
             pintarFunciones();
             iniciarFuncion();
             return { nombre: f.nombre, modelo: cambio ? VARIANTES.find(v => v.id === S.variante).nombre : '' };
+        },
+        bailar(idBaile, idCancion) {
+            if (S.estado !== 'listo') return null;
+            if (S.corriendoFuncion || S.actuando) paro();
+            S.funcion = '';
+            S.modoBaile = true;
+            let b = BAILES.find(x => x.id === idBaile);
+            if (!b) b = BAILES.find(x => x.id === S.baile && x.id !== 'quieto') || BAILES[0];
+            S.baile = b.id;
+            S.pasos = b.texto;
+            const c = idCancion ? CANCIONES.find(x => x.id === idCancion) : null;
+            if (c) { S.cancion = c.id; S.notas = c.texto; S.bpm = c.bpm; }
+            guardar();
+            pintarTodo();
+            setTimeout(() => actuar(true, true), 400);
+            return { baile: b.nombre, cancion: c ? c.nombre : '' };
         },
         canciones: () => CANCIONES.map(c => ({ id: c.id, nombre: c.nombre })).concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre }))),
         cancionActual: () => S.cancion,
