@@ -163,7 +163,7 @@ function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
     // Hacia atrás la palanca es un volante: el robot retrocede hacia donde empujas (la x se invierte). Entre
     // y = -0.15 y y = -0.35 pasa de una a otra, para que girar en el sitio no tenga un salto.
     const volante = y >= -0.15 ? 1 : y <= -0.35 ? -1 : 1 - 2 * (-0.15 - y) / 0.2;
-    const sx = x * k * volante, sy = y * k;
+    const sx = x * k * Math.abs(x * k) * volante, sy = y * k;   // el giro crece al cuadrado: de frente un roce lateral casi no curva
     let izq = sy + sx, der = sy - sx;
     const m = Math.max(1, Math.abs(izq), Math.abs(der));
     izq /= m; der /= m;
