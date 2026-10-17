@@ -47,6 +47,7 @@
         <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
         <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></symbol>
         <symbol id="i-ruta" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></symbol>
+        <symbol id="i-mic" viewBox="0 0 24 24"><rect width="6" height="12" x="9" y="2" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
         <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
         <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
@@ -703,6 +704,7 @@
                                     <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
                                     <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
                                     <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
+                                    <button type="button" id="rb-ctl-extra" class="rb-btn rb-btn--chico" data-abre="rb-menu-extra" aria-expanded="false" aria-label="Jarvis, figuras, radar y guardia"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg></button>
                                     <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
                                     <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
                                     <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
@@ -748,6 +750,40 @@
                                     <button type="button" id="rb-ruta-grabar" class="rb-cancion rb-cancion--grabar"><svg class="icon" aria-hidden="true"><use href="#i-rec"/></svg><span>Grabar un recorrido</span></button>
                                     <p class="rb-menu__msg" id="rb-ruta-msg" role="status"></p>
                                     <div class="rb-menu__lista" id="rb-recorridos"></div>
+                                </div>
+                                <div class="rb-menu rb-menu--extra" id="rb-menu-extra" role="dialog" aria-label="Jarvis, figuras, radar y guardia" hidden>
+                                    <div class="rb-menu__lista">
+                                        <button type="button" id="rb-jarvis" class="rb-cancion rb-cancion--jarvis"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Jarvis</span></button>
+                                        <p class="rb-menu__msg" id="rb-jarvis-msg" role="status">Di «avanza», «gira a la derecha», «dibuja un círculo» o «regresa a casa».</p>
+                                        <h4 class="rb-extra__t">Dibujar en el piso</h4>
+                                        <div class="rb-extra__fila">
+                                            <button type="button" class="rb-cancion" data-figura="circulo"><span>Círculo</span></button>
+                                            <button type="button" class="rb-cancion" data-figura="cuadrado"><span>Cuadrado</span></button>
+                                        </div>
+                                        <div class="rb-extra__fila">
+                                            <button type="button" class="rb-cancion" data-figura="triangulo"><span>Triángulo</span></button>
+                                            <button type="button" class="rb-cancion" data-figura="estrella"><span>Estrella</span></button>
+                                        </div>
+                                        <h4 class="rb-extra__t">Dibuja una ruta</h4>
+                                        <canvas id="rb-lienzo" class="rb-lienzo" width="300" height="200" aria-label="Dibuja con el dedo el camino que debe hacer el robot"></canvas>
+                                        <div class="rb-extra__fila">
+                                            <button type="button" id="rb-lienzo-ir" class="rb-cancion"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Recorrer</span></button>
+                                            <button type="button" id="rb-lienzo-borrar" class="rb-cancion"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span>Borrar</span></button>
+                                        </div>
+                                        <h4 class="rb-extra__t">Casa, radar y guardia</h4>
+                                        <div class="rb-extra__fila">
+                                            <button type="button" id="rb-casa-marca" class="rb-cancion"><span>Marcar casa aquí</span></button>
+                                            <button type="button" id="rb-casa-ir" class="rb-cancion"><span>Regresar a casa</span></button>
+                                        </div>
+                                        <div class="rb-extra__fila">
+                                            <button type="button" id="rb-radar" class="rb-cancion"><span>Radar 360°</span></button>
+                                            <button type="button" id="rb-guardia" class="rb-cancion" aria-pressed="false"><span>Guardia</span></button>
+                                        </div>
+                                        <canvas id="rb-radar-lienzo" class="rb-lienzo rb-lienzo--radar" width="240" height="240" aria-label="Mapa del radar" hidden></canvas>
+                                        <h4 class="rb-extra__t">Calibración</h4>
+                                        <label class="rb-extra__cal">Velocidad (cm/s)<input id="rb-cal-vel" type="number" inputmode="numeric" min="5" max="80" step="1" value="22"></label>
+                                        <label class="rb-extra__cal">Giro de 90° (ms)<input id="rb-cal-giro" type="number" inputmode="numeric" min="150" max="2000" step="10" value="500"></label>
+                                    </div>
                                 </div>
                                 <div class="rb-menu rb-menu--luces" id="rb-menu-luces" role="dialog" aria-label="Luces" hidden>
                                     <div class="rb-menu__rejilla">
@@ -1191,6 +1227,7 @@
     <script src="robot.js"></script> <!-- @robot:line -->
     <script src="js/robot-bluetooth.js"></script> <!-- @robot:line -->
     <script src="js/robot-control.js"></script> <!-- @robot:line -->
+    <script src="js/robot-extras.js"></script> <!-- @robot:line -->
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

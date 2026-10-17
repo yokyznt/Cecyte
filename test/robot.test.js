@@ -726,3 +726,36 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(S(0, 0, false, false), { dir: 'o', luz: 'o' }, 'quieto sin haberse movido: nada');
     assert.strictEqual(S(-100, -100, false, true).luz, 'r', 'reversa');
 }
+
+{
+    const sumaMs = r => r.ms;
+    const sq = R.rutaARecorrido(R.figura('cuadrado', 60), 20, 500);
+    assert(sq && sq.pasos.filter(p => p.izq > 0 && p.der < 0).length === 3, 'cuadrado: 3 giros a la derecha (el primer lado ya va de frente)');
+    assert(sumaMs(sq) > 4 * 3000, 'cuadrado: 4 lados de 60 cm a 20 cm/s');
+    assert.strictEqual(R.rutaARecorrido([{ x: 0, y: 0 }], 20, 500), null, 'un punto no es ruta');
+    const izq = R.rutaARecorrido([{ x: 0, y: 0 }, { x: -50, y: 0 }], 20, 500);
+    assert(izq.pasos[0].izq < 0 && izq.pasos[0].der > 0, 'a la izquierda gira a la izquierda');
+    assert.strictEqual(izq.pasos[0].t === 0 && Math.round(izq.pasos[2].t) >= 500, true, 'girar 90 dura giro90');
+    ['circulo', 'cuadrado', 'triangulo', 'estrella'].forEach(f => assert(R.rutaARecorrido(R.figura(f, 60), 20, 500), f));
+    assert.strictEqual(R.figura('rombo', 60), null);
+    const ida = R.validarRecorrido({ nombre: 'x', ms: 3000, pasos: [{ t: 0, izq: 100, der: 100 }, { t: 1000, izq: 100, der: -100 }, { t: 2000, izq: 0, der: 0 }] });
+    const vuelta = R.inversoDeRecorrido(ida.pasos, 3000, 'Casa');
+    assert.deepStrictEqual(vuelta.pasos.map(p => [p.t, p.izq, p.der]), [[0, 0, 0], [1000, -100, 100], [2000, -100, -100]], 'el regreso invierte orden y signos');
+    assert.strictEqual(R.giroARecorrido(90, 500).ms, 500);
+    assert.strictEqual(R.giroARecorrido(-180, 500).pasos[0].izq < 0, true);
+    assert.strictEqual(R.movimientoARecorrido(-1, 1000).pasos[0].izq < 0, true);
+    const V = R.ordenDeVoz;
+    assert.deepStrictEqual(V('Jarvis, para'), { a: 'paro' });
+    assert.deepStrictEqual(V('avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
+    assert.deepStrictEqual(V('ve para atrás 3 segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
+    assert.deepStrictEqual(V('gira a la izquierda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('gira 45 grados a la derecha'), { a: 'giro', grados: 45 });
+    assert.deepStrictEqual(V('da la vuelta'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('dibuja un círculo'), { a: 'figura', f: 'circulo' });
+    assert.deepStrictEqual(V('regresa a casa'), { a: 'casa' });
+    assert.deepStrictEqual(V('activa el modo guardia'), { a: 'guardia', on: true });
+    assert.deepStrictEqual(V('desactiva la guardia'), { a: 'guardia', on: false });
+    assert.deepStrictEqual(V('hazme un radar'), { a: 'radar' });
+    assert.deepStrictEqual(V('quita el turbo'), { a: 'turbo', on: false });
+    assert.strictEqual(V('qué hora es'), null);
+}

@@ -26,6 +26,7 @@
         freno: true,                      // freno automático ante obstáculos (necesita el firmware con DIST)
         grab: null,                       // grabando un recorrido: { t0, pasos }
         repro: null,                      // repitiendo uno: { r, t0, ult, envio, timer }
+        trayecto: [], casa0: 0,           // lo manejado con el mando desde «casa»: para regresar
         enMarcha: false, dirVista: 'o', dirHasta: 0,
         senal: { dir: 'o', luz: 'o' }, senalT: { dir: 0, luz: 0 },
     };
@@ -41,6 +42,17 @@
     function mandar(izq, der) {
         enlace().mover(izq, der);
         if (C.grab) anotar(izq, der);
+        registrarTrayecto(izq, der);
+    }
+
+    const MS_TRAYECTO = 110000;
+    function registrarTrayecto(izq, der) {
+        const u = C.trayecto[C.trayecto.length - 1], t = Date.now();
+        if (u && u.izq === izq && u.der === der) return;
+        if (!u && !izq && !der) return;
+        if (!u) C.casa0 = t;
+        if (C.trayecto.length >= 2800 || t - C.casa0 > MS_TRAYECTO) return;
+        C.trayecto.push({ t: t - C.casa0, izq, der });
     }
 
     // ---------- Qué se manda ----------
@@ -544,14 +556,15 @@
         pintarRutas();
     }
 
-    function reproducir(r) {
-        if (C.grab || C.repro) return;
-        if (!listo()) { mensajeRuta('Conecta el robot primero.'); return; }
-        cerrarMenus(null);
+    function reproducir(r, mantener) {
+        if (C.grab || C.repro) return false;
+        if (!listo()) { mensajeRuta('Conecta el robot primero.'); return false; }
+        if (!mantener) cerrarMenus(null);
         C.repro = { r, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoRepro, 50) };
         pintarRutaBtn();
         vibrar(25);
         pasoRepro();
+        return true;
     }
 
     function pasoRepro() {
@@ -709,7 +722,17 @@
         window.addEventListener('blur', () => frenar(false));
     }
 
-    raiz.RobotControl = { salirPantalla };
+    raiz.RobotControl = {
+        salirPantalla,
+        reproducir: (r, mantener) => !!r && reproducir(r, mantener),
+        reproduciendo: () => !!C.repro,
+        activo: () => C.activa && listo(),
+        paro: () => frenar(true),
+        turbo: si => ponerTurbo(!!si),
+        marcarCasa() { C.trayecto = []; C.casa0 = 0; },
+        trayecto: () => ({ pasos: C.trayecto.slice(), ms: C.trayecto.length ? Date.now() - C.casa0 : 0 }),
+        vibrar,
+    };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
     else iniciar();
