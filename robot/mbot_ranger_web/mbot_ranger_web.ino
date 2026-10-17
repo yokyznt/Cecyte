@@ -33,6 +33,8 @@
                      encender. FCLR la borra
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
+    LINEA clave valor ajustes del seguidor de línea (puerto 9): vel 40..150, giro 10..100, buscar ms, color 0/1
+    SENS             responde "SENS 01": lo que ven los dos sensores de línea (1 = nivel alto)
     DIR i|d|x|o      direccional izquierda, derecha, intermitentes o apagar (se apaga sola a los 4 s sin repetir)
     LUZ f|r|o        luz de freno (roja), de reversa (blanca con pitido) o apagar
     DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
@@ -154,6 +156,9 @@ const int PIN_BUZZER = 45;
 const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
+const int MODO_LINEA = 6;            // seguir la línea con el módulo Me Line Follower del puerto 9 (solo por la página)
+bool lnUsa = false;                  // la página ya habló del módulo: el puerto 9 comparte el pin A7 con el botón de la placa
+unsigned long lnT0 = 0;
 const unsigned long SIN_ORDENES_MS = 3000;
 
 // Show guardado: cabecera de 4 bytes en la EEPROM y luego las órdenes, una detrás de otra:
@@ -270,6 +275,7 @@ void aplicaModo() {
   escEstado = 0;
   musP = 0;
   musT = millis() + 1500;               // si la página manda la música, tiene tiempo de adelantarse
+  lnT0 = 0;
   // los colores de los modos del botón mandan sobre el efecto, salvo en esquivar y seguir la mano cuando
   // el usuario guardó sus luces: ahí siguen con su efecto
   const bool conserva = luzPropia && (modo == 1 || modo == 2);
@@ -381,6 +387,7 @@ bool botonLiberado = false;
 bool botonAntes = false;
 unsigned long botonBajoDesde = 0;
 bool botonFlanco() {
+  if (lnUsa) return false;
   int v = analogRead(A7);
   unsigned long t = millis();
   if (v > 500) {
@@ -625,6 +632,83 @@ void senalPaso() {
   else if (s == 4) ledsTodos(120, 0, 0);
   else if (s == 5) ledsTodos(70, 70, 70);
   ledsMuestra();
+}
+
+// ---------- Seguidor de línea (módulo Me Line Follower: dos sensores digitales, puerto 9) ----------
+// Con dos sensores solo se sabe a qué lado se ve la línea, así que la dirección es un valor suave (lnS, -255 izquierda
+// a 255 derecha) que sube mientras un sensor ve la línea, se relaja en cuanto vuelve a quedar entre los dos y, si la
+// pierde, sigue creciendo hacia el último lado (arco cada vez más cerrado, y luego hacia el otro lado) hasta hallarla.
+// En las curvas baja la velocidad. Ajustes por la orden LINEA (en RAM): vel, giro, buscar, color.
+const uint8_t LN_S1 = A7, LN_S2 = A12;
+uint8_t lnVel = 120, lnGiro = 55, lnColor = 0;
+uint16_t lnBuscarMs = 4000;
+int lnS = 0;
+int8_t lnLado = 1;
+unsigned long lnUlt = 0, lnPerdidoDesde = 0;
+uint8_t lnEstado = 255;
+
+void lineaConfig(const char *k, int v) {
+  lnUsa = true;
+  if (!strcmp(k, "vel")) lnVel = constrain(v, 40, 150);
+  else if (!strcmp(k, "giro")) lnGiro = constrain(v, 10, 100);
+  else if (!strcmp(k, "buscar")) lnBuscarMs = constrain(v, 0, 10000);
+  else if (!strcmp(k, "color")) lnColor = v ? 1 : 0;
+}
+
+void seguirLinea() {
+  const unsigned long ahora = millis();
+  if (lnT0 == 0) {
+    lnT0 = ahora;
+    lnUlt = ahora;
+    lnS = 0;
+    lnPerdidoDesde = 0;
+    lnEstado = 255;
+    lnUsa = true;
+    pinMode(LN_S1, INPUT);
+    pinMode(LN_S2, INPUT);
+  }
+  const unsigned long dt = ahora - lnUlt;
+  if (dt < 5) return;
+  lnUlt = ahora;
+  const bool s1 = (digitalRead(LN_S1) == LOW) != (lnColor == 1);
+  const bool s2 = (digitalRead(LN_S2) == LOW) != (lnColor == 1);
+  int objetivo = 0, ritmo = 2;
+  uint8_t estado = 1;
+  if (s1 != s2) {
+    lnLado = s2 ? 1 : -1;
+    lnPerdidoDesde = 0;
+    objetivo = lnLado * 255;
+    ritmo = 1;
+  } else if (s1 && s2) {
+    lnPerdidoDesde = 0;
+    ritmo = 3;
+  } else {
+    if (lnPerdidoDesde == 0) lnPerdidoDesde = ahora;
+    const unsigned long perdido = ahora - lnPerdidoDesde;
+    if (perdido < 200) {
+      ritmo = 2;
+    } else if (perdido > lnBuscarMs) {
+      parar();
+      modo = 0;
+      aplicaModo();
+      return;
+    } else {
+      estado = 0;
+      const int8_t lado = ((perdido / 1200UL) & 1) ? -lnLado : lnLado;
+      objetivo = lado * 255;
+      ritmo = 1;
+    }
+  }
+  const int paso = (int)(constrain(dt, 5UL, 100UL) * (ritmo == 1 ? 1 : ritmo == 2 ? 2 : 3));
+  lnS += constrain(objetivo - lnS, -paso, paso);
+  if (estado != lnEstado) {
+    lnEstado = estado;
+    if (fxModo == 0) { if (estado) color(0, 40, 0); else color(40, 0, 0); }
+  }
+  const int g = lnS < 0 ? -lnS : lnS;
+  const int v = (int)((long)lnVel * (510 - g) / 510);
+  const int c = (int)((long)v * lnGiro * 2 * g / 25500L);
+  if (lnS < 0) motores(v - c, v); else motores(v, v - c);
 }
 
 // ---------- Guardar el efecto: al encender, el robot lo vuelve a poner ----------
@@ -876,6 +960,16 @@ void ejecuta(char *s) {
     luzSenal = k == 'f' ? 4 : k == 'r' ? 5 : 0;
     senalVence = millis() + 4000UL;
     ok();
+  } else if (!strcmp(cmd, "LINEA") && a && b) {
+    lineaConfig(a, atoi(b));
+    ok();
+  } else if (!strcmp(cmd, "SENS")) {
+    lnUsa = true;
+    pinMode(LN_S1, INPUT);
+    pinMode(LN_S2, INPUT);
+    Serial.print(F("SENS "));
+    Serial.print(digitalRead(LN_S1));
+    Serial.println(digitalRead(LN_S2));
   } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
     for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
     ok();
@@ -915,7 +1009,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
-    if (n < 0 || n > MODO_SHOW) { err(F("modo")); }
+    if (n < 0 || n > MODO_LINEA) { err(F("modo")); }
     else {
       modo = n;
       aplicaModo();
@@ -999,7 +1093,7 @@ void setup() {
   imprimeDec(bateriaCv(), 2);
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
-  Serial.print(F(" DIST=1 DIR=1"));            // este programa entiende las órdenes DIST, DIR y LUZ
+  Serial.print(F(" DIST=1 DIR=1 LIN=1"));            // este programa entiende las órdenes DIST, DIR y LUZ
   Serial.println();
   Serial.println(F("mBot Ranger web v1 listo"));
 }
@@ -1036,6 +1130,7 @@ void loop() {
     case 2: seguir();      break;
     case 3: testMotores(); break;
     case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
+    case MODO_LINEA: seguirLinea(); break;
     default: break;
   }
 

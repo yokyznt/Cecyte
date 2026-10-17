@@ -508,7 +508,7 @@ for (const c of R.CANCIONES) {
     for (const f of R.FUNCIONES) {
         assert(f.v.length && f.v.every(v => ids.includes(v)), f.id + ': modelo desconocido');
         assert(f.nombre && f.desc, f.id);
-        if (f.modo) assert([1, 2].includes(f.modo), f.id + ': modos 1 (esquivar) y 2 (seguir) del robot');
+        if (f.modo) assert([1, 2, 6].includes(f.modo), f.id + ': modos 1 (esquivar), 2 (seguir) y 6 (línea) del robot');
         else {
             assert(R.pasosDeFuncion(f.pasos).length > 0, f.id + ': sin pasos');
             // todo el texto de pasos es "MOV número[°]": nada se pierde en silencio
@@ -549,7 +549,7 @@ for (const c of R.CANCIONES) {
     // el firmware entiende los modos que usan las funciones autónomas y la página los manda con MODE
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/case 1: esquivar\(\);/.test(ino) && /case 2: seguir\(\);/.test(ino), 'modos 1 y 2 del robot');
-    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_SHOW/.test(ino));
+    assert(/strcmp\(cmd, "MODE"\)/.test(ino) && /n > MODO_LINEA/.test(ino));
 }
 
 // 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz
@@ -570,10 +570,11 @@ for (const c of R.CANCIONES) {
 // 24) Sin seguidor de línea (se hará con el Raptor) y tiempo de carga de las pilas
 {
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    assert(!html.includes('rb-ln-'), 'la interfaz ya no lleva el seguidor de línea');
-    assert(!R.FUNCIONES.some(f => f.modo === 6 || f.linea || f.id === 'linea'), 'ninguna función usa el modo 6');
+    assert(html.includes('id="rb-ln-vel"') && html.includes('id="rb-ln-sensores"'), 'la interfaz lleva los ajustes del seguidor de línea');
+    const lin = R.FUNCIONES.find(f => f.id === 'linea');
+    assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(!/SEGUIDOR_LINEA|seguirLinea|LINEA/.test(fw), 'el firmware ya no lleva el seguidor');
+    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
     assert.strictEqual(R.tiempoCarga({ pct: 50, capacidadMah: 2000, corrienteMa: 500, quimica: 'nimh' }), 168);
     assert.strictEqual(R.tiempoCarga({ pct: 100, capacidadMah: 2000, corrienteMa: 500 }), 0);
@@ -745,19 +746,45 @@ console.log('robot.test.js: todo bien');
     assert.strictEqual(R.giroARecorrido(-180, 500).pasos[0].izq < 0, true);
     assert.strictEqual(R.movimientoARecorrido(-1, 1000).pasos[0].izq < 0, true);
     const V = R.ordenDeVoz;
-    assert.deepStrictEqual(V('Jarvis, para'), { a: 'paro' });
-    assert.deepStrictEqual(V('avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
-    assert.deepStrictEqual(V('ve para atrás 3 segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
-    assert.deepStrictEqual(V('gira a la izquierda'), { a: 'giro', grados: -90 });
-    assert.deepStrictEqual(V('gira 45 grados a la derecha'), { a: 'giro', grados: 45 });
-    assert.deepStrictEqual(V('da la vuelta'), { a: 'giro', grados: 180 });
-    assert.deepStrictEqual(V('dibuja un círculo'), { a: 'figura', f: 'circulo' });
-    assert.deepStrictEqual(V('regresa a casa'), { a: 'casa' });
-    assert.deepStrictEqual(V('activa el modo guardia'), { a: 'guardia', on: true });
-    assert.deepStrictEqual(V('desactiva la guardia'), { a: 'guardia', on: false });
-    assert.deepStrictEqual(V('hazme un radar'), { a: 'radar' });
-    assert.deepStrictEqual(V('quita el turbo'), { a: 'turbo', on: false });
-    assert.strictEqual(V('qué hora es'), null);
+    assert.deepStrictEqual(V('avanza'), { a: 'sinNombre' }, 'sin decir Jarvis no obedece');
+    assert.deepStrictEqual(V('para'), { a: 'sinNombre' });
+    assert.deepStrictEqual(V('Jarvis'), { a: 'saludo' });
+    assert.deepStrictEqual(V('Oye Jarvis, para'), { a: 'paro' });
+    assert.deepStrictEqual(V('yarvis alto ya'), { a: 'paro' }, 'tolera cómo se oye el nombre');
+    assert.deepStrictEqual(V('Jarvis avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
+    assert.deepStrictEqual(V('Jarvis por favor avanza dos metros'), { a: 'mover', sentido: 1, cm: 200, s: null }, 'números en palabras');
+    assert.deepStrictEqual(V('Jarvis avanza medio metro'), { a: 'mover', sentido: 1, cm: 50, s: null });
+    assert.deepStrictEqual(V('Jarvis ve para atrás tres segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
+    assert.deepStrictEqual(V('Jarvis gira a la izquierda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('Jarvis gira cuarenta y cinco grados a la derecha'), { a: 'giro', grados: 45 });
+    assert.deepStrictEqual(V('Jarvis gira ciento ochenta grados'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Jarvis a la derecha'), { a: 'giro', grados: 90 });
+    assert.deepStrictEqual(V('Jarvis da la vuelta'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Jarvis dibuja un círculo'), { a: 'figura', f: 'circulo' });
+    assert.deepStrictEqual(V('Jarvis hazme una estrella'), { a: 'figura', f: 'estrella' });
+    assert.deepStrictEqual(V('Jarvis regresa a casa'), { a: 'casa' });
+    assert.deepStrictEqual(V('Jarvis activa el modo guardia'), { a: 'guardia', on: true });
+    assert.deepStrictEqual(V('Jarvis desactiva la guardia'), { a: 'guardia', on: false });
+    assert.deepStrictEqual(V('Jarvis hazme un radar'), { a: 'radar' });
+    assert.deepStrictEqual(V('Jarvis quita el turbo'), { a: 'turbo', on: false });
+    assert.deepStrictEqual(V('Jarvis enciende las luces rojas'), { a: 'luces', efecto: 'fijo', color: '#ff2a2a' });
+    assert.deepStrictEqual(V('Jarvis pon las luces en arcoíris'), { a: 'luces', efecto: 'arcoiris' });
+    assert.deepStrictEqual(V('Jarvis apaga las luces'), { a: 'luces', efecto: 'fijo', color: '#000000' });
+    assert.deepStrictEqual(V('Jarvis luces respirando'), { a: 'luces', efecto: 'respirar' });
+    assert.deepStrictEqual(V('Jarvis inicia la función zigzag'), { a: 'funcion', id: 'zigzag' });
+    assert.deepStrictEqual(V('Jarvis activa esquivar obstáculos'), { a: 'funcion', id: 'esquivar' });
+    assert.deepStrictEqual(V('Jarvis modo seguir mi mano'), { a: 'funcion', id: 'mano' });
+    assert.deepStrictEqual(V('Jarvis sigue la línea'), { a: 'funcion', id: 'linea' });
+    assert.deepStrictEqual(V('Jarvis deja de seguir la línea'), { a: 'paro' });
+    assert.deepStrictEqual(V('Jarvis haz círculos'), { a: 'funcion', id: 'circulos' });
+    assert.deepStrictEqual(V('Jarvis toca estrellita'), { a: 'cancion', id: 'estrellita' });
+    assert.deepStrictEqual(V('Jarvis pon la canción de la cucaracha'), { a: 'cancion', id: 'cucaracha' });
+    assert.deepStrictEqual(V('Jarvis reproduce música'), { a: 'cancion', id: null, q: '' });
+    assert.deepStrictEqual(V('Jarvis toca la canción mi vals'), { a: 'cancion', id: null, q: 'mi vals' });
+    assert.deepStrictEqual(V('Jarvis detén la música'), { a: 'cancionParar' });
+    assert.deepStrictEqual(V('Jarvis cuánta batería tienes'), { a: 'bateria' });
+    assert.deepStrictEqual(V('Jarvis toca el claxon'), { a: 'claxon' });
+    assert.strictEqual(V('Jarvis qué hora es'), null);
 }
 
 {

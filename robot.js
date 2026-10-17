@@ -388,6 +388,7 @@ const FUNCIONES = [
     { id: 'avanzar', v: ['tanque', 'raptor', 'pajaro'], nombre: 'Seguir avanzando', desc: 'Avanza en línea recta sin parar hasta que pulses Paro.', pasos: 'AD 4' },
     { id: 'esquivar', v: ['tanque', 'raptor'], nombre: 'Esquivar obstáculos', desc: 'Avanza solo; si algo está a menos de 20 cm, retrocede y gira hacia un lado al azar. Usa su sensor ultrasónico.', modo: 1 },
     { id: 'mano', v: ['tanque', 'raptor'], nombre: 'Seguir mi mano', desc: 'Se acerca si tu mano está entre 12 y 40 cm, retrocede si la pones a menos de 8 cm y se queda quieto si no hay nada.', modo: 2 },
+    { id: 'linea', v: ['raptor'], nombre: 'Seguir la línea', desc: 'Sigue una línea negra del piso con los dos sensores del puerto 9: corrige con suavidad, baja la velocidad en las curvas y la busca si la pierde.', modo: 6 },
     { id: 'cuadrado', v: ['tanque', 'raptor'], nombre: 'Patrulla cuadrada', desc: 'Avanza, gira 90° y repite: recorre un cuadrado una y otra vez.', pasos: 'AD 1.5 GD 90°' },
     { id: 'idavuelta', v: ['tanque'], nombre: 'Ida y vuelta', desc: 'Avanza 2 s, para, retrocede 2 s y vuelve a empezar, como un guardia en su pasillo.', pasos: 'AD 2 PA 0.5 AT 2 PA 0.5' },
     { id: 'vigilante', v: ['tanque'], nombre: 'Vigilante', desc: 'Sin moverse del sitio, barre a un lado y al otro con pausas, como mirando que todo esté bien.', pasos: 'GI 45° PA 1 GD 90° PA 1 GI 45° PA 1' },
@@ -404,7 +405,7 @@ const FUNCIONES = [
 ];
 
 const GRUPOS_FN = [
-    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano'] },
+    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano', 'linea'] },
     { id: 'rectas', nombre: 'Rectas y patrullas', ids: ['avanzar', 'cuadrado', 'idavuelta', 'vigilante'] },
     { id: 'curvas', nombre: 'Curvas', ids: ['zigzag', 'circulos', 'ocho', 'slalom'] },
     { id: 'giros', nombre: 'Giros y trucos', ids: ['trompo', 'arrancon', 'derrape'] },
@@ -1106,31 +1107,105 @@ function figura(nombre, lado) {
 
 function sinAcentos(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
+const NUMEROS_VOZ = {
+    cero: 0, un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19,
+    veinte: 20, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25,
+    treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80, noventa: 90,
+    cien: 100, ciento: 100, doscientos: 200, trescientos: 300, cuatrocientos: 400, quinientos: 500,
+};
+
+function numerosEnPalabras(t) {
+    const w = t.split(' '), sal = [];
+    for (let i = 0; i < w.length;) {
+        if (!Object.prototype.hasOwnProperty.call(NUMEROS_VOZ, w[i])) { sal.push(w[i++]); continue; }
+        let n = NUMEROS_VOZ[w[i++]];
+        for (;;) {
+            const sig = w[i], dep = w[i + 1];
+            if (sig === 'y' && NUMEROS_VOZ[dep] >= 1 && NUMEROS_VOZ[dep] <= 9 && n >= 20 && n < 100 && n % 10 === 0) { n += NUMEROS_VOZ[dep]; i += 2; }
+            else if (NUMEROS_VOZ[sig] >= 1 && NUMEROS_VOZ[sig] < 100 && n >= 100 && n % 100 === 0) { n += NUMEROS_VOZ[sig]; i++; }
+            else break;
+        }
+        sal.push(String(n));
+    }
+    return sal.join(' ');
+}
+
+const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas)\s+)?(?:jarvis|jarvi|jarbis|jarbi|yarvis|yarvi|yarbis|harvis|charvis|garvis|jarves|yarves|jarvin|jervis|yervis)\b\s*/;
+const COLORES_VOZ = {
+    rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
+    verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
+};
+const FUNCIONES_VOZ = [
+    ['linea', /\b(linea|lineas|seguidor)\b|sigue ?lineas/], ['esquivar', /esquiv|obstaculos|evita/], ['mano', /\bmano\b|sigueme|seguirme/],
+    ['idavuelta', /ida y vuelta/], ['vigilante', /vigilante/], ['trompo', /trompo/], ['zigzag', /zig ?zag|\beses\b/], ['arrancon', /arrancon/],
+    ['circulos', /\bcirculos\b|vueltas en circulo/], ['ocho', /figura de ocho|\bocho\b(?! centimetros| metros| segundos| grados)/], ['slalom', /slalom|eslalon/],
+    ['derrape', /derrape|derrapa/], ['picoteo', /pajarito|picote/], ['paso', /paso de pajaro/], ['mirada', /mirar a los lados|mirada/],
+    ['cuadrado', /patrulla|cuadrada/], ['avanzar', /seguir avanzando|avanza sin parar|avanza siempre|sin parar/],
+];
+const CANCIONES_VOZ = [
+    ['estrellita', /estrellita|estrellita brillante/], ['cumple', /cumple|feliz cumple/], ['cucaracha', /cucaracha/],
+    ['alegria', /alegria|beethoven/], ['jingle', /jingle|navidad|campanas/], ['elisa', /elisa/], ['santiago', /santiago|fray/], ['escala', /escala|afinar/],
+];
+
 function ordenDeVoz(texto) {
-    const t = sinAcentos(texto).replace(/^(oye |hey |ok )?jarvis ?/, '');
-    if (!t) return null;
+    let t = sinAcentos(texto);
+    const nombre = t.match(NOMBRE_VOZ);
+    if (!nombre) return { a: 'sinNombre' };
+    t = t.slice(nombre[0].length)
+        .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+    if (!t) return { a: 'saludo' };
+    const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
+    const tp = t;
+    const dice0 = r => r.test(tp);
+    if (dice0(/\b(cancion|canciones|musica|melodia)\b/) && quita) return { a: 'cancionParar' };
+    const cancion = CANCIONES_VOZ.find(c => c[1].test(tp));
+    const verboCancion = /\b(toca|tocar|pon|poner|reproduce|reproducir|canta|cantar|suena|sonar|escuchar|cancion|musica|melodia)\b/.test(tp);
+    if (cancion && verboCancion) return { a: 'cancion', id: cancion[0] };
+    if (verboCancion && /\b(cancion|musica|melodia|canta|cantar)\b/.test(tp)) {
+        const q = tp.replace(/\b(toca|tocar|pon|poner|reproduce|reproducir|canta|cantar|suena|sonar|escuchar|la|el|una|un|cancion|canciones|musica|melodia|de|que)\b/g, ' ').replace(/\s+/g, ' ').trim();
+        return { a: 'cancion', id: null, q };
+    }
+    const funcion = FUNCIONES_VOZ.find(f => f[1].test(tp));
+    const verboFuncion = /\b(inicia|iniciar|activa|activar|ejecuta|ejecutar|empieza|empezar|arranca|arrancar|corre|correr|haz|hacer|hazlo|modo|funcion|pon|poner|comienza|comenzar|realiza|realizar)\b/.test(tp);
+    if (funcion && !quita && (verboFuncion || funcion[0] === 'linea' || /^(trompo|zigzag|slalom|derrape|arrancon|vigilante)$/.test(tp)) && !(funcion[0] === 'cuadrado' && /\b(dibuja|dibujar|traza|figura)\b/.test(tp))) {
+        return { a: 'funcion', id: funcion[0] };
+    }
+    if (funcion && quita) return { a: 'paro' };
+    t = t.replace(/\bmedio metro\b/, '50 centimetros').replace(/\bun cuarto de vuelta\b/, '90 grados').replace(/\bmedia vuelta\b/, 'dar la vuelta');
+    t = numerosEnPalabras(t);
     const dice = r => r.test(t);
-    if (dice(/\b(para(?! atras)|alto|detente|detenerte|frena|stop|basta)\b/)) return { a: 'paro' };
-    if (dice(/guardia|vigila|vigilancia/)) return { a: 'guardia', on: !dice(/\b(quita|apaga|desactiva|deja de|termina|cancela)\b/) };
-    if (dice(/\b(regresa|vuelve|ven|regreso)\b.*\bcasa\b|\bcasa\b/)) return { a: 'casa' };
-    if (dice(/radar|escanea|escaner|mapa/)) return { a: 'radar' };
-    if (dice(/turbo/)) return { a: 'turbo', on: !dice(/\b(quita|apaga|desactiva|sin)\b/) };
-    if (dice(/bateria|pilas|carga/)) return { a: 'bateria' };
-    if (dice(/claxon|pito|bocina|toca el claxon/)) return { a: 'claxon' };
-    if (dice(/\b(hola|quien eres|que eres|presentate)\b/)) return { a: 'saludo' };
-    const fig = dice(/circulo|redondo/) ? 'circulo' : dice(/cuadrado/) ? 'cuadrado' : dice(/triangulo/) ? 'triangulo' : dice(/estrella/) ? 'estrella' : null;
-    if (fig && dice(/\b(dibuja|haz|traza|hacer|dibujar|forma)\b/)) return { a: 'figura', f: fig };
+    if (dice(/\b(luz|luces|foco|focos|leds?|ilumina\w*)\b/)) {
+        if (quita) return { a: 'luces', efecto: 'fijo', color: '#000000' };
+        const col = t.split(' ').map(x => COLORES_VOZ[x]).find(Boolean);
+        if (col) return { a: 'luces', efecto: 'fijo', color: col };
+        if (dice(/respira|respirar|pulso|latido/)) return { a: 'luces', efecto: 'respirar' };
+        if (dice(/persecucion|persigue|corriendo|carrera/)) return { a: 'luces', efecto: 'persecucion' };
+        return { a: 'luces', efecto: 'arcoiris' };
+    }
+    if (dice(/guardia|vigila|vigilar|vigilancia|centinela|cuida/)) return { a: 'guardia', on: !quita };
+    if (dice(/\b(para(?! atras)|alto|detente|detenerte|detener|frena|frenar|stop|basta|quieto|quieta|espera|ya)\b/)) return { a: 'paro' };
+    if (dice(/\bcasa\b/)) return { a: 'casa' };
+    if (dice(/radar|escanea|escanear|escaner|mapa|alrededor/)) return { a: 'radar' };
+    if (dice(/turbo/)) return { a: 'turbo', on: !quita };
+    if (dice(/bateria|pilas|carga|energia/)) return { a: 'bateria' };
+    if (dice(/claxon|pito|pitar|bocina|pitido/)) return { a: 'claxon' };
+    if (dice(/\b(hola|quien eres|que eres|presentate|como estas|estas ahi|buenos dias|buenas tardes|buenas noches)\b/)) return { a: 'saludo' };
+    const fig = dice(/circulo|redondo|redonda/) ? 'circulo' : dice(/cuadrado|cuadro/) ? 'cuadrado' : dice(/triangulo/) ? 'triangulo' : dice(/estrella/) ? 'estrella' : null;
+    if (fig) return { a: 'figura', f: fig };
     const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
     const n = num ? parseFloat(num.replace(',', '.')) : null;
-    if (dice(/\b(da la vuelta|media vuelta|date la vuelta|dar la vuelta)\b/)) return { a: 'giro', grados: 180 };
-    if (dice(/\b(gira|girar|voltea|vuelta|dobla)\b/)) {
-        const lado = dice(/izquierda/) ? -1 : 1;
-        return { a: 'giro', grados: lado * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) };
+    if (dice(/\b(da la vuelta|dar la vuelta|date la vuelta|date vuelta)\b/)) return { a: 'giro', grados: 180 };
+    if (dice(/\b(vuelta completa|giro completo|360)\b/)) return { a: 'giro', grados: 360 };
+    const lado = dice(/izquierda|izquierdo/) ? -1 : dice(/derecha/) ? 1 : 0;
+    if (dice(/\b(gira|girar|gire|giro|voltea|voltear|dobla|doblar|rota|rotar|vira|virar|vuelta)\b/) || (lado && !dice(/\b(avanza|ve|camina|anda|adelante|atras|reversa)\b/))) {
+        return { a: 'giro', grados: (lado || 1) * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) };
     }
-    const sentido = dice(/\b(atras|reversa|retrocede|reversa|para atras)\b/) ? -1 : dice(/\b(avanza|adelante|ve|camina|anda|sigue|derecho|recto)\b/) ? 1 : 0;
+    const sentido = dice(/\b(atras|reversa|retrocede|retroceder|marcha atras|hacia atras)\b/) ? -1 : dice(/\b(avanza|avanzar|adelante|ve|camina|caminar|anda|andar|sigue|seguir|derecho|recto|muevete|mover|moverte|hacia adelante)\b/) ? 1 : 0;
     if (sentido) {
-        const metros = dice(/metro/), seg = dice(/segundo/);
-        return { a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && dice(/centimetro|cm/) ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null };
+        const metros = dice(/\bmetros?\b/), seg = dice(/segundo/), cm = dice(/centimetro|\bcm\b/);
+        return { a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && cm ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null };
     }
     return null;
 }
@@ -1152,7 +1227,7 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
 const lib = {
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
-    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
@@ -1197,6 +1272,9 @@ const S = {
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
     fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
     fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
+    fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
+    linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
+    sensores: null, verSensores: null,
     distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
@@ -1205,8 +1283,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -1218,6 +1296,9 @@ function cargar() {
     S.velFx = clamp(Number(S.velFx) || 100, 20, 300);
     S.vol = clamp(Number.isFinite(Number(S.vol)) ? Number(S.vol) : 100, 0, 100);
     if (typeof S.rec !== 'string') S.rec = '';
+    const ln = S.linea && typeof S.linea === 'object' ? S.linea : {};
+    S.linea = { vel: clamp(Math.round(Number(ln.vel) || 120), 40, 150), giro: clamp(Math.round(Number(ln.giro) || 55), 10, 100), buscar: clamp(Math.round(Number(ln.buscar)) || 0, 0, 10), color: ln.color ? 1 : 0 };
+    if (!('buscar' in ln)) S.linea.buscar = 4;
     const b = S.bateria && typeof S.bateria === 'object' ? S.bateria : {};
     S.bateria = {
         quimica: b.quimica in CURVAS_BATERIA ? b.quimica : 'nimh',
@@ -1295,6 +1376,11 @@ function alLinea(l) {
     } else if (/^BAT /.test(l)) {
         S.cola.ack();                      // BAT contesta con su propia línea, sin OK
         bateriaLeida(parseFloat(l.slice(4)));
+    } else if (/^SENS /.test(l)) {
+        S.cola.ack();
+        const v = l.slice(5).trim();
+        S.sensores = v.length === 2 ? [(v[0] === '0') !== (S.linea.color === 1), (v[1] === '0') !== (S.linea.color === 1)] : null;
+        pintarSensores();
     } else if (/^DIST /.test(l)) {
         S.cola.ack();                      // igual: DIST contesta con su propia línea
         const cm = parseInt(l.slice(5), 10);
@@ -1312,6 +1398,7 @@ function alLinea(l) {
         S.fwNuevo = true;                  // este programa ya entiende la orden BAT
         S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
         S.fwDir = kv.DIR === 1;
+        S.fwLin = kv.LIN === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
@@ -1689,12 +1776,13 @@ function iniciarFuncion(reinicio) {
         return esperarYTocar({ fn: true });
     }
     S.guardarEn = 0;                       // unas luces apagadas por la función no se guardan en el robot
+    if (f.modo === 6 && !S.fwLin) return mensaje('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
     if (f.modo) {
         S.actuando = false;
         S.corriendoFuncion = true;
         S.autonomo = f.modo;
         S.ultimaActividad = Date.now();
-        S.cola.enviar(['SPD ' + velAuto(), { l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]);
+        S.cola.enviar((f.modo === 6 ? lineaOrdenes() : []).concat(['SPD ' + velAuto(), { l: 'MODE ' + f.modo, ex: true }, { l: lineaLuces(), ex: true }, 'VOL ' + S.vol]));
         if (S.funMusica) musicaAutonoma();
         return mensaje(`${f.nombre}: lo hace el robot solo con su sensor. Pulsa Paro para detenerlo.`, 'ok');
     }
@@ -1719,6 +1807,7 @@ function guardarFuncion() {
     const f = funcionActual();
     if (!f) return funInfo('Elige una función primero.', 'err');
     if (S.estado !== 'listo') return funInfo('Conecta el robot primero.', 'err');
+    if (f.modo === 6) return funInfo('El seguidor de línea no se guarda en el robot: se inicia desde aquí.', 'err');
     if (S.corriendoFuncion) paro();
     S.guardarEn = 0;
     const solo = S.funAuto ? 1 : 0;
@@ -1815,6 +1904,34 @@ function quitarFuncion() {
     mensaje('Se quitó la función: el baile y la función no van juntos.');
 }
 
+function lineaOrdenes() {
+    const c = S.linea;
+    return ['LINEA vel ' + c.vel, 'LINEA giro ' + c.giro, 'LINEA buscar ' + c.buscar * 1000, 'LINEA color ' + c.color];
+}
+
+function pintarSensores() {
+    const el = $('rb-ln-sensores');
+    if (!el) return;
+    [...el.children].forEach((p, i) => p.classList.toggle('is-linea', !!(S.sensores && S.sensores[i])));
+}
+
+function alternarSensores() {
+    const b = $('rb-ln-ver');
+    if (S.verSensores) {
+        clearInterval(S.verSensores);
+        S.verSensores = null;
+        S.sensores = null;
+        pintarSensores();
+    } else {
+        S.verSensores = setInterval(() => {
+            if (S.estado !== 'listo') { alternarSensores(); return; }
+            if (!S.cola.ocupado()) S.cola.ultimo('SN', 'SENS');
+        }, 400);
+    }
+    b.setAttribute('aria-pressed', String(!!S.verSensores));
+    b.textContent = S.verSensores ? 'Dejar de ver' : 'Ver sensores';
+}
+
 function pintarFunciones() {
     const v = VARIANTES.find(x => x.id === S.variante) || VARIANTES[0];
     const f = funcionActual();
@@ -1842,6 +1959,15 @@ function pintarFunciones() {
     $('rb-fn-giro-v').textContent = S.giro90 + ' ms';
     $('rb-fn-vel').value = S.vel;
     $('rb-fn-vel-v').textContent = S.vel;
+    $('rb-ln').hidden = !(f && f.modo === 6);
+    $('rb-ln-aviso').hidden = S.fwLin || S.estado !== 'listo';
+    $('rb-ln-vel').value = S.linea.vel;
+    $('rb-ln-vel-v').textContent = S.linea.vel;
+    $('rb-ln-giro').value = S.linea.giro;
+    $('rb-ln-giro-v').textContent = S.linea.giro;
+    $('rb-ln-buscar').value = S.linea.buscar;
+    $('rb-ln-buscar-v').textContent = S.linea.buscar;
+    $('rb-ln-color').value = String(S.linea.color);
     $('rb-fn-giro').disabled = !!(f && f.modo);                // las de sensor no giran por tiempo
     const op = $('rb-cancion').selectedOptions[0];
     $('rb-fn-cancion').textContent = op ? op.textContent : '';
@@ -2659,6 +2785,17 @@ function iniciar() {
         cambio('funcion');
     });
     $('rb-fn-iniciar').addEventListener('click', () => iniciarFuncion());
+    const lineaCambio = () => {
+        S.linea = { vel: Number($('rb-ln-vel').value), giro: Number($('rb-ln-giro').value), buscar: Number($('rb-ln-buscar').value), color: Number($('rb-ln-color').value) };
+        $('rb-ln-vel-v').textContent = S.linea.vel;
+        $('rb-ln-giro-v').textContent = S.linea.giro;
+        $('rb-ln-buscar-v').textContent = S.linea.buscar;
+        guardar();
+        if (S.estado === 'listo' && S.autonomo === 6 && !S.cola.ocupado()) S.cola.enviar(lineaOrdenes());
+    };
+    ['rb-ln-vel', 'rb-ln-giro', 'rb-ln-buscar'].forEach(id => $(id).addEventListener('input', lineaCambio));
+    $('rb-ln-color').addEventListener('change', lineaCambio);
+    $('rb-ln-ver').addEventListener('click', alternarSensores);
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
     $('rb-baile-guardar').addEventListener('click', guardarBaile);
     $('rb-baile-auto').addEventListener('change', e => { S.baileAuto = e.target.checked; guardar(); });
@@ -2733,6 +2870,18 @@ function iniciar() {
         pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
         distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
         giro90: () => S.giro90,
+        funcionPorId(id) {
+            const f = S.estado === 'listo' ? FUNCIONES.find(x => x.id === id) : null;
+            if (!f) return null;
+            const cambio = !f.v.includes(S.variante);
+            if (cambio) S.variante = f.v[0];
+            elegirFuncion(id);
+            pintarFunciones();
+            iniciarFuncion();
+            return { nombre: f.nombre, modelo: cambio ? VARIANTES.find(v => v.id === S.variante).nombre : '' };
+        },
+        canciones: () => CANCIONES.map(c => ({ id: c.id, nombre: c.nombre })).concat(S.guardadas.map(g => ({ id: 'g:' + g.id, nombre: g.nombre }))),
+        cancionActual: () => S.cancion,
         soportaSenal: () => S.estado === 'listo' && S.fwDir,
         senal(tipo, v) { if (S.estado === 'listo' && S.fwDir) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
