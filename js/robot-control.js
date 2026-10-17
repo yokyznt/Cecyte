@@ -270,7 +270,6 @@
             $('rb-ctl-vmax-v').textContent = 'MAX';
             cerrarMenus(null);
             soltarClaxon();
-            if (C.inclinar) ponerInclinar(false);
             if (listo()) { C.luzPrev = e.luzAhora(); e.detenerCancion(); e.luces('fijo', '#000000'); }
         } else {
             C.vmax = C.vmaxPrev;

@@ -609,6 +609,8 @@ for (const c of R.CANCIONES) {
     const c = J(0.7, 0.7, 100);
     assert(c.izq > c.der && c.der >= 0 && c.izq <= 180, 'diagonal: avanza curvando a la derecha');
     assert.deepStrictEqual(J(3, 3, 100), J(0.7071, 0.7071, 100), 'fuera del círculo se recorta');
+    const suave = J(0.2, 1, 100);
+    assert(suave.der >= 160, 'de frente, un roce lateral casi no curva');
     const m = J(0.3, 0.6, 20);
     assert(Math.abs(m.izq) <= 36 && Math.abs(m.der) <= 36, 'vmax 20 % = 36');
     assert.deepStrictEqual(J(NaN, undefined, 60), { izq: 0, der: 0 }, 'valores raros no mueven');
