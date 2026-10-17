@@ -843,6 +843,9 @@ console.log('robot.test.js: todo bien');
         assert.deepStrictEqual(V(d), { a: 'charla', t: 'fact' }, d);
     }
     assert(R.FRASES.fact.length >= 3, 'hay facts de fábrica');
+    const extras = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
+    assert(/function meneoHablar/.test(extras) && /enlace\(\)\.libre\(\)/.test(extras) && /E\.guardia/.test(extras.split('function meneoHablar')[1].split('function iniciarMeneo')[0]), 'Yokis menea al robot al contestar, solo si está libre y sin la guardia armada');
+    assert(/hablar\(t \|\| raiz\.Robot\.frase\(tipo, datos\), tipo === 'paro'\)/.test(extras), 'al decir «para» no se mueve');
     assert(Object.values(R.FRASES).flat().every(f => !/\bcompa\b/i.test(f)), 'Yokis dice «we», no «compa»');
     assert.deepStrictEqual(V('Yokis gracias'), { a: 'charla', t: 'gracias' });
     assert.deepStrictEqual(V('Yokis quién eres'), { a: 'charla', t: 'quien' });

@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null };
 
     const enlace = () => raiz.RobotEnlace || null;
     const control = () => raiz.RobotControl || null;
@@ -448,10 +448,50 @@
         $('rb-voz-rapido').value = a.rate;
     }
 
-    function hablar(texto) {
+    const CLAVE_MENEO = 'cecyte_yokis_meneo';
+    const meneoActivo = () => { try { return localStorage.getItem(CLAVE_MENEO) !== '0'; } catch (e) { return true; } };
+
+    function detenerMeneo() {
+        const G = E.meneo;
+        if (!G) return;
+        clearInterval(G.timer);
+        E.meneo = null;
+        if (listo()) enlace().mover(0, 0);
+    }
+
+    // Mientras contesta, el robot hace un meneo corto en su sitio (un giro a cada lado, sin avanzar): como si hablara.
+    // La duración se calcula por el largo del texto; con la voz nativa, que avisa cuándo termina, se corta ahí.
+    function meneoHablar(texto, fin) {
+        if (!meneoActivo() || E.corrida || E.radar || E.guardia || !listo() || !enlace().libre()) return;
+        detenerMeneo();
+        const t0 = Date.now(), G = { hasta: t0 + Math.min(9000, Math.max(700, texto.length * 62)), ult: '' };
+        fin.then(() => { if (E.meneo === G && Date.now() - t0 > 700) G.hasta = Date.now(); });
+        G.timer = setInterval(() => {
+            const t = Date.now();
+            if (t >= G.hasta || !listo() || E.corrida) { detenerMeneo(); return; }
+            const f = (t - t0) % 520;
+            const v = f < 110 ? [130, -130] : f >= 260 && f < 370 ? [-130, 130] : [0, 0];
+            const clave = v.join(',');
+            if (clave !== G.ult) { enlace().mover(v[0], v[1]); G.ult = clave; }
+        }, 40);
+        E.meneo = G;
+    }
+
+    function iniciarMeneo() {
+        const c = $('rb-habla-mueve');
+        if (!c) return;
+        c.checked = meneoActivo();
+        c.addEventListener('change', () => {
+            try { localStorage.setItem(CLAVE_MENEO, c.checked ? '1' : '0'); } catch (e) { /* sin guardado */ }
+            if (!c.checked) detenerMeneo();
+        });
+    }
+
+    function hablar(texto, quieto) {
         aviso(texto);
         historial('yokis', texto);
-        voz(texto);
+        const fin = voz(texto);
+        if (!quieto) meneoHablar(texto, fin);
     }
 
     const di = (tipo, datos) => {
@@ -460,7 +500,7 @@
             const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
             if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
         }
-        hablar(t || raiz.Robot.frase(tipo, datos));
+        hablar(t || raiz.Robot.frase(tipo, datos), tipo === 'paro');
     };
 
     function calibra() {
@@ -508,6 +548,7 @@
         if (!listo()) { di('sinRobot'); return false; }
         if (!recorrido) { di('fallo'); return false; }
         if (E.corrida) { di('ocupado'); return false; }
+        detenerMeneo();
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
         if (control() && control().pantalla) control().pantalla(true, 'ruta');
         pasoCorrida();
@@ -721,7 +762,7 @@
         if (o.a === 'sinNombre') { di('sinNombre'); return; }
         if (o.a === 'charla') { charla(o.t); return; }
         if (o.a === 'saludo') { di('saludo'); return; }
-        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); di('paro'); return; }
+        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -823,6 +864,7 @@
         $('rb-jarvis').addEventListener('click', escuchar);
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
         iniciarFacts();
+        iniciarMeneo();
         $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
         iniciarEntrena();

@@ -3141,6 +3141,7 @@ function iniciar() {
         estado: () => S.estado,
         listo: () => S.estado === 'listo',
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
+        libre: () => S.estado === 'listo' && !S.actuando && !S.corriendoFuncion && !S.serieOn && !S.ruleta,
         soportaRumbo: () => S.estado === 'listo' && S.fwGiro,
         rumboIniciar(si) { if (S.estado === 'listo' && S.fwGiro) S.cola.enviar([{ l: si ? 'H0' : 'H1', ex: true }]); },
         rumbo(grados, v) { if (S.estado === 'listo' && S.fwGiro) { S.ultimaActividad = Date.now(); S.cola.ultimo('H', 'H ' + grados + ' ' + v); } },
