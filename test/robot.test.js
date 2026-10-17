@@ -597,7 +597,17 @@ for (const c of R.CANCIONES) {
     const ctl = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8');
     assert(/addEventListener\('deviceorientationabsolute'/.test(ctl) && /iniciarBrujula\(\);/.test(ctl) && /rumboRelativo\(hayBrujula\(\) \? C\.fi : C\.fi0, r\.grados, C\.fi0\)/.test(ctl), 'la brújula del teléfono se lee siempre y el rumbo que se manda la usa en cada revisión');
     assert(/id="rb-dir-cal"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')) && /\$\('rb-dir-cal'\)\.addEventListener\('click', alinearRumbo\)/.test(ctl), 'hay un botón para alinear el teléfono con el robot');
-    assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl) && /id="rb-dir-on"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')), 'la app manda H con el rumbo de la palanca');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const ctlLF = ctl.replace(/\r/g, '');
+    assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl), 'la app manda H con el rumbo de la palanca');
+    assert(!/id="rb-dir-on"/.test(html) && /ciclarCel\(\); \}\);/.test(ctl), 'el modo dirección ya no tiene botón propio: es el segundo estado del botón del celular');
+    assert(/if \(C\.dirModo\) \{ ponerRumbo\(false\); return; \}\n[^\n]*if \(C\.inclinar\) \{ ponerInclinar\(false\);[^\n]*ponerRumbo\(true\)[^\n]*\n[^\n]*ponerInclinar\(true\);/.test(ctlLF), 'el botón del celular pasa normal → inclinar → dirección → normal');
+    assert(/id="rb-estilo"/.test(html) && /const ESTILOS = \['palanca', 'flechas', 'pedales'\]/.test(ctl) && /class="rb-flechas"/.test(html) && /rb-pedales--dir/.test(html) && /rb-pedales--gas/.test(html) && (html.match(/data-pad="/g) || []).length === 8, 'hay botón de estilo de control con palanca, flechas (4) y pedales (2 de dirección y 2 de aceleración)');
+    assert(/if \(!f\.pad\) suavizar\(m\);/.test(ctl) && /C\.px \+= \(k1\(x\) - C\.px\) \* 0\.4;/.test(ctl), 'la palanca se suaviza y las flechas y pedales aceleran poco a poco');
+    assert(/rb-grupo--sesion/.test(html) && /rb-grupo--info/.test(html) && /rb-grupo--herr/.test(html), 'la barra del mando está agrupada en sesión, información y herramientas');
+    const fwc = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8').replace(/\r/g, '');
+    assert(/void parar\(\) \{[^}]*rumboV = 0;/.test(fwc) && /strcmp\(cmd, "M"\) && a && b\) \{[\s\S]{0,140}rumboV = 0;/.test(fwc), 'cualquier paro o una orden M cancela el control de rumbo del robot');
+    assert(/w = rumboW >> 7/.test(fwc) && /\(rumboV \* \(70 - a\)\) >> 6/.test(fwc), 'el rumbo se corrige dentro del robot, con freno por la velocidad de giro');
 }
 
 // 23c) El robot solo se controla desde la app: sin Web Serial y con la pestaña oculta en la web

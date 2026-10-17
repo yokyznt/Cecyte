@@ -36,7 +36,6 @@
     LINEA clave valor ajustes del seguidor de línea (puerto 9): vel 40..150, giro 10..100, buscar ms, color 0/1
     H0               modo dirección: pone el rumbo actual como cero (con el robot quieto); H1 lo apaga
     H grados v       va hacia ese rumbo (-180..180, positivo = derecha del cero): gira hacia él y avanza con velocidad v; v = 0 frena
-    HG               responde "HG 90": el rumbo actual en grados
     G n              gira n grados (-360..360, positivo = derecha) con el giroscopio; INFO trae GIRO=1 si lo hay
     PADD G grados    en el show: gira esos grados (como G)
     MODE 7         se acerca despacio a lo de enfrente y se detiene a 10 cm, pitando más rápido al acercarse (PARK=1 en INFO)
@@ -190,6 +189,7 @@ unsigned long musT = 0;                  // a esta hora toca la siguiente nota o
 bool abortar = false;                // un "!" de la página: corta lo que esté haciendo
 bool moviendo = false;
 bool rumboOn = false;                // modo dirección: el giroscopio lleva la cuenta del rumbo (orden H0)
+int rumboV = 0;                      // velocidad pedida en el modo dirección (0 = el robot no persigue el rumbo)
 unsigned long ultimoBoton = 0;
 unsigned long ultimaOrden = 0;
 
@@ -261,6 +261,7 @@ void parar() {
   motorPwm(0, 0);
   motorPwm(1, 0);
   moviendo = false;
+  rumboV = 0;
 }
 
 // ---------- LEDs ----------
@@ -754,31 +755,43 @@ long calibraGiro() {
 }
 
 long rumbo = 0, rumboRep = 0;
-unsigned long rumboT = 0;
+int rumboW = 0, rumboObj = 0;
+unsigned long rumboT = 0, rumboC = 0;
+int rumboGrados() { return (int)((rumbo + 65536L) >> 17); }
 void rumboPaso() {
   if (!rumboOn) return;
   const unsigned long t = millis();
   if (t - rumboT < 4) return;
-  rumbo += (long)(gyroZ() - rumboRep) * (long)(t - rumboT);
+  rumboW = gyroZ() - (int)rumboRep;
+  rumbo += (long)rumboW * (long)(t - rumboT);
   rumboT = t;
+  if (rumboV <= 0 || t - rumboC < 20) return;
+  rumboC = t;
+  int e = rumboObj - rumboGrados();
+  while (e > 180) e -= 360;
+  while (e < -180) e += 360;
+  const int a = e < 0 ? -e : e, w = rumboW >> 7, aw = w < 0 ? -w : w;
+  const int fwd = a <= 6 ? rumboV : a >= 70 ? 0 : (rumboV * (70 - a)) >> 6;
+  int s = ((e * 7) >> 2) - (w >> 2);
+  if (!fwd) {
+    if (a < 3) s = 0;
+    else if (aw < 25) s = s < 0 ? min(s, -105) : max(s, 105);
+  }
+  s = constrain(s, -180, 180);
+  const int tope = max(rumboV, 180);
+  motores(constrain(fwd + s, -tope, tope), constrain(fwd - s, -tope, tope));
 }
 void rumboInicia() {
   rumboRep = calibraGiro();
   rumbo = 0;
+  rumboV = 0;
   rumboT = millis();
   rumboOn = true;
 }
-int rumboGrados() { return (int)((rumbo + 65536L) >> 17); }
 void rumboMueve(int obj, int v) {
-  if (v <= 0) { parar(); return; }
-  int e = obj - rumboGrados();
-  while (e > 180) e -= 360;
-  while (e < -180) e += 360;
-  const int a = e < 0 ? -e : e;
-  const int fwd = a >= 64 ? 0 : (v * (64 - a)) >> 6;
-  const int g = a < 4 ? 0 : constrain(a * 2 + 100, 110, 150);
-  const int s = e > 0 ? g : -g, tope = max(v, g);
-  motores(constrain(fwd + s, -tope, tope), constrain(fwd - s, -tope, tope));
+  rumboObj = obj;
+  rumboV = v;
+  if (v <= 0) parar();
 }
 
 void giroGrados(int grados) {
@@ -1018,6 +1031,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "M") && a && b) {
     if (modo != MODO_WEB) { modo = MODO_WEB; aplicaModo(); }
+    rumboV = 0;
     motores(constrain(atoi(a), -VEL_TURBO, VEL_TURBO), constrain(atoi(b), -VEL_TURBO, VEL_TURBO));
     ok();
   } else if (!strcmp(cmd, "S")) {
@@ -1110,9 +1124,6 @@ void ejecuta(char *s) {
       rumboMueve(constrain(atoi(a), -180, 180), constrain(atoi(b), 0, VEL_TURBO));
       ok();
     }
-  } else if (!strcmp(cmd, "HG")) {
-    Serial.print(F("HG "));
-    Serial.println(rumboGrados());
   } else if (!strcmp(cmd, "G") && a) {
     if (giroOk) { giroGrados(constrain(atoi(a), -360, 360)); ok(); } else err(F("giro"));
   } else if (!strcmp(cmd, "PCLR")) {

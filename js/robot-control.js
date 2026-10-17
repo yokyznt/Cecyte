@@ -21,6 +21,8 @@
         vmax: 60,
         movido: false, ultimo: '', ultimoEnvio: 0,
         dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo respecto al teléfono y el robot gira hacia él y avanza
+        estilo: 'palanca', pad: new Map(), px: 0, py: 0,   // estilo de control (palanca, flechas o pedales): botones sostenidos y su aceleración gradual
+        sIzq: 0, sDer: 0,                  // salida suavizada de las ruedas
         fi: 0, fi0: 0, brujulaT: 0,        // hacia dónde apunta el teléfono (brújula, siempre al día), y hacia dónde apuntaba al alinear
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
@@ -64,9 +66,28 @@
         return v.length ? { x: v[v.length - 1][0], y: v[v.length - 1][1] } : { x: 0, y: 0 };
     }
 
+    // Flechas y pedales: lo que se sostiene suma una dirección; el valor sube poco a poco (acelera) y al soltar todo vuelve a 0
     function fuente() {
         if (C.inclinar) return Date.now() >= C.armaEn ? C.tilt : { x: 0, y: 0 };
+        if (C.pad.size) {
+            let x = 0, y = 0;
+            for (const [a, b] of C.pad.values()) { x += a; y += b; }
+            C.px += (k1(x) - C.px) * 0.4;
+            C.py += (k1(y) - C.py) * 0.4;
+            return { x: C.px, y: C.py, pad: true };
+        }
+        C.px = 0; C.py = 0;
         return C.joyActivo ? { x: C.jx, y: C.jy } : teclado();
+    }
+
+    // La salida a las ruedas alcanza lo pedido en unos tres turnos (~150 ms): un temblor del dedo ya no se nota en el robot.
+    // Soltar (todo a 0) frena de inmediato.
+    function suavizar(m) {
+        if (!m.izq && !m.der) { C.sIzq = 0; C.sDer = 0; return; }
+        C.sIzq += (m.izq - C.sIzq) * 0.5;
+        C.sDer += (m.der - C.sDer) * 0.5;
+        m.izq = Math.round(C.sIzq / 5) * 5;
+        m.der = Math.round(C.sDer / 5) * 5;
     }
 
     function revisar() {
@@ -81,6 +102,7 @@
         // Repitiendo un recorrido: si se toca la palanca, el teclado o el teléfono, el mando recupera el control
         if (C.repro) { if (m.izq || m.der) pararRepro(false); else return; }
         const pedido = !!(m.izq || m.der);
+        if (!f.pad) suavizar(m);
         // Freno por obstáculo: hacia adelante no pasa de 15 cm (35 en turbo); atrás y girar en el sitio siguen libres
         if (C.freno && enlace().distancias) {
             const d = enlace().distancias();
@@ -110,7 +132,7 @@
 
     // Modo dirección: se manda el rumbo de la palanca (redondeado, para no saturar el enlace) y la velocidad
     function revisarRumbo(f, ahora, turbo) {
-        $('rb-dir-on').classList.toggle('is-sin-brujula', !hayBrujula());
+        $('rb-incl-on').classList.toggle('is-sin-brujula', !hayBrujula());
         if (ahora < C.dirListoEn) return;
         const r = raiz.Robot.rumboDeJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         if (C.repro) { if (!r.v) return; pararRepro(false); }
@@ -158,12 +180,28 @@
         if (si && C.inclinar) ponerInclinar(false);
         frenar(false);
         C.dirModo = si;
-        $('rb-dir-on').setAttribute('aria-pressed', String(si));
         $('rb-mando').classList.toggle('es-dir', si);
         C.dirListoEn = si ? Date.now() + 900 : 0;
         if (si) C.fi0 = hayBrujula() ? C.fi : 0;
         if (listo()) e.rumboIniciar(si);
         vibrar(si ? [20, 30, 20] : 14);
+        pintarCel();
+    }
+
+    // El botón del celular tiene tres estados: control normal → inclinar el celular → modo dirección → normal
+    function pintarCel() {
+        const b = $('rb-incl-on'), m = C.inclinar ? 1 : C.dirModo ? 2 : 0;
+        b.dataset.modo = String(m);
+        b.setAttribute('aria-pressed', String(m > 0));
+        b.setAttribute('aria-label', ['Manejar inclinando el celular', 'Inclinar el celular activado. Toca para pasar al modo dirección', 'Modo dirección activado. Toca para volver al control normal'][m]);
+        if (m !== 2) b.classList.remove('is-sin-brujula');
+    }
+
+    function ciclarCel() {
+        const e = enlace();
+        if (C.dirModo) { ponerRumbo(false); return; }
+        if (C.inclinar) { ponerInclinar(false); if (listo() && e.soportaRumbo && e.soportaRumbo()) ponerRumbo(true); return; }
+        ponerInclinar(true);
     }
 
     // Direccionales, luz de freno y de reversa: solo se manda cuando cambian, y se repiten cada MS_SENAL mientras duran
@@ -202,6 +240,8 @@
     function frenar(conParo) {
         C.jx = 0; C.jy = 0; C.joyActivo = false;
         C.teclas.clear();
+        C.pad.clear(); C.px = 0; C.py = 0; C.sIzq = 0; C.sDer = 0;
+        document.querySelectorAll('#rb-mando [data-pad].is-down').forEach(b => b.classList.remove('is-down'));
         C.tilt = { x: 0, y: 0 };
         pintarPalanca();
         pintarNivel();
@@ -210,7 +250,7 @@
         pararRepro(!conParo);                  // si repetía un recorrido, también se frena (con paro ya va el «!»)
         if (!listo()) return;
         if (conParo) enlace().paro();
-        else if (C.movido) mandar(0, 0);
+        else if (C.movido) { if (C.dirModo) enlace().rumbo(0, 0); else mandar(0, 0); }
         C.movido = false;
         C.ultimo = '';
     }
@@ -329,7 +369,6 @@
     function ponerInclinar(si) {
         if (si && C.dirModo) ponerRumbo(false);
         C.inclinar = si;
-        $('rb-incl-on').setAttribute('aria-pressed', String(si));
         $('rb-mando').classList.toggle('es-incl', si);
         C.ref = null;
         C.armaEn = si ? Date.now() + MS_ARMAR : 0;
@@ -337,6 +376,7 @@
         C.tilt = { x: 0, y: 0 };
         pintarNivel();
         pintarPalanca();
+        pintarCel();
     }
 
     function iniciarInclinar() {
@@ -346,10 +386,59 @@
             const t = 9.81, f = 0.25;                     // filtro pasa-bajos: quita temblores
             C.g = { x: C.g.x + ((a.x / t) - C.g.x) * f, y: C.g.y + ((a.y / t) - C.g.y) * f, z: C.g.z + ((a.z / t) - C.g.z) * f };
         });
-        $('rb-incl-on').addEventListener('click', () => { if (C.turbo) return; vibrar(14); ponerInclinar(!C.inclinar); });
+        $('rb-incl-on').addEventListener('click', () => { if (C.turbo) return; vibrar(14); ciclarCel(); });
         $('rb-incl-cal').addEventListener('click', centrar);
         $('rb-incl-inv-g').addEventListener('click', () => alternar('rb-incl-inv-g'));
         $('rb-incl-inv-a').addEventListener('click', () => alternar('rb-incl-inv-a'));
+    }
+
+    // ---------- Estilo de control: palanca, flechas o pedales ----------
+    // Los tres alimentan lo mismo (x, y): sirven con el control normal y con el modo dirección.
+    const ESTILOS = ['palanca', 'flechas', 'pedales'];
+    const CLAVE_ESTILO = 'cecyte_mando_estilo';
+
+    function aplicarEstilo(e) {
+        C.estilo = ESTILOS.includes(e) ? e : 'palanca';
+        const m = $('rb-mando'), b = $('rb-estilo');
+        ESTILOS.forEach(x => m.classList.toggle('es-estilo-' + x, x === C.estilo));
+        b.dataset.estilo = C.estilo;
+        b.setAttribute('aria-label', 'Estilo de control: ' + C.estilo + '. Toca para cambiar a ' + ESTILOS[(ESTILOS.indexOf(C.estilo) + 1) % ESTILOS.length]);
+    }
+
+    function ponerEstilo(e) {
+        frenar(false);
+        aplicarEstilo(e);
+        try { localStorage.setItem(CLAVE_ESTILO, C.estilo); } catch (err) { /* sin guardado */ }
+        vibrar(14);
+    }
+
+    // Cada flecha o pedal suma su dirección mientras se mantiene (varios a la vez: avanzar y girar)
+    function iniciarPads() {
+        document.querySelectorAll('#rb-mando [data-pad]').forEach(b => {
+            const v = b.dataset.pad.split(',').map(Number);
+            const soltar = e => { C.pad.delete(e.pointerId); b.classList.remove('is-down'); };
+            b.addEventListener('pointerdown', e => {
+                try { b.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+                C.pad.set(e.pointerId, v);
+                b.classList.add('is-down');
+                vibrar(8);
+                e.preventDefault();
+            });
+            b.addEventListener('pointerup', soltar);
+            b.addEventListener('pointercancel', soltar);
+            b.addEventListener('lostpointercapture', soltar);
+            b.addEventListener('keydown', e => {
+                if ((e.key !== ' ' && e.key !== 'Enter') || e.repeat) return;
+                C.pad.set('k' + b.dataset.pad, v);
+                b.classList.add('is-down');
+                e.preventDefault();
+            });
+            b.addEventListener('keyup', e => {
+                if (e.key !== ' ' && e.key !== 'Enter') return;
+                C.pad.delete('k' + b.dataset.pad);
+                b.classList.remove('is-down');
+            });
+        });
     }
 
     // ---------- Turbo ----------
@@ -497,7 +586,6 @@
         const b = $('rb-freno');
         const e = enlace();
         b.hidden = !(e && e.soportaDistancia && e.soportaDistancia());
-        $('rb-dir-on').hidden = !(e && e.soportaRumbo && e.soportaRumbo());
         const d = e && e.distancias ? e.distancias() : null;
         const cm = d && d.lecturas.length ? d.lecturas[d.lecturas.length - 1] : null;
         $('rb-dist').textContent = cm === null || cm >= 400 ? '-- cm' : cm + ' cm';
@@ -519,7 +607,11 @@
         });
         $('rb-ctl-bt').addEventListener('click', () => { const b = $('rb-conectar'); if (b) b.click(); });
         $('rb-turbo').addEventListener('click', () => ponerTurbo(!C.turbo));
-        $('rb-dir-on').addEventListener('click', () => ponerRumbo(!C.dirModo));
+        $('rb-estilo').addEventListener('click', () => ponerEstilo(ESTILOS[(ESTILOS.indexOf(C.estilo) + 1) % ESTILOS.length]));
+        iniciarPads();
+        let guardado = null;
+        try { guardado = localStorage.getItem(CLAVE_ESTILO); } catch (e) { /* sin guardado */ }
+        aplicarEstilo(guardado);
         $('rb-dir-cal').addEventListener('click', alinearRumbo);
         iniciarBrujula();
     }
@@ -751,7 +843,7 @@
         for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
         sec.classList.toggle('is-sin-enlace', e !== 'listo');
         pintarDistancia();
-        if (e !== 'listo') { C.dirModo = false; C.dirListoEn = 0; $('rb-dir-on').setAttribute('aria-pressed', 'false'); $('rb-mando').classList.remove('es-dir'); pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
+        if (e !== 'listo') { C.dirModo = false; C.dirListoEn = 0; $('rb-mando').classList.remove('es-dir'); pintarCel(); pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
     }
 
     function iniciar() {

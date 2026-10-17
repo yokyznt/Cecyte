@@ -294,7 +294,10 @@
 .rb-btn[hidden] { display: none; }
 
 /* Barra de arriba */
-.rb-mando__barra { display: flex; align-items: center; gap: 12px; padding: 10px 14px 8px; }
+.rb-mando__barra { display: flex; align-items: center; gap: 16px; padding: 10px 14px 8px; }
+.rb-grupo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rb-grupo--info { flex: 1; justify-content: center; }
+.rb-grupo--herr { margin-left: auto; }
 .rb-estado { display: grid; place-items: center; width: 24px; height: 44px; }
 .rb-estado__punto { width: 12px; height: 12px; border-radius: 50%; background: oklch(0.5 0.02 160); transition: background 0.2s, box-shadow 0.2s; }
 .is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25); }
@@ -305,7 +308,9 @@
 
 /* Cuerpo: palanca (o inclinar) · paro y velocidad · botones de acción */
 .rb-mando__cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2vw; padding: 0 3vw 10px; }
-.rb-joy, .rb-incl { grid-column: 1; grid-row: 1; }
+.rb-joy, .rb-incl, .rb-flechas, .rb-pedales--dir { grid-column: 1; grid-row: 1; }
+.rb-centro { grid-column: 2; grid-row: 1; }
+.rb-caras, .rb-pedales--gas { grid-column: 3; grid-row: 1; }
 
 /* Palanca */
 .rb-joy {
@@ -436,12 +441,9 @@
 .rb-incl__txt:empty { display: none; }
 
 /* Turbo: botón en la barra y el mando cambia de color; lo demás queda apagado */
-.rb-turbo { width: 64px; height: 44px; margin-left: auto; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-turbo { width: 64px; height: 44px; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
 .rb-turbo .icon { width: 24px; height: 24px; fill: currentColor; stroke-width: 1.6; }
 .rb-btn.rb-turbo[aria-pressed="true"] { background: var(--m-naranja); color: var(--m-base); }
-.rb-btn.rb-dir[aria-pressed="true"] { background: var(--m-verde); color: var(--m-base); }
-.rb-dir { position: relative; }
-.rb-dir.is-sin-brujula::after { content: ''; position: absolute; inset-block-start: 4px; inset-inline-end: 4px; inline-size: 9px; block-size: 9px; border-radius: 50%; background: var(--m-naranja); }
 .rb-dir-cal { display: none; }
 .rb-mando.es-dir .rb-dir-cal { display: grid; }
 .rb-alerta { padding: 4px 10px; border-radius: 999px; background: oklch(0.55 0.2 27); color: oklch(0.98 0 0); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
@@ -449,8 +451,53 @@
 .es-turbo .rb-caras, .es-turbo .rb-vel input { opacity: 0.3; pointer-events: none; }
 .es-turbo .rb-joy__mando { background: radial-gradient(circle at 38% 32%, oklch(0.9 0.12 70), var(--m-naranja) 45%, oklch(0.62 0.17 48)); box-shadow: 0 6px 0 oklch(0.42 0.1 48), 0 10px 18px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35); }
 
+/* Botón del celular: normal → inclinar → dirección (brújula). Naranja = dirección */
+.rb-cara--incl { position: relative; }
+.rb-cara--incl .ico-dir { display: none; }
+.rb-cara--incl[data-modo="2"] .ico-cel { display: none; }
+.rb-cara--incl[data-modo="2"] .ico-dir { display: block; }
+.rb-cara--incl[data-modo="2"] { background: var(--m-naranja); box-shadow: 0 5px 0 var(--m-base), 0 0 0 3px var(--m-naranja); }
+.rb-cara--incl.is-sin-brujula::after { content: ''; position: absolute; inset-block-start: 8%; inset-inline-end: 8%; inline-size: 11px; block-size: 11px; border-radius: 50%; background: var(--m-rojo); box-shadow: 0 0 0 2px var(--m-base); }
+
+/* Estilo de control: palanca · flechas · pedales (el botón de la barra muestra el que está puesto) */
+.rb-estilo .icon { display: none; }
+.rb-estilo[data-estilo="palanca"] .ico-palanca, .rb-estilo[data-estilo="flechas"] .ico-flechas, .rb-estilo[data-estilo="pedales"] .ico-pedales { display: block; }
+.rb-flechas { display: none; width: calc(var(--t) * 2.9); height: calc(var(--t) * 2.9); grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr)); gap: calc(var(--t) * 0.14); }
+.rb-flecha { border-radius: 24%; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.rb-flecha .icon { width: calc(var(--t) * 0.5); height: calc(var(--t) * 0.5); stroke-width: 2.8; }
+.rb-flecha--arriba { grid-area: 1 / 2; }
+.rb-flecha--izq { grid-area: 2 / 1; }
+.rb-flecha--der { grid-area: 2 / 3; }
+.rb-flecha--abajo { grid-area: 3 / 2; }
+.rb-flecha--izq .icon { rotate: -90deg; }
+.rb-flecha--der .icon { rotate: 90deg; }
+.rb-flecha--abajo .icon { rotate: 180deg; }
+.rb-pedales { display: none; gap: 12px; }
+.rb-pedales--dir { width: calc(var(--t) * 2.9); height: calc(var(--t) * 2.2); }
+.rb-pedales--gas { width: calc(var(--t) * 1.5); height: calc(var(--t) * 2.9); flex-direction: column; }
+.rb-pedal {
+    flex: 1; width: auto; height: auto; border-radius: 18px; color: var(--m-base); background: var(--m-menta);
+    background-image: repeating-linear-gradient(0deg, transparent 0 9px, oklch(0.12 0.02 160 / 0.22) 9px 11px);
+}
+.rb-pedal { min-width: 0; min-height: 0; }
+.rb-pedal .icon { width: calc(var(--t) * 0.46); height: calc(var(--t) * 0.46); stroke-width: 3; }
+.rb-pedal--acel { flex: 2.2; background-color: var(--m-verde); }
+.rb-pedal--rev { background-color: var(--m-naranja); }
+.rb-pedal--izq .icon { rotate: -90deg; }
+.rb-pedal--der .icon { rotate: 90deg; }
+.rb-pedal--rev .icon { rotate: 180deg; }
+.rb-mando.es-estilo-flechas:not(.es-incl) .rb-flechas { display: grid; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-pedales { display: flex; }
+.rb-mando.es-estilo-flechas:not(.es-incl) .rb-joy, .rb-mando.es-estilo-pedales:not(.es-incl) .rb-joy { display: none; }
+/* Con pedales las dos manos quedan ocupadas: las cuatro acciones pasan al centro, debajo del paro */
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-centro { align-self: start; padding-top: 6px; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-paro-gran { --p: clamp(68px, min(21dvh, 20vw), 100px); }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-caras { grid-column: 2; grid-row: 1; align-self: end; justify-self: center; grid-template-columns: repeat(4, 46px); grid-template-rows: 46px; gap: 10px; margin: 0; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara { translate: none; grid-area: 1 / auto; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara.is-down, .rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara:active { translate: 0 4px; }
+
 /* Sin enlace: lo que depende del robot se ve apagado; el paro siempre queda vivo */
-.is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl { opacity: 0.35; }
+.is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl, .is-sin-enlace .rb-flechas, .is-sin-enlace .rb-pedales { opacity: 0.35; }
 
 /* Vertical: pide girar el teléfono */
 .rb-mando__gira { display: none; }
