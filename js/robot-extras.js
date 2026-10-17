@@ -412,8 +412,101 @@
         }
     }
 
+    const CLAVE_VOZIA = 'cecyte_yokis_vozia';
+    const MODELOS_VOZIA = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
+    const VOCES_IA = [['Charon', 'Charon (grave)'], ['Fenrir', 'Fenrir (fuerte)'], ['Orus', 'Orus (firme)'], ['Puck', 'Puck (alegre)'], ['Zephyr', 'Zephyr (brillante)'], ['Kore', 'Kore (firme, femenina)']];
+    const VIA = { audio: null, fuente: null, cache: new Map(), pausaHasta: 0 };
+
+    function ajustesVozIA() {
+        const a = { on: false, voz: 'Charon' };
+        try { Object.assign(a, JSON.parse(localStorage.getItem(CLAVE_VOZIA)) || {}); } catch (e) { return a; }
+        if (!VOCES_IA.some(v => v[0] === a.voz)) a.voz = 'Charon';
+        return a;
+    }
+
+    function pcmABuffer(b64) {
+        const bin = atob(b64), n = bin.length >> 1, f = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            const s = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+            f[i] = (s > 32767 ? s - 65536 : s) / 32768;
+        }
+        const buf = VIA.audio.createBuffer(1, n, 24000);
+        buf.copyToChannel(f, 0);
+        return buf;
+    }
+
+    async function pedirVozIA(texto, a) {
+        const llave = llaveIA();
+        for (const modelo of MODELOS_VOZIA) {
+            const corte = new AbortController();
+            const reloj = setTimeout(() => corte.abort(), 9000);
+            try {
+                const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: 'Di en español mexicano, con tono de amigo, animado y natural: ' + texto }] }],
+                        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: a.voz } } } },
+                    }),
+                });
+                if (r.status === 429) { VIA.pausaHasta = Date.now() + 60000; return null; }
+                if (!r.ok) continue;
+                const j = await r.json();
+                const dato = j.candidates[0].content.parts.find(p => p.inlineData);
+                if (dato) return dato.inlineData.data;
+            } catch (e) {
+                continue;
+            } finally {
+                clearTimeout(reloj);
+            }
+        }
+        return null;
+    }
+
+    async function hablarIA(texto) {
+        const a = ajustesVozIA();
+        if (!a.on || !llaveIA() || Date.now() < VIA.pausaHasta || !(raiz.AudioContext || raiz.webkitAudioContext)) return false;
+        try {
+            if (!VIA.audio) VIA.audio = new (raiz.AudioContext || raiz.webkitAudioContext)();
+            if (VIA.audio.state === 'suspended') await VIA.audio.resume();
+            const clave = a.voz + '|' + texto;
+            let datos = VIA.cache.get(clave);
+            if (!datos) {
+                datos = await pedirVozIA(texto, a);
+                if (!datos) return false;
+                VIA.cache.set(clave, datos);
+                if (VIA.cache.size > 40) VIA.cache.delete(VIA.cache.keys().next().value);
+            }
+            if (VIA.fuente) { try { VIA.fuente.stop(); } catch (e) { VIA.fuente = null; } }
+            const fuente = VIA.audio.createBufferSource();
+            fuente.buffer = pcmABuffer(datos);
+            fuente.connect(VIA.audio.destination);
+            VIA.fuente = fuente;
+            await new Promise(res => { fuente.onended = res; fuente.start(); });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function iniciarVozIA() {
+        const on = $('rb-vozia-on'), sel = $('rb-vozia-voz');
+        if (!on || !sel) return;
+        const a = ajustesVozIA();
+        sel.innerHTML = VOCES_IA.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
+        on.checked = a.on;
+        sel.value = a.voz;
+        const guardar = () => {
+            VIA.pausaHasta = 0;
+            try { localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ on: on.checked, voz: sel.value })); } catch (e) { return; }
+            if (on.checked && !llaveIA()) $('rb-ia-estado').textContent = 'Para la voz con IA pega tu llave de Gemini arriba.';
+        };
+        on.addEventListener('change', guardar);
+        sel.addEventListener('change', () => { guardar(); hablar('¡Qué onda, we! Así suena esta voz.', true); });
+    }
+
     async function voz(texto) {
         if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
+        if (await hablarIA(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
         try {
@@ -922,6 +1015,7 @@
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
         iniciarFacts();
         iniciarIA();
+        iniciarVozIA();
         iniciarMeneo();
         $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
