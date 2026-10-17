@@ -759,3 +759,16 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('quita el turbo'), { a: 'turbo', on: false });
     assert.strictEqual(V('qué hora es'), null);
 }
+
+{
+    const ids = R.GRUPOS_FN.flatMap(g => g.ids);
+    assert.deepStrictEqual([...ids].sort(), R.FUNCIONES.map(f => f.id).sort(), 'cada función está en un solo grupo');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ['ninguna', ...R.FUNCIONES.map(f => f.id)].forEach(id => assert(html.includes(`id="i-fn-${id}"`), 'icono de ' + id));
+    R.VARIANTES.forEach(v => assert(html.includes(`id="i-mod-${v.id}"`), 'icono del modelo ' + v.id));
+    ['radar', 'escudo', 'casa', 'fig-circulo', 'fig-cuadrado', 'fig-triangulo', 'fig-estrella'].forEach(i => assert(html.includes(`id="i-${i}"`), 'icono ' + i));
+    ['robot-jarvis', 'robot-dibujar', 'robot-funciones'].forEach(sec => assert(html.includes(`id="sec-${sec}"`) && html.includes(`id="tab-${sec}"`), 'sección ' + sec));
+    assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Jarvis');
+    const nav = fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8');
+    assert(/'robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar'/.test(nav), 'Funciones va junto a Control');
+}
