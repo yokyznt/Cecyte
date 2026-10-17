@@ -263,7 +263,7 @@ function crearCola(escribir, crudo) {
     };
 }
 
-// Junta los pedazos que llegan por USB en líneas completas (sin el basura que sale al reiniciar).
+// Junta los pedazos que llegan por Bluetooth en líneas completas (sin el basura que sale al reiniciar).
 function crearLector(alLinea) {
     let resto = '';
     return function (trozo) {
@@ -279,13 +279,6 @@ function crearLector(alLinea) {
 }
 
 // ---------- LEDs ----------
-
-function hsv(h, s, v) {
-    const i = Math.floor(h * 6) % 6, f = h * 6 - Math.floor(h * 6);
-    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
-    const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i];
-    return [r * 255, g * 255, b * 255];
-}
 
 function hexARgb(hex) {
     const n = parseInt(String(hex).replace('#', ''), 16) || 0;
@@ -867,10 +860,6 @@ function* melodiaAutoGen(x, sr, op = {}) {
     return Object.assign(t, { ini: mejorF * hopMs / 1000, dur: L * hopMs / 1000, voz: mejorVoz });
 }
 
-function melodiaAuto(x, sr, op = {}) {
-    return correrSync(melodiaAutoGen(x, sr, op));
-}
-
 // notas: [{ s, e, p }] en ms y p = número MIDI. Si suenan varias a la vez, se queda la más aguda.
 function melodiaDeMidi(notas, op = {}) {
     const hopMs = 20;
@@ -1404,8 +1393,8 @@ const lib = {
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
-    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
-    melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
+    hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
+    melodiaDeAudio, melodiaDeAudioGen, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
 };
 
@@ -1548,8 +1537,8 @@ function ponEstado(est) {
     if (est === 'sinprograma' && typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });
 }
 
-// ---------- Transporte: USB (Web Serial) o Bluetooth (BLE) ----------
-// Un transporte es { tipo: 'serial' | 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
+// ---------- Transporte: Bluetooth (BLE) ----------
+// Un transporte es { tipo: 'ble', escribir(texto): Promise, cerrar(): Promise }. Lo que llega del robot
 // entra por entregar(texto), que junta los trozos en líneas y las manda a alLinea.
 
 function crudo(texto) {

@@ -1428,10 +1428,7 @@
     <script src="calendario.js"></script>
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
-    <script src="robot.js"></script> <!-- @robot:line -->
-    <script src="js/robot-bluetooth.js"></script> <!-- @robot:line -->
-    <script src="js/robot-control.js"></script> <!-- @robot:line -->
-    <script src="js/robot-extras.js"></script> <!-- @robot:line -->
+    <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

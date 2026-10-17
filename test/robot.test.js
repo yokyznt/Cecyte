@@ -165,7 +165,6 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.marcoHex(blanco, 100), 'ffffff'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 0), '000000'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 50).slice(0, 6), '808080');
-    assert.deepStrictEqual(R.hsv(0, 1, 1).map(Math.round), [255, 0, 0]);
     assert.deepStrictEqual(R.hexARgb('#ff8000'), [255, 128, 0]);
     // FX: modo, brillo y los 12 colores base SIN brillo (lo aplica el robot)
     const azul = Array.from({ length: 12 }, () => [0, 0, 255]);
@@ -284,9 +283,6 @@ for (const c of R.CANCIONES) {
     }
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ff0000')), 40).slice(0, 6), '660000');
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ffffff')), 40).slice(0, 6), '666666');
-    // el arcoíris también usa primarios puros
-    assert.deepStrictEqual(R.hsv(1 / 3, 1, 1).map(Math.round), [0, 255, 0]);
-    assert.deepStrictEqual(R.hsv(2 / 3, 1, 1).map(Math.round), [0, 0, 255]);
 }
 
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)

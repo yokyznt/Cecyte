@@ -1,7 +1,7 @@
 # App de Android (CECyTE 18)
 
 La app es la misma web empaquetada con **Capacitor 8**: un solo código para el sitio y el APK. El robot entra al APK desde la 1.1.0 y se
-conecta por Bluetooth LE; en la web de escritorio sigue por USB.
+conecta por Bluetooth LE; en la web ya no se puede controlar.
 
 ## Qué cambia entre la web y el APK
 
