@@ -1118,6 +1118,8 @@ const FRASES = {
     chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, compa.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
     hora: ['Son las {hora}, compa.', 'Ya van siendo las {hora}.'],
     fecha: ['Hoy es {fecha}, compa.', 'Estamos a {fecha}.'],
+    ruleta: ['¡Va! A girar la ruleta, compa. Hagan sus apuestas.', 'Hagan sus apuestas… ¡y ahí va la bolita!'],
+    ruletaFin: ['¡Cayó en el {num}, {color}! ¿Le apostaste a ese?', '¡{color}! La bolita se quedó en el {num}, compa.', 'Y la ganadora es el {num}, {color}. ¡Qué emoción!'],
     paro: ['¡Alto ahí, compa! Ya me frené.', 'Listo, me quedé quieto.', 'Va, me detengo.'],
     mover: ['Va, ahí voy.', '¡Órale, a rodar!', 'Simón, avanzando.'],
     reversa: ['Reversa, compa. Cuidado con la cola.', 'Va, me echo para atrás.'],
@@ -1211,6 +1213,7 @@ function ordenDeVoz(texto) {
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
     const dice0 = r => r.test(tp);
+    if (dice0(/ruleta|casino|apuesta|apuestas/)) return quita ? { a: 'paro' } : { a: 'ruleta' };
     if (dice0(/\b(gracias|grax)\b/)) return { a: 'charla', t: 'gracias' };
     if (dice0(/como estas|como andas|como te va|como amaneciste|que onda|que tal|como te sientes/)) return { a: 'charla', t: 'estado' };
     if (dice0(/chiste|chistes|hazme reir|hacerme reir|algo gracioso/)) return { a: 'charla', t: 'chiste' };
@@ -1293,7 +1296,29 @@ function frenoPorDistancia(izq, der, lecturas, edadMs, turbo) {
     return { izq: 0, der: 0, cerca, bloqueado: true };
 }
 
+const RULETA_N = 12;
+const RULETA_ROJO = [170, 0, 0], RULETA_NEGRO = [6, 6, 6], RULETA_BOLA = [255, 255, 255];
+
+function ruletaColor(i) { return i % 2 === 0 ? 'rojo' : 'negro'; }
+
+function ruletaPos(inicio, total, u) {
+    const p = 1 - Math.pow(1 - clamp(u, 0, 1), 3);
+    return (inicio + Math.floor(total * p)) % RULETA_N;
+}
+
+function ruletaPlan(azar, vueltas) {
+    const r = typeof azar === 'function' ? azar : Math.random;
+    const inicio = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N)), destino = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N));
+    const total = Math.round(clamp(vueltas, 1, 8)) * RULETA_N + ((destino - inicio + RULETA_N) % RULETA_N);
+    return { inicio, destino, total, num: destino + 1, color: ruletaColor(destino) };
+}
+
+function ruletaColores(pos, bola) {
+    return Array.from({ length: RULETA_N }, (_, i) => (bola && i === pos ? RULETA_BOLA : (ruletaColor(i) === 'rojo' ? RULETA_ROJO : RULETA_NEGRO)));
+}
+
 const lib = {
+    ruletaColor, ruletaPos, ruletaPlan, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
@@ -1344,6 +1369,7 @@ const S = {
     fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
+    ruleta: null, modoRuleta: false, ruletaSonido: true,
     distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
@@ -1422,7 +1448,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
         if ($('rb-instalar')) $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1956,6 +1982,7 @@ function elegirBaile() {
     if (S.corriendoFuncion) paro();
     S.funcion = '';
     S.modoBaile = true;
+    S.modoRuleta = false;
     if (S.baile === 'quieto' && S.pasos.trim() === '') {
         const b = BAILES.find(x => x.id !== 'quieto');
         S.baile = b.id;
@@ -1966,10 +1993,79 @@ function elegirBaile() {
     mensaje('Baile puesto: ajústalo abajo y pulsa Bailar y cantar.', 'ok');
 }
 
+function elegirRuleta() {
+    if (S.corriendoFuncion || S.actuando) paro();
+    S.funcion = '';
+    S.modoBaile = false;
+    S.modoRuleta = true;
+    guardar();
+    pintarTodo();
+    mensaje('Ruleta lista: pulsa Girar la ruleta.', 'ok');
+}
+
+function pararRuleta() {
+    const R = S.ruleta;
+    if (!R) return;
+    clearInterval(R.timer);
+    clearInterval(R.parpadeo);
+    S.ruleta = null;
+    S.sucio = true;
+    const b = $('rb-rul-girar');
+    if (b) b.textContent = 'Girar la ruleta';
+}
+
+function girarRuleta(vueltas, alTerminar) {
+    if (S.estado !== 'listo') { mensaje('Conecta el robot primero.', 'err'); return false; }
+    if (S.ruleta) return false;
+    if (S.corriendoFuncion || S.actuando) paro();
+    const plan = ruletaPlan(Math.random, vueltas || 3);
+    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 3, 1, 8)) * 3000, ult: -1, timer: null, parpadeo: null };
+    S.ruleta = R;
+    S.guardarEn = 0;
+    $('rb-rul-girar').textContent = 'Parar';
+    $('rb-rul-res').textContent = '';
+    $('rb-rul-res').className = 'rb-rul-res';
+    mensaje('La ruleta está girando…');
+    const frame = (pos, bola) => 'LS ' + marcoHex(ruletaColores(pos, bola), Math.max(S.brillo, 30));
+    R.timer = setInterval(() => {
+        if (S.estado !== 'listo') { pararRuleta(); return; }
+        const u = (performance.now() - R.t0) / R.T;
+        if (u < 1) {
+            const pos = ruletaPos(plan.inicio, plan.total, u);
+            if (pos === R.ult) return;
+            R.ult = pos;
+            if (!S.cola.ocupado()) S.cola.ultimo('RL', frame(pos, true));
+            if (S.ruletaSonido) S.cola.ultimo('T', 'T 1800 10');
+            return;
+        }
+        clearInterval(R.timer);
+        let n = 0;
+        S.cola.enviar([{ l: frame(plan.destino, true), ex: true }]);
+        if (S.ruletaSonido) S.cola.enviar(['T 784 120', 'T 988 120', 'T 1319 260']);
+        R.parpadeo = setInterval(() => {
+            if (S.estado !== 'listo') { pararRuleta(); return; }
+            n++;
+            S.cola.enviar([{ l: frame(plan.destino, n % 2 === 0), ex: true }]);
+            if (n < 12) return;
+            clearInterval(R.parpadeo);
+            S.ruleta = null;
+            S.sucio = true;
+            $('rb-rul-girar').textContent = 'Girar la ruleta';
+            const res = $('rb-rul-res');
+            res.textContent = `${plan.num} ${plan.color}`;
+            res.className = 'rb-rul-res is-' + plan.color;
+            mensaje(`Cayó en el ${plan.num}, ${plan.color}.`, 'ok');
+            if (alTerminar) alTerminar({ num: plan.num, color: plan.color });
+        }, 260);
+    }, 35);
+    return true;
+}
+
 function elegirFuncion(id) {
     if (S.corriendoFuncion) paro();
     const habiaBaile = S.baile !== 'quieto' || S.pasos.trim() !== '';
     S.modoBaile = false;
+    S.modoRuleta = false;
     S.funcion = id;
     if (id) {
         S.baile = 'quieto';
@@ -2023,7 +2119,7 @@ function pintarFunciones() {
     const f = funcionActual();
     $('rb-fn-var').value = v.id;
     $('rb-fn-nota').textContent = v.nota;
-    const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile : x.id === S.funcion);
+    const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === 'ruleta' ? S.modoRuleta && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile && !S.modoRuleta : x.id === S.funcion);
     const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${marca(x) ? ' checked' : ''}>`
         + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
         + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}</label>`;
@@ -2034,7 +2130,10 @@ function pintarFunciones() {
     }).join('');
     const baile = tarjeta({ id: 'baile', nombre: 'Baile', desc: 'Mueve las ruedas al ritmo de una canción, con luces. Al elegirlo se abren sus ajustes.' });
     $('rb-baile-panel').hidden = !(S.modoBaile && !S.funcion);
-    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}</div>${grupos}`;
+    $('rb-ruleta-panel').hidden = !(S.modoRuleta && !S.funcion);
+    $('rb-rul-sonido').checked = S.ruletaSonido;
+    const ruleta = tarjeta({ id: 'ruleta', nombre: 'Ruleta', desc: 'Ruleta de casino con los LEDs: rojo y negro, una bolita que gira, va frenando y cae en un número.' });
+    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}${ruleta}</div>${grupos}`;
     $('rb-fn-modelos').innerHTML = VARIANTES.map(x =>
         `<button type="button" role="radio" class="rb-modelo" data-v="${x.id}" aria-checked="${x.id === v.id}">`
         + `<svg class="icon" aria-hidden="true"><use href="#i-mod-${x.id}"/></svg><span>${x.nombre}</span></button>`).join('');
@@ -2064,6 +2163,7 @@ function pintarFunciones() {
 
 function paro() {
     document.dispatchEvent(new CustomEvent('robot-paro'));
+    pararRuleta();
     pararMusicaAutonoma();
     S.ultimaActividad = Date.now();
     S.actuando = false;
@@ -2693,7 +2793,7 @@ function seccionRobotActual() {
 
 function pintarBarra() {
     const sec = seccionRobotActual();
-    $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
+    $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoRuleta && !S.funcion ? 'la ruleta' : sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
     $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar'].includes(sec);
 }
 
@@ -2702,6 +2802,7 @@ function reproducirGeneral() {
     const sec = seccionRobotActual();
     const listo = S.estado === 'listo';
     if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
+    if (sec === 'robot-funciones' && S.modoRuleta && !S.funcion) return girarRuleta(3);
     if (sec === 'robot-funciones') return S.modoBaile && !S.funcion ? (listo ? actuar(true, true) : escucharAqui()) : iniciarFuncion();
     if (sec === 'robot-luces') {
         if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
@@ -2864,7 +2965,7 @@ function iniciar() {
     });
     $('rb-fn-lista').addEventListener('change', e => {
         if (e.target.name !== 'rb-fn') return;
-        if (e.target.value === 'baile') elegirBaile(); else elegirFuncion(e.target.value);
+        if (e.target.value === 'baile') elegirBaile(); else if (e.target.value === 'ruleta') elegirRuleta(); else elegirFuncion(e.target.value);
     });
     $('rb-fn-luces').addEventListener('change', e => { S.funLuces = e.target.checked; cambio('led'); });
     $('rb-fn-musica').addEventListener('change', e => { S.funMusica = e.target.checked; cambio('funcion'); });
@@ -2885,6 +2986,8 @@ function iniciar() {
     ['rb-ln-vel', 'rb-ln-giro', 'rb-ln-buscar'].forEach(id => $(id).addEventListener('input', lineaCambio));
     $('rb-ln-color').addEventListener('change', lineaCambio);
     $('rb-ln-ver').addEventListener('click', alternarSensores);
+    $('rb-rul-girar').addEventListener('click', () => { if (S.ruleta) paro(); else girarRuleta(Number($('rb-rul-dur').value) || 3); });
+    $('rb-rul-sonido').addEventListener('change', e => { S.ruletaSonido = e.target.checked; });
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
     $('rb-baile-guardar').addEventListener('click', guardarBaile);
     $('rb-baile-auto').addEventListener('change', e => { S.baileAuto = e.target.checked; guardar(); });
@@ -2969,6 +3072,7 @@ function iniciar() {
             iniciarFuncion();
             return { nombre: f.nombre, modelo: cambio ? VARIANTES.find(v => v.id === S.variante).nombre : '' };
         },
+        ruleta(alTerminar) { return girarRuleta(3, alTerminar); },
         bailar(idBaile, idCancion) {
             if (S.estado !== 'listo') return null;
             if (S.corriendoFuncion || S.actuando) paro();

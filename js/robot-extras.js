@@ -300,6 +300,9 @@
         else if (o.a === 'radar') radar(false);
         else if (o.a === 'guardia') ponerGuardia(o.on, false);
         else if (o.a === 'turbo') di('turbo');
+        else if (o.a === 'ruleta') {
+            if (enlace().ruleta(r => di('ruletaFin', { num: r.num, color: r.color }))) di('ruleta'); else di('ocupado');
+        }
         else if (o.a === 'claxon') { enlace().nota(440, 500); di('claxon'); }
         else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); di(o.color === '#000000' ? 'lucesOff' : 'luces'); }
         else if (o.a === 'baile') {

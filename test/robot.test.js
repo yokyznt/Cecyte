@@ -823,3 +823,34 @@ console.log('robot.test.js: todo bien');
     const nav = fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8');
     assert(/'robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar'/.test(nav), 'Funciones va junto a Control');
 }
+
+{
+    assert.strictEqual(R.RULETA_N, 12);
+    assert.deepStrictEqual([0, 1, 2, 3].map(R.ruletaColor), ['rojo', 'negro', 'rojo', 'negro'], 'rojo y negro alternados');
+    const plan = R.ruletaPlan(() => 0.5, 3);
+    assert.strictEqual(plan.destino, 6);
+    assert.strictEqual(plan.inicio, 6);
+    assert.strictEqual(plan.total, 36, 'tres vueltas justas si sale donde empezó');
+    assert.strictEqual(R.ruletaPos(plan.inicio, plan.total, 1), plan.destino, 'al terminar cae en el destino');
+    const azares = [0.1, 0.9, 0.3, 0.7];
+    let k = 0;
+    const p2 = R.ruletaPlan(() => azares[k++ % 4], 3);
+    assert.strictEqual(R.ruletaPos(p2.inicio, p2.total, 1), p2.destino);
+    assert.strictEqual(p2.color, R.ruletaColor(p2.destino));
+    assert.strictEqual(p2.num, p2.destino + 1);
+    const avanzados = [];
+    for (let u = 0; u <= 1.0001; u += 0.01) avanzados.push(R.ruletaPos(0, 60, u));
+    const pasos = [];
+    let acum = 0, prev = avanzados[0];
+    for (const x of avanzados.slice(1)) { acum += (x - prev + 12) % 12; pasos.push(acum); prev = x; }
+    assert(pasos[19] > pasos[99] - pasos[79], 'va desacelerando: en el primer 20 % avanza más que en el último');
+    const col = R.ruletaColores(4, true);
+    assert.strictEqual(col.length, 12);
+    assert.deepStrictEqual(col[4], [255, 255, 255], 'la bolita es blanca');
+    assert(col[0][0] > 100 && col[0][1] === 0, 'las casillas pares son rojas');
+    assert(col[1][0] < 20 && col[1][1] < 20, 'las impares son negras');
+    assert.deepStrictEqual(R.ordenDeVoz('Yokis juega a la ruleta'), { a: 'ruleta' });
+    assert.deepStrictEqual(R.ordenDeVoz('Yokis detén la ruleta'), { a: 'paro' });
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(html.includes('id="rb-ruleta-panel"') && html.includes('id="rb-rul-girar"') && html.includes('id="i-fn-ruleta"'), 'la ruleta tiene panel e icono');
+}

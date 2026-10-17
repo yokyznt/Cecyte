@@ -49,6 +49,7 @@
         <symbol id="i-ruta" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5"/></symbol>
         <symbol id="i-fn-linea" viewBox="0 0 24 24"><!-- @robot:line --><path d="M3 18c5 0 4-12 9-12s4 12 9 12"/></symbol>
         <symbol id="i-fn-baile" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="14" cy="4.5" r="2"/><path d="m12 8-3 4 4 2-1 6"/><path d="m12 8 4 3 3-2"/><path d="m13 14 4 3"/></symbol>
+        <symbol id="i-fn-ruleta" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></symbol>
         <symbol id="i-fn-ninguna" viewBox="0 0 24 24"><!-- @robot:line --><circle cx="12" cy="12" r="8"/><path d="m6.3 6.3 11.4 11.4"/></symbol>
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
@@ -958,6 +959,19 @@
                                             <legend class="field__label">Función</legend>
                                             <div id="rb-fn-lista" class="rb-fn-lista"></div>
                                         </fieldset>
+                                        <div id="rb-ruleta-panel" class="rb-ln" hidden>
+                                            <h4 class="rb-fn-t">Ruleta de casino</h4>
+                                            <p class="hint">Los 12 LEDs son la mesa, rojo y negro. Una bolita blanca gira, va frenando y cae en un número; esa casilla parpadea.</p>
+                                            <div class="field">
+                                                <label class="field__label" for="rb-rul-dur">Qué tan larga</label>
+                                                <select id="rb-rul-dur" class="select"><option value="2">Corta (6 s)</option><option value="3" selected>Normal (9 s)</option><option value="5">Larga (15 s)</option></select>
+                                            </div>
+                                            <label class="rb-check"><input type="checkbox" id="rb-rul-sonido" checked><span>Con sonido de matraca</span></label>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-rul-girar" class="btn btn--primary btn--sm" disabled>Girar la ruleta</button>
+                                            </div>
+                                            <p id="rb-rul-res" class="rb-rul-res" role="status"></p>
+                                        </div>
                                         <div id="rb-baile-panel" class="rb-ln" hidden>
                                             <h4 class="rb-fn-t">Ajustes del baile</h4>
                                     <div class="field">
