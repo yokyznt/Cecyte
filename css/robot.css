@@ -447,3 +447,10 @@
 .rb-aud-item.is-error span { color: var(--rose-700); }
 .rb-avanzado > summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
 .rb-avanzado[open] > summary { margin-bottom: 8px; }
+
+.rb-ln { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--green-50); }
+.rb-ln[hidden] { display: none; }
+.rb-ln-ver { display: flex; align-items: center; gap: 12px; }
+.rb-ln-sensores { display: inline-flex; gap: 10px; }
+.rb-ln-s { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); transition: background-color 120ms; }
+.rb-ln-s.is-linea { background: var(--black); border-color: var(--black); }

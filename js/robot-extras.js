@@ -257,6 +257,7 @@
     function ejecutar(o) {
         if (!o) { hablar('No entendí esa orden.'); return; }
         const c = calibra();
+        if (o.a === 'sinNombre') { hablar('Para darme una orden empieza diciendo Jarvis.'); return; }
         if (o.a === 'paro') { if (listo()) enlace().paro(); hablar('Detenido.'); return; }
         if (o.a === 'saludo') { hablar('Hola, soy Jarvis. Dime qué hacer.'); return; }
         if (o.a === 'bateria') { const p = $('rb-bat-pct'); hablar(p && /\d/.test(p.textContent) ? 'La batería está al ' + p.textContent.replace(/\s*%/, ' por ciento') : 'No sé cuánta batería tengo ahora.'); return; }
@@ -271,6 +272,22 @@
         else if (o.a === 'guardia') ponerGuardia(o.on);
         else if (o.a === 'turbo') hablar('El turbo solo se usa desde el mando.');
         else if (o.a === 'claxon') enlace().nota(440, 500);
+        else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); hablar('Luces listas.'); }
+        else if (o.a === 'funcion') {
+            const r = enlace().funcionPorId(o.id);
+            hablar(r ? `Iniciando ${r.nombre}.${r.modelo ? ' Cambié al modelo ' + r.modelo + '.' : ''}` : 'No encontré esa función.');
+        } else if (o.a === 'cancionParar') { enlace().detenerCancion(); hablar('Música detenida.'); }
+        else if (o.a === 'cancion') {
+            let id = o.id;
+            if (!id && o.q) {
+                const q = raiz.Robot.sinAcentos(o.q);
+                const c = enlace().canciones().find(x => raiz.Robot.sinAcentos(x.nombre).includes(q) || q.includes(raiz.Robot.sinAcentos(x.nombre)));
+                id = c ? c.id : null;
+                if (!id) { hablar('No encontré esa canción.'); return; }
+            }
+            if (!id) id = enlace().cancionActual();
+            hablar(enlace().tocarCancion(id) ? 'Música en marcha.' : 'No pude tocar esa canción.');
+        }
     }
 
     async function escuchar() {
