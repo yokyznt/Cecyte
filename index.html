@@ -279,6 +279,9 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Panel de administración</h2>
+<!-- @robot:start -->
+                        <div id="rb-estado-fila" class="rb-estado-fila"></div>
+<!-- @robot:end -->
                     </div>
                     <div class="admin-head__actions">
                         <button type="button" onclick="logoutAdmin()" class="btn btn--secondary">
@@ -1107,7 +1110,6 @@
                                         <dialog id="rb-fn-ventana" class="rb-ventana" aria-labelledby="rb-fn-ventana-titulo">
                                             <header class="rb-ventana__cab">
                                                 <h3 id="rb-fn-ventana-titulo">Ajustes</h3>
-                                                <button type="button" id="rb-fn-ventana-cerrar" class="icon-btn" aria-label="Cerrar los ajustes"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                                             </header>
                                             <div id="rb-fn-ventana-cuerpo" class="rb-ventana__cuerpo"></div>
                                         </dialog>
@@ -1320,6 +1322,12 @@
                                     </div>
                                 </details>
                                     <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
+                                </div>
+                                <div class="rb-card rb-card--ancho" data-solo="android">
+                                    <h4 class="panel__sub">Sesión</h4>
+                                    <div class="btn-row">
+                                        <button type="button" onclick="logoutAdmin()" class="btn btn--secondary"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg> Cerrar sesión</button>
+                                    </div>
                                 </div>
                             </div>
                         </section>

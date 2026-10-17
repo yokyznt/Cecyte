@@ -500,6 +500,7 @@
         if (!R) return;
         clearInterval(R.timer);
         E.corrida = null;
+        if (control() && control().pantalla) control().pantalla(false, 'ruta');
         if (alto && listo()) enlace().mover(0, 0);
     }
 
@@ -508,6 +509,7 @@
         if (!recorrido) { di('fallo'); return false; }
         if (E.corrida) { di('ocupado'); return false; }
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
+        if (control() && control().pantalla) control().pantalla(true, 'ruta');
         pasoCorrida();
         if (habla) di(habla, datos);
         else if (texto) aviso(texto);

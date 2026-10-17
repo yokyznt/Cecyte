@@ -502,6 +502,25 @@
 
 .rb-ent-audio .btn.is-grabando { background: var(--rose-700); border-color: var(--rose-700); color: #fff; }
 
+.rb-estado-fila { display: none; }
+.rb-conexion[hidden] { display: none; }
+.es-app .rb-estado-fila { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
+.es-app #view-admin:not(:has(#sec-robot:not([hidden]))) .rb-estado-fila { display: none; }
+.es-app .rb-estado-fila .rb-bateria { margin: 0; cursor: pointer; }
+.es-app .rb-estado-fila .rb-bateria__v, .es-app .rb-estado-fila .rb-bateria__barra, .es-app .rb-estado-fila .rb-bateria__tiempo { display: none; }
+.es-app .rb-estado-fila .rb-bateria.is-abierta .rb-bateria__v, .es-app .rb-estado-fila .rb-bateria.is-abierta .rb-bateria__tiempo { display: inline; }
+.es-app .rb-estado-fila .rb-bateria.is-abierta .rb-bateria__barra { display: block; }
+.es-app .rb-estado-fila .rb-bateria__pct { font-size: var(--fs-lg); }
+.es-app .admin-head__actions { display: none; }
+.es-app .sections { transition: transform 280ms var(--ease-out); }
+.es-app .sections.is-oculta { transform: translateY(-125%); }
+.es-app .rb-barra { flex-wrap: wrap; gap: 8px; padding: 8px 10px; bottom: 8px; margin-top: 10px; }
+.es-app .rb-barra .btn { flex: 1 1 40%; min-height: 44px; padding-inline: 10px; }
+.es-app .rb-barra__que { display: none; }
+.es-app .rb-barra .rb-prog[value="0"] { display: none; }
+.es-app .rb-barra #rb-msg:empty { display: none; }
+.es-app .rb-barra #rb-msg { flex: 1 1 100%; margin: 0; }
+
 /* App: animaciones. Solo dentro del APK (clase es-app que pone js/plataforma.js) y solo si el teléfono no pidió reducirlas */
 .es-app p.hint:not([id]):not(:has(button, a)) { display: none; }
 .es-app .ayuda { display: none; }

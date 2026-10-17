@@ -1453,6 +1453,16 @@ function mensaje(texto, tipo) {
     const el = $('rb-msg');
     el.textContent = texto || '';
     el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+    clearTimeout(mensaje.t);
+    if (texto && document.documentElement.classList.contains('es-app')) mensaje.t = setTimeout(() => { el.textContent = ''; }, 7000);
+}
+
+function toque(ms) {
+    if (document.documentElement.classList.contains('es-app') && navigator.vibrate) navigator.vibrate(ms);
+}
+
+function pantallaViva(si, razon) {
+    if (raiz.RobotControl && raiz.RobotControl.pantalla) raiz.RobotControl.pantalla(si, razon);
 }
 
 const TEXTO_ESTADO = {
@@ -2069,6 +2079,7 @@ function pararRuleta() {
     if (!R) return;
     clearInterval(R.timer);
     clearInterval(R.parpadeo);
+    pantallaViva(false, 'ruleta');
     S.ruleta = null;
     S.sucio = true;
     const b = $('rb-rul-girar');
@@ -2082,6 +2093,7 @@ function girarRuleta(vueltas, alTerminar) {
     const plan = ruletaPlan(Math.random, vueltas || 8);
     const R = { plan, t0: performance.now(), ult: -1, timer: null, parpadeo: null };
     S.ruleta = R;
+    pantallaViva(true, 'ruleta');
     S.guardarEn = 0;
     $('rb-rul-girar').textContent = 'Parar';
     $('rb-rul-res').textContent = '';
@@ -2095,11 +2107,13 @@ function girarRuleta(vueltas, alTerminar) {
             const pos = ruletaPosEn(plan, ms);
             if (pos === R.ult) return;
             R.ult = pos;
+            toque(5);
             if (!S.cola.ocupado()) S.cola.ultimo('RL', frame(pos, true));
             if (S.ruletaSonido) S.cola.ultimo('T', 'T 1800 10');
             return;
         }
         clearInterval(R.timer);
+        toque([40, 60, 90]);
         let n = 0;
         S.cola.enviar([{ l: frame(plan.destino, true), ex: true }]);
         if (S.ruletaSonido) S.cola.enviar(['T 784 120', 'T 988 120', 'T 1319 260']);
@@ -2110,6 +2124,7 @@ function girarRuleta(vueltas, alTerminar) {
             if (n < 12) return;
             clearInterval(R.parpadeo);
             S.ruleta = null;
+            pantallaViva(false, 'ruleta');
             S.sucio = true;
             $('rb-rul-girar').textContent = 'Girar la ruleta';
             const res = $('rb-rul-res');
@@ -3118,9 +3133,13 @@ function iniciar() {
     listaFn.addEventListener('keydown', e => {
         if (e.key === 'Enter' && e.target.matches('input[type="radio"]') && e.target.checked && e.target.value !== '') abrirVentanaFuncion();
     });
-    $('rb-fn-ventana-cerrar').addEventListener('click', cerrarVentanaFuncion);
     $('rb-fn-ventana').addEventListener('close', guardarPanelesFuncion);
-    $('rb-fn-ventana').addEventListener('click', e => { if (e.target === $('rb-fn-ventana')) cerrarVentanaFuncion(); });
+    let origenFuera = false;
+    $('rb-fn-ventana').addEventListener('pointerdown', e => { origenFuera = e.target === $('rb-fn-ventana'); });
+    $('rb-fn-ventana').addEventListener('click', e => {
+        if (e.target === $('rb-fn-ventana') && origenFuera) cerrarVentanaFuncion();
+        origenFuera = false;
+    });
     $('rb-fn-modelos').addEventListener('click', e => {
         const b = e.target.closest('[data-v]');
         if (!b) return;

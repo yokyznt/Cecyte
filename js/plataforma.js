@@ -23,6 +23,7 @@
         document.addEventListener('pointerdown', e => {
             const b = e.target.closest(ONDABLES);
             if (!b || b.disabled) return;
+            toque(8);
             const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
             const o = document.createElement('span');
             o.className = 'app-onda';
@@ -33,11 +34,45 @@
         }, { passive: true });
     }
 
+    function toque(ms) {
+        if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
+    function moverEstadoRobot() {
+        const fila = document.getElementById('rb-estado-fila'), bat = document.getElementById('rb-bat'), badge = document.getElementById('rb-badge');
+        const panel = document.querySelector('.rb-conexion');
+        if (!fila || !bat || !badge) return;
+        fila.append(bat, badge);
+        if (panel) panel.hidden = true;
+        bat.setAttribute('role', 'button');
+        bat.tabIndex = 0;
+        bat.addEventListener('click', () => bat.classList.toggle('is-abierta'));
+    }
+
+    function navAutoOcultar() {
+        let y0 = window.scrollY, espera = false;
+        window.addEventListener('scroll', () => {
+            if (espera) return;
+            espera = true;
+            requestAnimationFrame(() => {
+                const y = window.scrollY, nav = document.querySelector('.sections');
+                if (nav) {
+                    if (y > y0 + 8 && y > 140) nav.classList.add('is-oculta');
+                    else if (y < y0 - 8 || y < 80) nav.classList.remove('is-oculta');
+                }
+                y0 = y;
+                espera = false;
+            });
+        }, { passive: true });
+    }
+
     function iniciar() {
         // Lo que solo existe en una plataforma (data-solo="web" | "android")
         document.querySelectorAll('[data-solo]').forEach(el => { el.hidden = el.dataset.solo !== (nativo ? 'android' : 'web'); });
         if (!nativo) return;
         ondas();
+        moverEstadoRobot();
+        navAutoOcultar();
         raiz.addEventListener('tema-cambiado', ajustarBarra);
         ajustarBarra();
         const App = plugin('App');

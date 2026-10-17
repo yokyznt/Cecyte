@@ -911,3 +911,20 @@ console.log('robot.test.js: todo bien');
     const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
     assert(/\.es-app p\.hint:not\(\[id\]\):not\(:has\(button, a\)\) \{ display: none; \}/.test(css), 'en la app se esconden los textos de ayuda');
 }
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!html.includes('rb-fn-ventana-cerrar') && html.includes('id="rb-fn-ventana"'), 'el menú de función ya no lleva la X: se cierra tocando fuera');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/origenFuera/.test(rj), 'solo se cierra si el toque empieza y termina fuera de la ventana');
+    assert(html.includes('id="rb-estado-fila"'), 'hay una fila para batería y conexión bajo el título del panel');
+    const inst = html.slice(html.indexOf('id="sec-robot-instalar"'));
+    assert(/data-solo="android">\s*<h4 class="panel__sub">Sesión<\/h4>[\s\S]*logoutAdmin\(\)/.test(inst), 'Cerrar sesión está en Instalar (solo app)');
+    const pl = fs.readFileSync(path.join(__dirname, '..', 'js', 'plataforma.js'), 'utf8');
+    assert(/function moverEstadoRobot/.test(pl) && /function navAutoOcultar/.test(pl) && /toque\(8\)/.test(pl), 'en la app la batería sube al encabezado, las pestañas se esconden y los toques vibran');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    assert(/\.es-app \.admin-head__actions \{ display: none; \}/.test(css) && /\.es-app \.rb-barra__que \{ display: none; \}/.test(css), 'en la app no sale Cerrar sesión arriba y la barra de abajo es compacta');
+    const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
+    assert(/android\.permission\.VIBRATE/.test(man), 'la app puede vibrar');
+    assert(/pantallaViva\(true, 'ruleta'\)/.test(rj) && /razonesPantalla/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8')), 'la pantalla sigue encendida con el mando, la ruleta y las rutas');
+}

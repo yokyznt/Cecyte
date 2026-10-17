@@ -658,12 +658,14 @@
     // ---------- Estado, pantalla encendida y seguridad ----------
 
     let candado = null;
-    async function pantallaEncendida(si) {
+    const razonesPantalla = new Set();
+    async function pantallaEncendida(si, razon) {
+        if (si) razonesPantalla.add(razon || 'mando'); else razonesPantalla.delete(razon || 'mando');
         try {
-            if (si && navigator.wakeLock && !candado) {
+            if (razonesPantalla.size && navigator.wakeLock && !candado) {
                 candado = await navigator.wakeLock.request('screen');
                 candado.addEventListener('release', () => { candado = null; });
-            } else if (!si && candado) {
+            } else if (!razonesPantalla.size && candado) {
                 await candado.release();
                 candado = null;
             }
@@ -724,6 +726,7 @@
 
     raiz.RobotControl = {
         salirPantalla,
+        pantalla: (si, razon) => pantallaEncendida(si, razon),
         reproducir: (r, mantener) => !!r && reproducir(r, mantener),
         reproduciendo: () => !!C.repro,
         activo: () => C.activa && listo(),
