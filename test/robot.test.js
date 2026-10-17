@@ -578,10 +578,25 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(D(0.7, 0.7, 100).grados, 45, 'diagonal a la derecha');
     assert.strictEqual(D(-0.7, -0.7, 100).grados, -135, 'diagonal atrás a la izquierda');
     assert.strictEqual(D(0, 1, 100, R.VEL_TURBO).v, R.VEL_TURBO, 'el turbo sube el tope');
+    const O = R.rumboDeOrientacion;
+    const cerca = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180) < 0.5;
+    assert(cerca(O(0, 0, 0, 0), 0), 'plano con el borde de arriba al norte');
+    assert(cerca(O(270, 0, 0, 0), 90), 'plano con el borde de arriba al este');
+    assert(cerca(O(0, 90, 0, 0), 0), 'parado: la parte trasera mira al norte');
+    assert(cerca(O(90, 90, 0, 0), 270), 'parado y girado a la izquierda: la parte trasera mira al oeste');
+    assert(cerca(O(0, 0, 0, 90), 90), 'plano en horizontal: el borde de arriba de la pantalla es el lado derecho del teléfono');
+    assert.strictEqual(R.rumboRelativo(170, 30, 0), -160, 'se envuelve a -180..180');
+    assert.strictEqual(R.rumboRelativo(10, 0, 10), 0, 'sin girar el teléfono ni la palanca, el rumbo es 0');
+    assert.strictEqual(R.rumboRelativo(350, 0, 10), -20, 'si el teléfono giró 20° a la izquierda, el robot también');
+    assert.strictEqual(R.rumboRelativo(100, 90, 100), 90, 'la palanca a la derecha, con el teléfono donde se alineó, es 90');
+    assert.strictEqual(R.rumboRelativo(190, 90, 100), -180, 'si el teléfono giró 90° a la derecha y la palanca va a la derecha, el robot da la media vuelta (180° = -180°)');
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/\(rumbo \+ 65536L\) >> 17/.test(ino), 'el rumbo sube al girar a la derecha');
     assert(/strcmp\(cmd, "H0"\)/.test(ino) && /strcmp\(cmd, "H1"\)/.test(ino) && /strcmp\(cmd, "H"\) && a && b/.test(ino) && /void rumboMueve/.test(ino), 'el firmware lleva el modo dirección (H0, H1, H)');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     const ctl = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8');
+    assert(/addEventListener\('deviceorientationabsolute'/.test(ctl) && /iniciarBrujula\(\);/.test(ctl) && /rumboRelativo\(hayBrujula\(\) \? C\.fi : C\.fi0, r\.grados, C\.fi0\)/.test(ctl), 'la brújula del teléfono se lee siempre y el rumbo que se manda la usa en cada revisión');
+    assert(/id="rb-dir-cal"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')) && /\$\('rb-dir-cal'\)\.addEventListener\('click', alinearRumbo\)/.test(ctl), 'hay un botón para alinear el teléfono con el robot');
     assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl) && /id="rb-dir-on"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')), 'la app manda H con el rumbo de la palanca');
 }
 

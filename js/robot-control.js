@@ -20,7 +20,8 @@
         teclas: new Map(),                // teclado: tecla -> [x, y]
         vmax: 60,
         movido: false, ultimo: '', ultimoEnvio: 0,
-        dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo y el robot gira hacia él y avanza
+        dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo respecto al teléfono y el robot gira hacia él y avanza
+        fi: 0, fi0: 0, brujulaT: 0,        // hacia dónde apunta el teléfono (brújula, siempre al día), y hacia dónde apuntaba al alinear
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
         turbo: false, vmaxPrev: 60, luzPrev: null, carga: 0, enfriaHasta: 0, ultimaRev: 0,
@@ -109,6 +110,7 @@
 
     // Modo dirección: se manda el rumbo de la palanca (redondeado, para no saturar el enlace) y la velocidad
     function revisarRumbo(f, ahora, turbo) {
+        $('rb-dir-on').classList.toggle('is-sin-brujula', !hayBrujula());
         if (ahora < C.dirListoEn) return;
         const r = raiz.Robot.rumboDeJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         if (C.repro) { if (!r.v) return; pararRepro(false); }
@@ -116,7 +118,7 @@
             if (C.movido) { enlace().rumbo(0, 0); C.movido = false; C.ultimo = ''; C.ultimoEnvio = ahora; }
             return;
         }
-        const g = Math.round(r.grados / 2) * 2, v = Math.round(r.v / 5) * 5;
+        const g = Math.round(raiz.Robot.rumboRelativo(hayBrujula() ? C.fi : C.fi0, r.grados, C.fi0) / 2) * 2, v = Math.round(r.v / 5) * 5;
         if (C.turbo) guardaCalor({ izq: v, der: v }, ahora);
         C.movido = true;
         const clave = g + ',' + v;
@@ -125,6 +127,28 @@
             C.ultimo = clave;
             C.ultimoEnvio = ahora;
         }
+    }
+
+    const hayBrujula = () => Date.now() - C.brujulaT < 1500;
+
+    // La brújula del teléfono se lee siempre (no solo al tocar un botón): C.fi sigue hacia dónde apunta el teléfono
+    function iniciarBrujula() {
+        raiz.addEventListener('deviceorientationabsolute', e => {
+            if (e.alpha === null || e.alpha === undefined) return;
+            const ang = (raiz.screen && raiz.screen.orientation && raiz.screen.orientation.angle) || 0;
+            const fi = raiz.Robot.rumboDeOrientacion(e.alpha, e.beta, e.gamma, ang);
+            if (fi === null) return;
+            C.fi = hayBrujula() ? (C.fi + ((fi - C.fi + 540) % 360 - 180) * 0.3 + 360) % 360 : fi;
+            C.brujulaT = Date.now();
+        }, true);
+    }
+
+    function alinearRumbo() {
+        frenar(false);
+        C.fi0 = hayBrujula() ? C.fi : 0;
+        C.dirListoEn = Date.now() + 900;
+        if (listo()) enlace().rumboIniciar(true);
+        vibrar([20, 30, 20]);
     }
 
     function ponerRumbo(si) {
@@ -137,6 +161,7 @@
         $('rb-dir-on').setAttribute('aria-pressed', String(si));
         $('rb-mando').classList.toggle('es-dir', si);
         C.dirListoEn = si ? Date.now() + 900 : 0;
+        if (si) C.fi0 = hayBrujula() ? C.fi : 0;
         if (listo()) e.rumboIniciar(si);
         vibrar(si ? [20, 30, 20] : 14);
     }
@@ -495,6 +520,8 @@
         $('rb-ctl-bt').addEventListener('click', () => { const b = $('rb-conectar'); if (b) b.click(); });
         $('rb-turbo').addEventListener('click', () => ponerTurbo(!C.turbo));
         $('rb-dir-on').addEventListener('click', () => ponerRumbo(!C.dirModo));
+        $('rb-dir-cal').addEventListener('click', alinearRumbo);
+        iniciarBrujula();
     }
 
     // ---------- Recorridos: grabar lo que mandas con el mando y repetirlo ----------

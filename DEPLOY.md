@@ -198,7 +198,7 @@ El USB solo sirve para subir el programa desde la computadora; después la app s
   cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
   nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
   `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
-  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 16 270 bytes de los 16 384 y se compila con
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 16 170 bytes de los 16 384 y se compila con
   `-mcall-prologues` (`--build-property compiler.cpp.extra_flags=-mcall-prologues` y lo mismo con `compiler.c.extra_flags`);
   sin esa bandera ya no cabe. Tampoco se usan `digitalWrite`, `pinMode` ni `analogWrite` (pesan ~700 bytes): los motores, el zumbador, el anillo y los sensores van por registros (PORTL, PORTB, PORTK, PINF, PINK, OCR1A/OCR2A).
 - **Serie de demostración:** en Funciones se arma una lista (función + segundos) que la página reproduce sola o guarda
@@ -206,12 +206,12 @@ El USB solo sirve para subir el programa desde la computadora; después la app s
   repite hasta cortarla con el botón o un `!`. Modo 7 = «Acercarse a la pared» (se detiene a 10 cm pitando más rápido).
   `INFO` trae `PARK=1` cuando el programa los entiende.
 - **Giro con giroscopio:** `G n` gira n grados (positivo = derecha) leyendo el MPU6050 (0x69) por I2C a mano; `PADD G n` lo guarda en el show. `INFO` trae `GIRO=1` si el chip responde. La página lo usa en las funciones sin música (con música los giros siguen por tiempo, `giro90`, porque `G` bloquea las notas).
-- **Modo dirección (mando):** el botón de la brújula en la barra del mando (solo aparece si el robot trae giroscopio). `H0` calibra el giroscopio con el robot quieto y toma el rumbo actual como cero; después la app manda `H grados v` ~15 veces por segundo con el rumbo de la palanca (0 = arriba, 90 = derecha, 180 = atrás) y el robot gira hacia ese rumbo y avanza. `H1` lo apaga y `HG` contesta el rumbo en grados. Sin freno por obstáculo en este modo. En el firmware se quitó el modo 3 del botón (test de motores) para ganar espacio.
+- **Modo dirección (mando):** el botón de la brújula en la barra del mando (solo aparece si el robot trae giroscopio). La palanca es **relativa al teléfono**: arriba = hacia donde apunta el teléfono, atrás = hacia ti. El teléfono lee su brújula (`deviceorientationabsolute`) todo el tiempo y en cada revisión (~15 veces por segundo) la app manda `H grados v` con `grados = brújula del teléfono + ángulo de la palanca − brújula al alinear`; el robot gira hacia ese rumbo con el giroscopio y avanza. Al activar el modo se alinea solo (supone que el robot mira hacia donde apunta el teléfono) y el botón «Alinear» lo repite cuando te cambias de lugar. `H0` calibra el giroscopio con el robot quieto y toma el rumbo actual como cero, `H1` apaga el modo y `HG` contesta el rumbo en grados. Sin brújula (no llegan eventos) usa un rumbo fijo y el botón muestra un puntito naranja. Sin freno por obstáculo en este modo. En el firmware se quitó el modo 3 del botón (test de motores) para ganar espacio.
 - **Pruebas:** `node test/robot.test.js`.
 
 ## Pendiente
 
-- El firmware ocupa 16 270 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
+- El firmware ocupa 16 170 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
 
 ## Alumnos: instalable, sin conexión, modo oscuro y calendario
 

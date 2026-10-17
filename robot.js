@@ -186,6 +186,28 @@ function rumboDeJoystick(x, y, vmax, tope = VEL_MAX) {
     return { grados: Math.round(Math.atan2(x, y) * 180 / Math.PI), v: Math.round(k * clamp(Number(vmax) || 0, 0, 100) / 100 * clamp(Number(tope) || VEL_MAX, 0, VEL_TURBO)) };
 }
 
+// Hacia dónde apunta el teléfono (0 a 360, 0 = norte, a la derecha crece) a partir de los ángulos de deviceorientationabsolute.
+// Parado o inclinado manda la parte trasera (la normal -Z); casi plano, el borde de arriba de la pantalla (corregido por la
+// rotación de pantalla: el mando va en horizontal). Matriz ZXY del W3C: columnas = ejes del teléfono en (este, norte, arriba).
+function rumboDeOrientacion(alfa, beta, gama, pantalla = 0) {
+    const rad = Math.PI / 180, a = alfa * rad, b = beta * rad, g = gama * rad;
+    const sA = Math.sin(a), cA = Math.cos(a), sB = Math.sin(b), cB = Math.cos(b), sG = Math.sin(g), cG = Math.cos(g);
+    const X = [cA * cG - sA * sB * sG, cG * sA + cA * sB * sG];
+    const Y = [-cB * sA, cA * cB];
+    const atras = [-(cG * sA * sB + cA * sG), -(sA * sG - cA * cG * sB)];
+    const arriba = { 0: Y, 90: X, 180: [-Y[0], -Y[1]], 270: [-X[0], -X[1]] }[((Math.round(pantalla / 90) * 90) % 360 + 360) % 360] || Y;
+    const v = Math.hypot(atras[0], atras[1]) >= 0.5 ? atras : arriba;
+    if (Math.hypot(v[0], v[1]) < 0.05) return null;
+    return (Math.atan2(v[0], v[1]) / rad + 360) % 360;
+}
+
+// Rumbo que debe llevar el robot: hacia dónde apunta el teléfono ahora, más el ángulo de la palanca, contado desde donde
+// apuntaba al alinear (fi0). Da -180 a 180.
+function rumboRelativo(fiActual, theta, fi0) {
+    const r = Math.round(fiActual + theta - fi0);
+    return ((r % 360) + 540) % 360 - 180;
+}
+
 const GIRO_DIRECCIONAL = 0.6;
 
 function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
@@ -1342,7 +1364,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

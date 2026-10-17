@@ -768,7 +768,7 @@ void rumboInicia() {
   rumboT = millis();
   rumboOn = true;
 }
-int rumboGrados() { return (int)((65536L - rumbo) >> 17); }
+int rumboGrados() { return (int)((rumbo + 65536L) >> 17); }
 void rumboMueve(int obj, int v) {
   if (v <= 0) { parar(); return; }
   int e = obj - rumboGrados();
