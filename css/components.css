@@ -211,21 +211,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 
 /* Sin clase: quedan el título, la línea del día y la siguiente clase */
 .now[data-state="none"] .now__clock,
-.now[data-state="none"] .now__time { display: none; }
-
-/* Línea del día: un segmento por bloque, proporcional a su duración, con la hora de inicio */
-.strip { display: flex; gap: 4px; margin: 0; padding: 0 0 20px; list-style: none; }
-.strip__seg { position: relative; height: 8px; border-radius: 4px; background: var(--green-100); }
-.strip__seg.is-past { background: var(--green-300); }
-.strip__seg.is-recess { background: var(--line); }
-.strip__seg.is-now { background: var(--green-700); box-shadow: 0 0 0 3px var(--green-100); }
-.strip__label {
-    position: absolute; top: 14px; left: 0;
-    font-size: 0.6875rem; font-weight: 600; color: var(--ink-3);
-    font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.strip__seg.is-now .strip__label { color: var(--green-800); font-weight: 700; }
-@media (max-width: 560px) { .strip__seg:nth-child(even) .strip__label { display: none; } }
+.now[data-state="none"] .now__time, .now[data-state="none"] .now__state { display: none; }
 
 .now__next {
     margin-top: auto;
@@ -638,3 +624,13 @@ html[data-tema-modo="claro"] .theme-btn__sol, html[data-tema-modo="oscuro"] .the
 .ayuda:hover, .ayuda[aria-expanded="true"] { background: var(--green-100); color: var(--green-700); }
 .ayuda:focus-visible { outline: 2px solid var(--green-600); outline-offset: 1px; }
 .hint--plegado { display: none; }
+
+.icon-btn {
+    flex: none; display: inline-grid; place-items: center; width: 50px; height: 50px;
+    border: 2px solid var(--green-600); border-radius: var(--r-md);
+    background: var(--green-50); color: var(--green-800);
+    transition: background-color 160ms, transform 120ms;
+}
+.icon-btn .icon { width: 1.35em; height: 1.35em; }
+.icon-btn:hover { background: var(--green-100); }
+.icon-btn:active { transform: scale(0.95); }
