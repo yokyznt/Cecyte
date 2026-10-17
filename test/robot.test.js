@@ -839,6 +839,11 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('Yokis deja de bailar'), { a: 'paro' });
     assert.deepStrictEqual(V('Yokis cómo estás'), { a: 'charla', t: 'estado' });
     assert.deepStrictEqual(V('Yokis cuéntame un chiste'), { a: 'charla', t: 'chiste' });
+    for (const d of ['Yokis tírate un facto', 'yokis tirate un fact', 'Yokis, tírate un fact por favor', 'Yokis dime un dato curioso', 'Yokis dame un dato']) {
+        assert.deepStrictEqual(V(d), { a: 'charla', t: 'fact' }, d);
+    }
+    assert(R.FRASES.fact.length >= 3, 'hay facts de fábrica');
+    assert(Object.values(R.FRASES).flat().every(f => !/\bcompa\b/i.test(f)), 'Yokis dice «we», no «compa»');
     assert.deepStrictEqual(V('Yokis gracias'), { a: 'charla', t: 'gracias' });
     assert.deepStrictEqual(V('Yokis quién eres'), { a: 'charla', t: 'quien' });
     assert.deepStrictEqual(V('Yokis qué puedes hacer'), { a: 'charla', t: 'ayuda' });
@@ -846,7 +851,7 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(V('Yokis adiós'), { a: 'charla', t: 'adios' });
     assert.strictEqual(V('Yokis cuántos planetas hay'), null);
     for (const tipo of Object.keys(R.FRASES)) assert(R.FRASES[tipo].length && R.FRASES[tipo].every(x => typeof x === 'string' && x.length > 3), 'frases de ' + tipo);
-    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., compa.');
+    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., we.');
     assert.strictEqual(R.frase('figura', { f: 'una estrella' }, () => 0.99), 'Órale, una estrella va saliendo.');
     assert(R.frase('noExiste').length > 3, 'tipo desconocido: contesta algo');
 }

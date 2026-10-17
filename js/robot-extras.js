@@ -582,7 +582,7 @@
         if (!listo()) { di('sinRobot'); return; }
         const t = control() ? control().trayecto() : { pasos: [], ms: 0 };
         const r = raiz.Robot.inversoDeRecorrido(t.pasos, t.ms, 'Casa');
-        if (!r) { hablar('No tengo nada que deshacer, compa. Maneja un poco con el mando primero.'); return; }
+        if (!r) { hablar('No tengo nada que deshacer, we. Maneja un poco con el mando primero.'); return; }
         if (correr(r, 'casa')) control().marcarCasa();
     }
 
@@ -620,7 +620,7 @@
 
     async function radar(callado) {
         if (E.radar) { E.radarCancelado = true; return; }
-        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo, compa.'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { hablar('El radar necesita el robot conectado con el firmware nuevo, we.'); return; }
         E.radar = true;
         E.radarCancelado = false;
         pintarRadarBtn();
@@ -644,7 +644,7 @@
         if (E.radarCancelado) { aviso('Radar cancelado.'); return; }
         if (lecturas.length === 12) {
             const cerca = Math.min.apply(null, lecturas), i = lecturas.indexOf(cerca);
-            hablar(`Radar listo, compa. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
+            hablar(`Radar listo, we. Lo más cerca está a ${cerca >= 400 ? 'más de 4 metros' : cerca + ' centímetros'}, hacia los ${i * 30} grados.`);
         }
     }
 
@@ -665,7 +665,7 @@
         b.setAttribute('aria-pressed', String(si));
         b.textContent = si ? 'Apagar guardia' : 'Armar guardia';
         if (!si) { if (callado) aviso('Guardia apagada.'); else di('guardiaOff'); return; }
-        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo, compa.'); return; }
+        if (!listo() || !enlace().soportaDistancia()) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Armar guardia'; hablar('La guardia necesita el robot conectado con el firmware nuevo, we.'); return; }
         const G = { base: [], enfria: 0, timer: null };
         G.timer = setInterval(() => {
             if (!listo()) { ponerGuardia(false, true); return; }
@@ -684,7 +684,29 @@
         if (callado) aviso('Guardia armada.'); else di('guardiaOn');
     }
 
+    const CLAVE_FACTS = 'cecyte_yokis_facts';
+    function leerFacts() {
+        let t = '';
+        try { t = localStorage.getItem(CLAVE_FACTS) || ''; } catch (e) { /* sin guardado */ }
+        const lista = t.split('\n').map(x => x.trim()).filter(Boolean);
+        return lista.length ? lista : raiz.Robot.FRASES.fact;
+    }
+    function tirarFact() {
+        const l = leerFacts();
+        hablar(l[Math.floor(Math.random() * l.length)]);
+    }
+    function iniciarFacts() {
+        const caja = $('rb-fact-texto');
+        if (!caja) return;
+        try { caja.value = localStorage.getItem(CLAVE_FACTS) || ''; } catch (e) { /* sin guardado */ }
+        caja.placeholder = raiz.Robot.FRASES.fact.join('\n');
+        caja.addEventListener('change', () => { try { localStorage.setItem(CLAVE_FACTS, caja.value); } catch (e) { /* sin guardado */ } });
+        $('rb-fact-probar').addEventListener('click', () => { caja.dispatchEvent(new Event('change')); tirarFact(); });
+        $('rb-fact-restaurar').addEventListener('click', () => { caja.value = ''; caja.dispatchEvent(new Event('change')); });
+    }
+
     function charla(t) {
+        if (t === 'fact') { tirarFact(); return; }
         const ahora = new Date();
         const datos = {
             hora: ahora.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
@@ -762,7 +784,7 @@
             if (SR) {
                 const p = await SR.requestPermissions();
                 if (p.speechRecognition !== 'granted') { di('sinMicro'); return; }
-                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, compa', partialResults: false, popup: true });
+                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, we', partialResults: false, popup: true });
                 texto = elegirTexto(r.matches);
             } else if (Web) {
                 texto = await new Promise((res, rej) => {
@@ -800,7 +822,8 @@
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
         $('rb-jarvis').addEventListener('click', escuchar);
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
-        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, compa! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
+        iniciarFacts();
+        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {
