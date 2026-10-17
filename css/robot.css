@@ -140,9 +140,12 @@
 .rb-barra {
     position: sticky; bottom: 12px; z-index: 25; margin-top: 18px;
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-    padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 14px;
-    background: var(--surface); box-shadow: 0 8px 24px -14px rgb(0 0 0 / 0.45);
+    padding: 0; pointer-events: none;
 }
+.rb-barra > * { pointer-events: auto; }
+.rb-barra .btn { box-shadow: 0 6px 16px -6px rgb(0 0 0 / 0.5); }
+.rb-barra .msg:not(:empty) { padding: 6px 10px; border-radius: 10px; background: var(--surface); box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.4); }
+.rb-barra .rb-prog { background: var(--surface); border-radius: 8px; }
 .rb-barra .btn { min-height: 48px; }
 .rb-barra .rb-barra__cuadro { flex: none; inline-size: 52px; block-size: 52px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 12px; }
 .rb-barra .rb-barra__cuadro .icon { inline-size: 24px; block-size: 24px; margin: 0; }
@@ -492,7 +495,7 @@
 .es-app .admin-head__actions { display: none; }
 .es-app .sections { transition: transform 280ms var(--ease-out); }
 .es-app .sections.is-oculta { transform: translateY(-125%); }
-.es-app .rb-barra { flex-wrap: wrap; gap: 8px; padding: 8px 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 64px); margin-top: 10px; }
+.es-app .rb-barra { flex-wrap: wrap; gap: 12px; padding: 0 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); margin-top: 10px; }
 .es-app .rb-barra .btn:not(.rb-barra__cuadro) { flex: 1 1 40%; min-height: 44px; padding-inline: 10px; }
 .es-app .rb-barra__que { display: none; }
 .es-app .rb-barra .rb-prog[value="0"] { display: none; }

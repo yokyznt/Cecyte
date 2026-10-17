@@ -974,7 +974,7 @@ console.log('robot.test.js: todo bien');
     assert(/function moverEstadoRobot/.test(pl) && /function navAutoOcultar/.test(pl) && /toque\(8\)/.test(pl), 'en la app la batería sube al encabezado, las pestañas se esconden y los toques vibran');
     const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
     assert(/\.es-app \.admin-head__actions \{ display: none; \}/.test(css) && /\.es-app \.rb-barra__que \{ display: none; \}/.test(css), 'en la app no sale Cerrar sesión arriba y la barra de abajo es compacta');
-    assert(/\.es-app \.rb-barra \{[^}]*bottom: calc\(env\(safe-area-inset-bottom, 0px\) \+ 64px\)/.test(css), 'la barra de parar y reproducir sube para que la barra del teléfono no la tape');
+    assert(/\.es-app \.rb-barra \{[^}]*bottom: calc\(env\(safe-area-inset-bottom, 0px\) \+ 28px\)/.test(css) && /\.rb-barra \{[^}]*padding: 0; pointer-events: none;/.test(css), 'los botones de parar y reproducir suben un poco para que la barra del teléfono no los tape y van sueltos, sin recuadro');
     const barra = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     assert(/id="rb-barra-paro"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-stop"\/><\/svg><\/button>/.test(barra) && /id="rb-barra-play"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-play"\/><\/svg><\/button>/.test(barra), 'parar y reproducir son botones cuadrados solo con el símbolo');
     const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
