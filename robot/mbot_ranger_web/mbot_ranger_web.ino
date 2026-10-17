@@ -33,6 +33,8 @@
                      encender. FCLR la borra
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
+    DIR i|d|x|o      direccional izquierda, derecha, intermitentes o apagar (se apaga sola a los 4 s sin repetir)
+    LUZ f|r|o        luz de freno (roja), de reversa (blanca con pitido) o apagar
     DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
                      frena los motores y borra lo pendiente. Responde ABORTED.
@@ -544,6 +546,10 @@ bool fxCarga(const char *h) {
   return true;
 }
 
+uint8_t dirSenal = 0, luzSenal = 0, senalVista = 0, senalFase = 0;
+uint8_t anilloGuardado[36];
+unsigned long senalVence = 0, reversaT = 0;
+
 void fxDibuja() {
   // reloj del efecto: corre al ritmo de fxVel (100 = normal, 200 = el doble de rápido)
   unsigned long ahora = millis();
@@ -580,7 +586,7 @@ void fxDibuja() {
 }
 
 void fxPaso() {
-  if (fxModo == 0) return;                                 // fijo: nada que animar
+  if (fxModo == 0 || dirSenal || luzSenal) return;         // fijo: nada que animar
   unsigned long t = millis();
   if (t - fxUltimo < FX_MS || t - ultimaOrden < FX_QUIETO_MS) return;
   if (fxModo == 4) {                                       // solo cuando hay un color nuevo
@@ -589,6 +595,36 @@ void fxPaso() {
   }
   fxUltimo = t;
   fxDibuja();
+}
+
+void senalPaso() {
+  const uint8_t s = dirSenal ? dirSenal : luzSenal;
+  if (s && (long)(millis() - senalVence) > 0) { dirSenal = 0; luzSenal = 0; }
+  if (!(dirSenal ? dirSenal : luzSenal)) {
+    if (senalVista) {
+      memcpy(anillo, anilloGuardado, 36);
+      ledsMuestra();
+      senalVista = 0;
+      fxSucio = true;
+    }
+    return;
+  }
+  if (s == 5 && millis() >= reversaT) {
+    reversaT = millis() + 900;
+    if (volumen) { tonoInicia(1200); tonoFin = millis() + 90; }
+  }
+  const uint8_t fase = s <= 3 ? (millis() / 350UL) & 1 : 0;
+  if (s == senalVista && fase == senalFase) return;
+  if (!senalVista) memcpy(anilloGuardado, anillo, 36);
+  senalVista = s;
+  senalFase = fase;
+  ledsTodos(0, 0, 0);
+  if (s == 1 && fase) for (uint8_t i = 6; i < 12; i++) ledPon(i, 150, 60, 0);
+  else if (s == 2 && fase) for (uint8_t i = 0; i < 6; i++) ledPon(i, 150, 60, 0);
+  else if (s == 3 && fase) ledsTodos(150, 60, 0);
+  else if (s == 4) ledsTodos(120, 0, 0);
+  else if (s == 5) ledsTodos(70, 70, 70);
+  ledsMuestra();
 }
 
 // ---------- Guardar el efecto: al encender, el robot lo vuelve a poner ----------
@@ -830,6 +866,16 @@ void ejecuta(char *s) {
   } else if (!strcmp(cmd, "DIST")) {
     Serial.print(F("DIST "));
     Serial.println(distanciaCm());
+  } else if (!strcmp(cmd, "DIR") && a) {
+    const char k = a[0];
+    dirSenal = k == 'i' ? 1 : k == 'd' ? 2 : k == 'x' ? 3 : 0;
+    senalVence = millis() + 4000UL;
+    ok();
+  } else if (!strcmp(cmd, "LUZ") && a) {
+    const char k = a[0];
+    luzSenal = k == 'f' ? 4 : k == 'r' ? 5 : 0;
+    senalVence = millis() + 4000UL;
+    ok();
   } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
     for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
     ok();
@@ -953,7 +999,7 @@ void setup() {
   imprimeDec(bateriaCv(), 2);
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
-  Serial.print(F(" DIST=1"));                  // este programa entiende la orden DIST
+  Serial.print(F(" DIST=1 DIR=1"));            // este programa entiende las órdenes DIST, DIR y LUZ
   Serial.println();
   Serial.println(F("mBot Ranger web v1 listo"));
 }
@@ -961,6 +1007,7 @@ void setup() {
 void loop() {
   atiendeUSB();
   fxPaso();
+  senalPaso();
 
   // Cambio de modo con el botón (con antirrebote): 0, 1, 2, 3 y, si hay show guardado, 5.
   // De 3 sin show, de 4 (página) y de 5 vuelve a 0.

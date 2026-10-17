@@ -171,6 +171,18 @@ function mezclaJoystick(x, y, vmax, tope = VEL_MAX) {
     return { izq: Math.round(izq * V), der: Math.round(der * V) };
 }
 
+const GIRO_DIRECCIONAL = 0.6;
+
+function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
+    const V = Math.max(Math.abs(izq), Math.abs(der));
+    let dir = 'o', luz = 'o';
+    if (bloqueado) dir = 'x';
+    else if (V && Math.abs(izq - der) >= V * GIRO_DIRECCIONAL) dir = izq > der ? 'd' : 'i';
+    if (V === 0) luz = veniaEnMarcha ? 'f' : 'o';
+    else if (izq < 0 && der < 0) luz = 'r';
+    return { dir, luz };
+}
+
 // ---------- Cola con confirmaciones ----------
 // Cada orden se confirma con una línea OK/ERR. Se mandan varias seguidas (para que no haya huecos
 // entre notas) sin pasarse de VENTANA_BYTES. Las de LEDs van solas porque mientras el robot
@@ -1026,7 +1038,7 @@ const lib = {
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
@@ -1067,6 +1079,7 @@ const S = {
     bateria: { quimica: 'nimh', capacidad: 2000, hist: [] },   // pilas: tipo, capacidad (mAh) y lecturas en reposo [ms, V]
     fwNuevo: false,           // el robot ya mandó su línea INFO: entiende BAT
     fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
+    fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
     distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
@@ -1181,6 +1194,7 @@ function alLinea(l) {
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
         S.fwNuevo = true;                  // este programa ya entiende la orden BAT
         S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
+        S.fwDir = kv.DIR === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
@@ -1243,6 +1257,7 @@ function mostrarBateria(v) {
     const aviso = $('rb-bat-aviso');
     aviso.hidden = nivel === 'ok';
     aviso.textContent = nivel === 'critica' ? '¡Cargar ya!' : 'Cargar pronto';
+    if (nivel !== 'ok' && nivel !== S.ultimoNivel) document.dispatchEvent(new CustomEvent('robot-bateria-baja', { detail: { nivel, pct } }));
     S.ultimoNivel = nivel;
 }
 
@@ -2586,6 +2601,8 @@ function iniciar() {
         soportaDistancia: () => S.estado === 'listo' && S.fwDist,
         pedirDistancia() { if (S.estado === 'listo' && S.fwDist && !S.cola.ocupado()) S.cola.ultimo('D', 'DIST'); },
         distancias: () => ({ lecturas: S.distancias.slice(), t: S.distanciaT }),
+        soportaSenal: () => S.estado === 'listo' && S.fwDir,
+        senal(tipo, v) { if (S.estado === 'listo' && S.fwDir) S.cola.ultimo(tipo === 'dir' ? 'DR' : 'LZ', (tipo === 'dir' ? 'DIR ' : 'LUZ ') + v); },
         // Las luces tal como están (para apagarlas en el turbo y devolverlas después)
         luzAhora: () => ({ efecto: S.efecto, leds: S.leds.slice() }),
         ponerLuz(o) {
