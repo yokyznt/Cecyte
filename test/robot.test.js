@@ -853,4 +853,7 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(R.ordenDeVoz('Yokis detén la ruleta'), { a: 'paro' });
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     assert(html.includes('id="rb-ruleta-panel"') && html.includes('id="rb-rul-girar"') && html.includes('id="i-fn-ruleta"'), 'la ruleta tiene panel e icono');
+    assert(['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido', 'rb-voz-probar'].every(id => html.includes(`id="${id}"`)), 'Yokis deja elegir su voz');
+    const ex = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
+    assert(/pitch: 0\.75/.test(ex) && /rate: 1\.15/.test(ex), 'voz grave y enérgica por defecto');
 }

@@ -1094,6 +1094,16 @@
                                         <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
+                                    <h4 class="rb-fn-t">La voz de Yokis</h4>
+                                    <div class="rb-calib">
+                                        <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
+                                        <label class="field"><span class="field__label">Más grave ← → más aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
+                                        <label class="field"><span class="field__label">Más calmada ← → más enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
+                                    </div>
+                                    <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
                                     <h4 class="rb-fn-t">Prueba con estas frases</h4>
                                     <ul class="rb-frases">
                                         <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>

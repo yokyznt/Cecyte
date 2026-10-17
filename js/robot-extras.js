@@ -25,20 +25,77 @@
         while (ol.children.length > HIST_MAX) ol.removeChild(ol.firstChild);
     }
 
+    const CLAVE_VOZ = 'cecyte_yokis_voz';
+    const PISTAS_HOMBRE = /esd|male|hombre|masculin|jorge|diego|carlos|pablo|juan|raul|enrique|miguel|antonio|-m\b/i;
+    const E_VOZ = { lista: null };
+
+    function ajustesVoz() {
+        const a = { nombre: '', pitch: 0.75, rate: 1.15 };
+        try { Object.assign(a, JSON.parse(localStorage.getItem(CLAVE_VOZ)) || {}); } catch (e) { /* sin guardado */ }
+        a.pitch = Math.min(1.5, Math.max(0.5, Number(a.pitch) || 0.75));
+        a.rate = Math.min(1.5, Math.max(0.8, Number(a.rate) || 1.15));
+        return a;
+    }
+
+    function guardaVoz() {
+        const a = { nombre: $('rb-voz-sel').value, pitch: Number($('rb-voz-grave').value), rate: Number($('rb-voz-rapido').value) };
+        try { localStorage.setItem(CLAVE_VOZ, JSON.stringify(a)); } catch (e) { /* sin guardado */ }
+    }
+
+    async function vocesEspanol() {
+        if (E_VOZ.lista) return E_VOZ.lista;
+        const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
+        let todas = [];
+        try {
+            if (TTS && TTS.getSupportedVoices) todas = (await TTS.getSupportedVoices()).voices || [];
+            else if (raiz.speechSynthesis) todas = raiz.speechSynthesis.getVoices().map(v => ({ name: v.name, lang: v.lang, voiceURI: v.voiceURI }));
+        } catch (e) { todas = []; }
+        E_VOZ.lista = todas.map((v, i) => ({ idx: i, nombre: v.name || v.voiceURI || ('voz ' + i), lang: v.lang || '' })).filter(v => /^es/i.test(v.lang));
+        return E_VOZ.lista;
+    }
+
+    async function vozElegida() {
+        const lista = await vocesEspanol();
+        const a = ajustesVoz();
+        const guardada = lista.find(v => v.nombre === a.nombre);
+        if (guardada) return guardada;
+        const mx = lista.filter(v => /^es[-_](MX|US|419)/i.test(v.lang));
+        return mx.find(v => PISTAS_HOMBRE.test(v.nombre)) || lista.find(v => PISTAS_HOMBRE.test(v.nombre)) || mx[0] || lista[0] || null;
+    }
+
     async function voz(texto) {
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
+        const a = ajustesVoz();
         try {
+            const v = await vozElegida();
             if (TTS) {
                 try { await TTS.stop(); } catch (e) { /* nada que parar */ }
-                await TTS.speak({ text: texto, lang: 'es-MX', rate: 1.05, pitch: 1.05, volume: 1, category: 'ambient' });
+                const op = { text: texto, lang: v ? v.lang.replace('_', '-') : 'es-MX', rate: a.rate, pitch: a.pitch, volume: 1, category: 'ambient' };
+                if (v) op.voice = v.idx;
+                await TTS.speak(op);
             } else if (raiz.speechSynthesis) {
                 const u = new SpeechSynthesisUtterance(texto);
-                u.lang = 'es-MX';
-                u.rate = 1.05;
+                u.lang = v ? v.lang : 'es-MX';
+                u.rate = a.rate;
+                u.pitch = a.pitch;
+                const real = raiz.speechSynthesis.getVoices().find(x => v && x.name === v.nombre);
+                if (real) u.voice = real;
                 raiz.speechSynthesis.cancel();
                 raiz.speechSynthesis.speak(u);
             }
         } catch (e) { /* sin voz: queda el texto */ }
+    }
+
+    async function pintarVoces() {
+        const sel = $('rb-voz-sel');
+        if (!sel) return;
+        const lista = await vocesEspanol();
+        const elegida = await vozElegida();
+        sel.innerHTML = lista.length ? lista.map(v => `<option value="${v.nombre}">${v.nombre} (${v.lang})</option>`).join('') : '<option value="">Voz del sistema</option>';
+        if (elegida) sel.value = elegida.nombre;
+        const a = ajustesVoz();
+        $('rb-voz-grave').value = a.pitch;
+        $('rb-voz-rapido').value = a.rate;
     }
 
     function hablar(texto) {
@@ -383,6 +440,9 @@
         $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(true); });
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
         $('rb-jarvis').addEventListener('click', escuchar);
+        ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
+        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, compa! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
+        pintarVoces();
         document.addEventListener('robot-paro', () => {
             detener(false);
             E.radarCancelado = true;
