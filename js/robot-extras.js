@@ -813,7 +813,7 @@
     }
 
     const CLAVE_IA = 'cecyte_yokis_ia';
-    const MODELOS_IA = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+    const MODELOS_IA = ['gemini-flash-lite-latest', 'gemini-flash-latest'];
 
     function llaveIA() {
         try { return (localStorage.getItem(CLAVE_IA) || '').trim(); } catch (e) { return ''; }
@@ -825,7 +825,7 @@
         const cuerpo = JSON.stringify({
             systemInstruction: { parts: [{ text: raiz.Robot.promptIA() }] },
             contents: [{ role: 'user', parts: [{ text: alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n') }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 300 },
         });
         for (const modelo of MODELOS_IA) {
             const corte = new AbortController();
@@ -836,7 +836,8 @@
                 });
                 if (!r.ok) continue;
                 const j = await r.json();
-                const o = raiz.Robot.validarOrdenIA(JSON.parse(j.candidates[0].content.parts[0].text));
+                const dicho = JSON.parse(j.candidates[0].content.parts.map(p => p.text || '').join(''));
+                const o = [].concat(dicho).map(raiz.Robot.validarOrdenIA).find(Boolean);
                 if (o) return o;
             } catch (e) {
                 continue;
