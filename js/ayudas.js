@@ -3,6 +3,7 @@
 // No toca los avisos que cambian solos (los que tienen id) ni los que llevan un botón dentro.
 (function () {
     const SVG = '<svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>';
+    if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return;
 
     document.querySelectorAll('p.hint').forEach(p => {
         if (p.id || p.querySelector('button, a') || p.closest('.rb-mando')) return;

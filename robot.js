@@ -2029,9 +2029,23 @@ function abrirVentanaFuncion() {
     d.showModal();
 }
 
+function cerrarSuave(d) {
+    if (!d || !d.open) return;
+    if (!document.documentElement.classList.contains('es-app') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { d.close(); return; }
+    d.classList.add('is-cerrando');
+    setTimeout(() => { d.close(); d.classList.remove('is-cerrando'); }, 190);
+}
+
 function cerrarVentanaFuncion() {
-    const d = $('rb-fn-ventana');
-    if (d && d.open) d.close();
+    cerrarSuave($('rb-fn-ventana'));
+}
+
+function cascada() {
+    document.querySelectorAll('.rb-fn-lista, .rb-modelos, .rb-figuras, .rb-frases, .rb-herr__rejilla, .rb-vz-lista').forEach(el => {
+        el.classList.add('is-entrando');
+        clearTimeout(el.cascadaT);
+        el.cascadaT = setTimeout(() => el.classList.remove('is-entrando'), 1000);
+    });
 }
 
 function guardarPanelesFuncion() {
@@ -2966,7 +2980,7 @@ function iniciarBarraYBateria() {
     });
     $('rb-barra-paro').addEventListener('click', pararTodo);
     $('rb-barra-play').addEventListener('click', reproducirGeneral);
-    document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); });
+    document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); cascada(); });
     pintarBarra();
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto
     $('rb-bat-quim').value = S.bateria.quimica;
@@ -3209,6 +3223,7 @@ function iniciar() {
     window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
 
     // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno
+    raiz.RobotUI = { cerrarSuave };
     raiz.RobotEnlace = {
         estado: () => S.estado,
         listo: () => S.estado === 'listo',

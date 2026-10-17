@@ -501,3 +501,70 @@
 .rb-ent-botones .btn.is-grabando { background: var(--rose-700); border-color: var(--rose-700); color: #fff; }
 
 .rb-ent-audio .btn.is-grabando { background: var(--rose-700); border-color: var(--rose-700); color: #fff; }
+
+/* App: animaciones. Solo dentro del APK (clase es-app que pone js/plataforma.js) y solo si el teléfono no pidió reducirlas */
+.es-app p.hint:not([id]):not(:has(button, a)) { display: none; }
+.es-app .ayuda { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .es-app { --resorte: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    .es-app .admin-sec:not([hidden]) .rb-card { animation: app-sube 460ms var(--ease-out) backwards; }
+    .es-app .admin-sec:not([hidden]) .rb-card:nth-child(2) { animation-delay: 80ms; }
+    .es-app .admin-sec:not([hidden]) .rb-card:nth-child(3) { animation-delay: 160ms; }
+    .es-app .admin-sec:not([hidden]) .rb-card:nth-child(4) { animation-delay: 240ms; }
+    .es-app .admin-sec:not([hidden]) .rb-card:nth-child(n+5) { animation-delay: 320ms; }
+    @keyframes app-sube { from { opacity: 0; transform: translateY(22px) scale(0.98); } }
+
+    .es-app .rb-fn:has(input:checked) { animation: app-elige 380ms var(--resorte); }
+    .es-app .rb-fn:has(input:checked) .rb-fn__ico { animation: app-rebote 560ms var(--resorte); }
+    .es-app .rb-fn:has(input:checked)::after { animation: app-sello 420ms var(--resorte) 90ms backwards; }
+    .es-app .rb-modelo[aria-checked="true"], .es-app .sections [role="tab"][aria-selected="true"] { animation: app-elige 380ms var(--resorte); }
+    @keyframes app-elige { 0% { transform: scale(0.94); } 55% { transform: scale(1.04); } 100% { transform: scale(1); } }
+    @keyframes app-rebote { 0% { transform: rotate(-14deg) scale(0.7); } 100% { transform: none; } }
+    @keyframes app-sello { from { transform: scale(0); } }
+
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo) { animation: app-pop 440ms var(--resorte) backwards; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(2) { animation-delay: 45ms; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(3) { animation-delay: 90ms; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(4) { animation-delay: 135ms; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(5) { animation-delay: 180ms; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(6) { animation-delay: 225ms; }
+    .es-app .is-entrando :is(.rb-fn, .rb-figura, .rb-frases li, .rb-herr__tarjeta, .rb-vz-item, .rb-modelo):nth-child(n+7) { animation-delay: 270ms; }
+    @keyframes app-pop { from { opacity: 0; transform: translateY(16px) scale(0.9); } }
+
+    .es-app .rb-ventana[open] { animation: app-ventana 380ms var(--resorte); }
+    .es-app .rb-ventana[open]::backdrop { animation: app-fondo 320ms ease-out; backdrop-filter: blur(3px); }
+    .es-app .rb-ventana.is-cerrando { animation: app-ventana-sale 190ms ease-in forwards; }
+    .es-app .rb-ventana.is-cerrando::backdrop { animation: app-fondo-sale 190ms ease-in forwards; }
+    @keyframes app-ventana { from { opacity: 0; transform: translateY(44px) scale(0.94); } }
+    @keyframes app-ventana-sale { to { opacity: 0; transform: translateY(26px) scale(0.96); } }
+    @keyframes app-fondo { from { opacity: 0; } }
+    @keyframes app-fondo-sale { to { opacity: 0; } }
+
+    .es-app .rb-rul-res.is-rojo, .es-app .rb-rul-res.is-negro { animation: app-resultado 820ms var(--resorte); }
+    @keyframes app-resultado { 0% { transform: scale(0.3) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.25) rotate(3deg); opacity: 1; } 100% { transform: none; } }
+
+    .es-app .rb-jarvis__mic { position: relative; }
+    .es-app .rb-jarvis__mic.is-activo::before, .es-app .rb-jarvis__mic.is-activo::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--orange-700); pointer-events: none; animation: app-onda-mic 1.5s ease-out infinite; }
+    .es-app .rb-jarvis__mic.is-activo::after { animation-delay: 0.6s; }
+    @keyframes app-onda-mic { from { transform: scale(1); opacity: 0.75; } to { transform: scale(1.35, 1.8); opacity: 0; } }
+    .es-app .rb-jarvis__hist li { animation: app-burbuja 340ms var(--ease-out) backwards; }
+    .es-app .rb-jarvis__hist .is-yo { --dx: 26px; }
+    .es-app .rb-jarvis__hist .is-jarvis { --dx: -26px; }
+    @keyframes app-burbuja { from { opacity: 0; transform: translateX(var(--dx, 0)) scale(0.92); } }
+
+    .es-app .rb-ent-frase.is-cambia { animation: app-frase 400ms var(--ease-out); }
+    @keyframes app-frase { from { opacity: 0; transform: translateX(30px) scale(0.98); } }
+    .es-app .rb-ent-botones .btn.is-grabando, .es-app .rb-ent-audio .btn.is-grabando { animation: rb-latido 0.9s ease-in-out infinite; }
+    .es-app .rb-ent-prog progress::-webkit-progress-value { transition: width 420ms var(--ease-out); }
+
+    .es-app .rb-barra { animation: app-barra 560ms var(--resorte) backwards; }
+    @keyframes app-barra { from { transform: translateY(130%); opacity: 0; } }
+
+    .es-app .btn:active:not(:disabled), .es-app .rb-figura:active, .es-app .rb-modelo:active { transform: scale(0.95); transition: transform 90ms; }
+    .es-app .rb-fn-lista .rb-fn, .es-app .rb-modelo, .es-app .rb-figura { transition: transform 160ms var(--ease-out), background-color 180ms, border-color 180ms; }
+    .app-ondable { position: relative; overflow: hidden; }
+    .app-onda { position: absolute; border-radius: 50%; background: currentColor; opacity: 0.2; transform: scale(0); pointer-events: none; animation: app-onda 620ms var(--ease-out) forwards; }
+    @keyframes app-onda { to { transform: scale(1); opacity: 0; } }
+}

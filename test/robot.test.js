@@ -890,3 +890,24 @@ console.log('robot.test.js: todo bien');
     const melodia = R.melodiaDeAudio(x, sr, { fMin: 120, fMax: 700, sens: 60, tonalidad: true, subir: true });
     assert.deepStrictEqual(melodia.texto.split(' ').map(t => t.split(':')[0]), ['G5', 'A5', 'C6', 'A5', 'G5'], 'una melodía cantada sol-la-do-la-sol sale como cinco pitidos (subida de octava)');
 }
+
+{
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    const marca = css.indexOf('/* App: animaciones.');
+    assert(marca > 0, 'hay un bloque de animaciones de la app');
+    const bloque = css.slice(marca);
+    assert(/@media \(prefers-reduced-motion: no-preference\)/.test(bloque), 'las animaciones respetan «reducir animaciones»');
+    ['app-sube', 'app-elige', 'app-pop', 'app-ventana', 'app-resultado', 'app-onda-mic', 'app-burbuja', 'app-frase', 'app-barra', 'app-onda'].forEach(k => assert(bloque.includes('@keyframes ' + k), 'animación ' + k));
+    const selectores = bloque.split('\n').map(l => l.trim()).filter(l => /^[.:]/.test(l));
+    assert(selectores.length > 20 && selectores.every(l => /^\.(es-app|app-onda)/.test(l)), 'todas las reglas están limitadas a la app (es-app) o a clases que solo crea la app');
+    const pl = fs.readFileSync(path.join(__dirname, '..', 'js', 'plataforma.js'), 'utf8');
+    assert(/if \(nativo\) document\.documentElement\.classList\.add\('es-app'\)/.test(pl) && /function ondas\(\)/.test(pl), 'la clase es-app y las ondas al tocar solo se activan en el APK');
+    assert(/if \(!nativo\) return;\s*ondas\(\);/.test(pl), 'las ondas se registran solo en la app');
+}
+
+{
+    const ay = fs.readFileSync(path.join(__dirname, '..', 'js', 'ayudas.js'), 'utf8');
+    assert(/isNativePlatform/.test(ay), 'en la app no se crean los iconos de información');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
+    assert(/\.es-app p\.hint:not\(\[id\]\):not\(:has\(button, a\)\) \{ display: none; \}/.test(css), 'en la app se esconden los textos de ayuda');
+}

@@ -3,6 +3,7 @@
 (function (raiz) {
     const cap = raiz.Capacitor;
     const nativo = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+    if (nativo) document.documentElement.classList.add('es-app');
 
     function plugin(nombre) {
         return nativo && cap.Plugins ? (cap.Plugins[nombre] || null) : null;
@@ -16,10 +17,27 @@
         try { SB.setStyle({ style: oscuro ? 'DARK' : 'LIGHT' }); } catch (e) { /* sin soporte */ }
     }
 
+    const ONDABLES = '.btn, .rb-fn, .rb-modelo, .rb-figura, .rb-jarvis__mic, [role="tab"], .icon-btn';
+
+    function ondas() {
+        document.addEventListener('pointerdown', e => {
+            const b = e.target.closest(ONDABLES);
+            if (!b || b.disabled) return;
+            const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
+            const o = document.createElement('span');
+            o.className = 'app-onda';
+            o.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
+            b.classList.add('app-ondable');
+            b.appendChild(o);
+            o.addEventListener('animationend', () => o.remove());
+        }, { passive: true });
+    }
+
     function iniciar() {
         // Lo que solo existe en una plataforma (data-solo="web" | "android")
         document.querySelectorAll('[data-solo]').forEach(el => { el.hidden = el.dataset.solo !== (nativo ? 'android' : 'web'); });
         if (!nativo) return;
+        ondas();
         raiz.addEventListener('tema-cambiado', ajustarBarra);
         ajustarBarra();
         const App = plugin('App');

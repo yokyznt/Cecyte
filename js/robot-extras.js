@@ -231,6 +231,9 @@
         $('rb-ent-prog').value = W.blobs.filter(Boolean).length;
         $('rb-ent-paso').textContent = `Frase ${W.i + 1} de ${n}`;
         $('rb-ent-frase').textContent = W.frases[W.i];
+        $('rb-ent-frase').classList.remove('is-cambia');
+        void $('rb-ent-frase').offsetWidth;
+        $('rb-ent-frase').classList.add('is-cambia');
         $('rb-ent-grabar').textContent = hecha ? 'Volver a grabar' : 'Grabar';
         $('rb-ent-grabar').classList.remove('is-grabando');
         $('rb-ent-sig').textContent = W.i === n - 1 ? 'Terminar' : 'Siguiente';
@@ -373,7 +376,7 @@
     async function iniciarEntrena() {
         if (!$('rb-vz-lista') || !raiz.indexedDB) return;
         $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
-        $('rb-ent-cerrar').addEventListener('click', () => $('rb-ent-ventana').close());
+        $('rb-ent-cerrar').addEventListener('click', () => (raiz.RobotUI ? raiz.RobotUI.cerrarSuave($('rb-ent-ventana')) : $('rb-ent-ventana').close()));
         $('rb-ent-ventana').addEventListener('close', limpiarGrabacion);
         $('rb-ent-grabar').addEventListener('click', grabarPaso);
         $('rb-ent-play').addEventListener('click', reproducirPaso);
