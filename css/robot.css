@@ -144,7 +144,24 @@
 }
 .rb-barra > * { pointer-events: auto; }
 .rb-barra .btn { box-shadow: 0 6px 16px -6px rgb(0 0 0 / 0.5); }
-.rb-barra .msg:not(:empty) { padding: 6px 10px; border-radius: 10px; background: var(--surface); box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.4); }
+.rb-barra #rb-msg { display: none; }
+.rb-barra__cuadro { position: relative; transition: transform 0.12s ease; }
+.rb-barra__cuadro:active { transform: scale(0.88); }
+.rb-barra__cuadro::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 3px solid currentColor; opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+    .rb-barra__cuadro.is-pulso::after { animation: rb-anillo 0.55s ease-out; }
+    .rb-barra__cuadro.is-pulso .icon { animation: rb-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+}
+@keyframes rb-anillo { from { opacity: 0.85; transform: scale(1); } to { opacity: 0; transform: scale(1.8); } }
+@keyframes rb-pop { 0% { transform: scale(1); } 40% { transform: scale(1.4) rotate(-10deg); } 100% { transform: scale(1); } }
+.rb-toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 90;
+    translate: -50% -160%; opacity: 0; pointer-events: none; max-inline-size: min(92vw, 520px);
+    padding: 10px 16px; border-radius: 14px; background: var(--ink, #1c2a22); color: #fff; font-size: var(--fs-sm); text-align: center;
+    box-shadow: 0 10px 28px -10px rgb(0 0 0 / 0.5); transition: translate 0.28s ease, opacity 0.28s ease;
+}
+.rb-toast.is-visible { translate: -50% 0; opacity: 1; }
+.rb-toast--err { background: var(--rose-700, #b3261e); }
 .rb-barra .rb-prog { background: var(--surface); border-radius: 8px; }
 .rb-barra .btn { min-height: 48px; }
 .rb-barra .rb-barra__cuadro { flex: none; inline-size: 52px; block-size: 52px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 12px; }

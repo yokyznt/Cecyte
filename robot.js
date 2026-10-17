@@ -1456,7 +1456,17 @@ function cargar() {
     S.serieOn = false;
 }
 
+function aviso(texto, tipo) {
+    const el = $('rb-toast');
+    clearTimeout(aviso.t);
+    if (!texto || $('sec-robot').hidden) { el.classList.remove('is-visible'); return; }
+    el.textContent = texto;
+    el.className = 'rb-toast is-visible' + (tipo === 'err' ? ' rb-toast--err' : '');
+    aviso.t = setTimeout(() => el.classList.remove('is-visible'), tipo === 'err' ? 4500 : 2600);
+}
+
 function mensaje(texto, tipo) {
+    aviso(texto, tipo);
     const el = $('rb-msg');
     el.textContent = texto || '';
     el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
@@ -2883,8 +2893,9 @@ function iniciarBarraYBateria() {
     $('rb-badge').addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irAConectar(); }
     });
-    $('rb-barra-paro').addEventListener('click', pararTodo);
-    $('rb-barra-play').addEventListener('click', reproducirGeneral);
+    const pulso = b => { b.classList.remove('is-pulso'); void b.offsetWidth; b.classList.add('is-pulso'); };
+    $('rb-barra-paro').addEventListener('click', () => { pulso($('rb-barra-paro')); pararTodo(); });
+    $('rb-barra-play').addEventListener('click', () => { pulso($('rb-barra-play')); reproducirGeneral(); });
     document.addEventListener('seccion-admin', () => { pintarBarra(); pintarFunciones(); cascada(); });
     pintarBarra();
     // ajustes de las pilas: el porcentaje y la duración se calculan con esto
