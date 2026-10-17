@@ -1258,7 +1258,7 @@ const S = {
     guardadas: [],            // canciones y ritmos guardados: { id, nombre, texto, bpm }
     guardarEn: 0,             // cuándo mandar SAVE al robot (ms), 0 = nada pendiente
     rec: '',                // última grabación del teclado (texto de notas)
-    variante: 'tanque', funcion: '',                 // modelo del robot y función elegida ('' = ninguna)
+    variante: 'tanque', funcion: '', modoBaile: false,                 // modelo del robot y función elegida ('' = ninguna)
     funLuces: true, funMusica: false, giro90: 500,   // casillas de la función y ms que tarda en girar 90°
     funAuto: false,           // la función guardada arranca sola al encender el robot
     baileAuto: false,         // el baile guardado arranca solo al encender el robot
@@ -1283,8 +1283,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -1321,6 +1321,8 @@ function cargar() {
     const f = FUNCIONES.find(x => x.id === S.funcion);
     if (!f || !f.v.includes(S.variante)) S.funcion = '';
     if (S.funcion) { S.baile = 'quieto'; S.pasos = ''; }    // con una función puesta no hay baile
+    if (typeof S.modoBaile !== 'boolean') S.modoBaile = !S.funcion && (S.baile !== 'quieto' || S.pasos.trim() !== '');
+    if (S.funcion) S.modoBaile = false;
     S.funLuces = S.funLuces !== false;
     S.funMusica = S.funMusica === true;
     S.funAuto = S.funAuto === true;
@@ -1881,9 +1883,24 @@ function borrarFuncionGuardada() {
 }
 
 // Poner una función quita el baile (los dos mueven las ruedas): queda en "Solo luces" y sin pasos.
+function elegirBaile() {
+    if (S.corriendoFuncion) paro();
+    S.funcion = '';
+    S.modoBaile = true;
+    if (S.baile === 'quieto' && S.pasos.trim() === '') {
+        const b = BAILES.find(x => x.id !== 'quieto');
+        S.baile = b.id;
+        S.pasos = b.texto;
+    }
+    guardar();
+    pintarTodo();
+    mensaje('Baile puesto: ajústalo abajo y pulsa Bailar y cantar.', 'ok');
+}
+
 function elegirFuncion(id) {
     if (S.corriendoFuncion) paro();
     const habiaBaile = S.baile !== 'quieto' || S.pasos.trim() !== '';
+    S.modoBaile = false;
     S.funcion = id;
     if (id) {
         S.baile = 'quieto';
@@ -1937,7 +1954,8 @@ function pintarFunciones() {
     const f = funcionActual();
     $('rb-fn-var').value = v.id;
     $('rb-fn-nota').textContent = v.nota;
-    const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${x.id === S.funcion ? ' checked' : ''}>`
+    const marca = x => (x.id === 'baile' ? S.modoBaile && !S.funcion : x.id === '' ? !S.funcion && !S.modoBaile : x.id === S.funcion);
+    const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${marca(x) ? ' checked' : ''}>`
         + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
         + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}</label>`;
     const ninguna = tarjeta({ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' });
@@ -1945,7 +1963,9 @@ function pintarFunciones() {
         const fs = FUNCIONES.filter(x => x.v.includes(v.id) && g.ids.includes(x.id));
         return fs.length ? `<h4 class="rb-fn-t">${g.nombre}</h4><div class="rb-fn-rejilla">${fs.map(tarjeta).join('')}</div>` : '';
     }).join('');
-    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}</div>${grupos}`;
+    const baile = tarjeta({ id: 'baile', nombre: 'Baile', desc: 'Mueve las ruedas al ritmo de una canción, con luces. Al elegirlo se abren sus ajustes.' });
+    $('rb-baile-panel').hidden = !(S.modoBaile && !S.funcion);
+    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}</div>${grupos}`;
     $('rb-fn-modelos').innerHTML = VARIANTES.map(x =>
         `<button type="button" role="radio" class="rb-modelo" data-v="${x.id}" aria-checked="${x.id === v.id}">`
         + `<svg class="icon" aria-hidden="true"><use href="#i-mod-${x.id}"/></svg><span>${x.nombre}</span></button>`).join('');
@@ -2591,7 +2611,7 @@ function iniciarTeclado() {
 // ---------- Barra fija: parar y reproducir lo que haya en la sección que se ve ----------
 
 const QUE_REPRODUCE = {
-    'robot-musica': 'la canción', 'robot-baile': 'el baile con la canción', 'robot-funciones': 'la función elegida',
+    'robot-musica': 'la canción', 'robot-funciones': 'la función elegida',
     'robot-luces': 'las luces',
     'robot-instalar': 'nada en esta sección',
     'robot-control': 'nada en esta sección',
@@ -2604,7 +2624,7 @@ function seccionRobotActual() {
 
 function pintarBarra() {
     const sec = seccionRobotActual();
-    $('rb-barra-que').textContent = QUE_REPRODUCE[sec] || 'nada';
+    $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
     $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar'].includes(sec);
 }
 
@@ -2613,8 +2633,7 @@ function reproducirGeneral() {
     const sec = seccionRobotActual();
     const listo = S.estado === 'listo';
     if (sec === 'robot-musica') return listo ? actuar(true, false) : escucharAqui();
-    if (sec === 'robot-baile') return listo ? actuar(true, true) : escucharAqui();
-    if (sec === 'robot-funciones') return iniciarFuncion();
+    if (sec === 'robot-funciones') return S.modoBaile && !S.funcion ? (listo ? actuar(true, true) : escucharAqui()) : iniciarFuncion();
     if (sec === 'robot-luces') {
         if (!listo) return mensaje('Conecta el robot para ver las luces en él.', 'err');
         S.guardarEn = Date.now() + 2500;
@@ -2775,7 +2794,8 @@ function iniciar() {
         pintarFunciones();
     });
     $('rb-fn-lista').addEventListener('change', e => {
-        if (e.target.name === 'rb-fn') elegirFuncion(e.target.value);
+        if (e.target.name !== 'rb-fn') return;
+        if (e.target.value === 'baile') elegirBaile(); else elegirFuncion(e.target.value);
     });
     $('rb-fn-luces').addEventListener('change', e => { S.funLuces = e.target.checked; cambio('led'); });
     $('rb-fn-musica').addEventListener('change', e => { S.funMusica = e.target.checked; cambio('funcion'); });
