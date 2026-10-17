@@ -471,8 +471,7 @@
                                 <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">El ESP32 descarga las horas, los días y el ritmo cada 5 segundos. "Tocar timbre ahora" suena sin esperar la hora programada.</p>
-
+                                <p class="hint">El ESP32 recibe los cambios cada 5 segundos.</p>
                                 <div>
                                     <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
                                         <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
@@ -480,73 +479,70 @@
                                     </button>
                                     <p id="bell-ring-msg" class="msg" role="status" style="margin-top:8px"></p>
                                 </div>
-
-                                <hr class="divider">
-
-                                <div style="display:flex;flex-direction:column;gap:10px">
-                                    <h4 class="panel__sub">Horas programadas</h4>
-                                    <div id="bell-times-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
-                                        <input type="time" id="bell-new-time" class="input">
-                                        <button type="button" onclick="addBellTime()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar hora
-                                        </button>
-                                    </div>
+                                <div class="rb-ops">
+                                    <details class="rb-op" open>
+                                        <summary><span class="rb-op__t">Horas y días</span><span class="rb-op__r">Cuándo suena el timbre</span></summary>
+                                        <div class="rb-op__c">
+                                            <div id="bell-times-list" class="chips"></div>
+                                            <div class="inline-form">
+                                                <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
+                                                <input type="time" id="bell-new-time" class="input">
+                                                <button type="button" onclick="addBellTime()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar hora
+                                                </button>
+                                            </div>
+                                            <fieldset style="border:0;padding:0;margin:0;min-width:0">
+                                                <legend class="rb-fn-t" style="margin-bottom:8px;padding:0">Días</legend>
+                                                <div class="days">
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                    </details>
+                                    <details class="rb-op">
+                                        <summary><span class="rb-op__t">Días sin timbre</span><span class="rb-op__r">Vacaciones y festivos</span></summary>
+                                        <div class="rb-op__c">
+                                            <p class="hint">Ese día no suena nada.</p>
+                                            <div id="bell-off-list" class="chips"></div>
+                                            <div class="inline-form">
+                                                <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
+                                                <input type="date" id="bell-off-date" class="input">
+                                                <button type="button" onclick="addOffDate()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar día
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <details class="rb-op">
+                                        <summary><span class="rb-op__t">Horario especial</span><span class="rb-op__r">Un día con otras horas</span></summary>
+                                        <div class="rb-op__c">
+                                            <p class="hint">Ese día manda sobre las horas normales y los días de la semana.</p>
+                                            <div id="bell-special-list" class="chips"></div>
+                                            <div class="stack">
+                                                <label class="field"><span class="field__label">Fecha</span><input type="date" id="bell-special-date" class="input"></label>
+                                                <label class="field"><span class="field__label">Horas de ese día</span><input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00"></label>
+                                                <button type="button" onclick="addSpecial()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar horario especial
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
                                 </div>
-
-                                <fieldset style="border:0;padding:0;margin:0;min-width:0">
-                                    <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
-                                    <div class="days">
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
-                                    </div>
-                                </fieldset>
-
-                                <hr class="divider">
-
                                 <div class="stack">
-                                    <h4 class="panel__sub">Días sin timbre</h4>
-                                    <p class="hint">Vacaciones, suspensiones y días festivos: ese día no suena nada.</p>
-                                    <div id="bell-off-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
-                                        <input type="date" id="bell-off-date" class="input">
-                                        <button type="button" onclick="addOffDate()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar día
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Horario especial</h4>
-                                    <p class="hint">Un día con otras horas, por ejemplo un día corto. Ese día manda sobre las horas normales y sobre los días de la semana.</p>
-                                    <div id="bell-special-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-special-date">Fecha del horario especial</label>
-                                        <input type="date" id="bell-special-date" class="input" style="max-width:170px">
-                                        <label class="sr-only" for="bell-special-times">Horas de ese día</label>
-                                        <input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00">
-                                        <button type="button" onclick="addSpecial()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="row-between">
-                                    <p id="bell-save-msg" class="msg" role="status"></p>
-                                    <button type="button" onclick="saveBell()" class="btn btn--primary">
+                                    <button type="button" onclick="saveBell()" class="btn btn--primary btn--block">
                                         <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
                                         Guardar timbre
                                     </button>
+                                    <p id="bell-save-msg" class="msg" role="status"></p>
                                 </div>
                             </div>
                         </section>
@@ -848,7 +844,7 @@
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-nombre">Guardar lo que hay en pantalla con el nombre</label>
-                                        <div class="inline-form">
+                                        <div class="inline-form inline-form--ap">
                                             <input type="text" id="rb-nombre" class="input" maxlength="40" placeholder="Ej. Ritmo de mi canción">
                                             <button type="button" id="rb-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
                                             <button type="button" id="rb-borrar" class="btn btn--secondary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Borrar</button>
@@ -858,7 +854,7 @@
                                         <label class="field__label" for="rb-notas">Notas</label>
                                         <textarea id="rb-notas" class="textarea" rows="6" spellcheck="false"></textarea>
                                         <p id="rb-err-notas" class="msg msg--err" role="status"></p>
-                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). También puedes poner milisegundos: A5:120 suena 120 ms y R:300 calla 300 ms. Lo que sigue a // es un comentario.</p>
+                                        <p class="hint">Notas como C4 D4 E4 (F#4, Bb3); R es silencio. /4 dura un tiempo, /8 medio, /2 dos y un punto la alarga (/4.). A5:120 suena 120 ms. Lo que sigue a // es comentario.</p>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
@@ -869,7 +865,6 @@
                                         <input type="range" id="rb-vol" min="0" max="100" step="5">
                                     </div>
                                     <label class="rb-check"><input type="checkbox" id="rb-fuerte"><span>Que suene más fuerte (sube la canción de octava)</span></label>
-                                    <p class="hint">El volumen ya llega al tope del zumbador; las notas agudas suenan mucho más fuerte que las graves. Las notas siguen siendo las mismas, solo más arriba.</p>
                                     <div class="btn-row">
                                         <button type="button" id="rb-escuchar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar aquí</button>
                                         <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
@@ -878,10 +873,11 @@
 
                                     </div>
                                 </div>
-                                <div class="rb-card" data-solo="android">
-                                    <h4 class="panel__sub">Cántalo y el robot lo toca en pitidos</h4>
-                                    <div class="stack">
-                                        <p class="hint">Pulsa Grabar, canta una melodía (con letra o con «la la la»), cerca del micrófono y sin música de fondo, y pulsa Parar: se convierte sola en notas del zumbador.</p>
+                                <div class="rb-ops" data-solo="android">
+                                  <details class="rb-op">
+                                    <summary><span class="rb-op__t">Cántalo</span><span class="rb-op__r">Tu voz se vuelve notas del zumbador</span></summary>
+                                    <div class="rb-op__c">
+                                        <p class="hint">Pulsa Grabar y canta una melodía cerca del micrófono, sin música de fondo. Al parar se convierte en notas.</p>
                                         <div class="field">
                                             <label class="field__label" for="rb-cant-voz">Tu voz</label>
                                             <select id="rb-cant-voz" class="select"><option value="hombre">Grave (voz de hombre)</option><option value="media" selected>Media</option><option value="aguda">Aguda (mujer o niño)</option></select>
@@ -897,11 +893,13 @@
                                         </div>
                                         <p id="rb-cant-info" class="msg" role="status"></p>
                                     </div>
+                                  </details>
                                 </div>
-                                <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
-                                    <div class="stack">
-                                            <p class="hint">Toca las teclas de abajo o las de tu computadora: <b>Z X C V B N M</b> (con <b>S D G H J</b> para las negras) son una octava y <b>Q W E R T Y U</b> (con <b>2 3 5 6 7</b>) la siguiente. Pulsa <b>Grabar</b> y las notas se van registrando solas, con su duración y sus silencios.</p>
+                                <div class="rb-ops">
+                                  <details class="rb-op">
+                                    <summary><span class="rb-op__t">Teclado</span><span class="rb-op__r">Toca y graba tus notas</span></summary>
+                                    <div class="rb-op__c">
+                                            <p class="hint">Toca las teclas o las de tu computadora: <b>Z X C V B N M</b> y <b>Q W E R T Y U</b> (con <b>S D G H J</b> y <b>2 3 5 6 7</b> las negras). Pulsa <b>Grabar</b> para registrar notas, duración y silencios.</p>
                                             <div id="rb-piano" class="rb-piano" role="group" aria-label="Teclado de notas"></div>
                                             <div class="btn-row">
                                                 <button type="button" id="rb-tec-oct-menos" class="btn btn--secondary btn--sm">Octava −</button>
@@ -922,14 +920,15 @@
                                             </div>
                                             <div class="field">
                                                 <label class="field__label" for="rb-rec-nombre">Guardar la grabación con el nombre</label>
-                                                <div class="inline-form">
+                                                <div class="inline-form inline-form--ap">
                                                     <input type="text" id="rb-rec-nombre" class="input" maxlength="40" placeholder="Ej. Mi melodía">
                                                     <button type="button" id="rb-rec-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
                                                     <button type="button" id="rb-rec-usar" class="btn btn--secondary btn--sm">Usar como la canción</button>
                                                 </div>
                                             </div>
                                             <p id="rb-rec-info" class="msg" role="status"></p>
-                                        </div>
+                                    </div>
+                                  </details>
                                 </div>
                             </div>
                         </section>
@@ -1120,19 +1119,20 @@
                                             <summary><span class="rb-op__t">Voz de Yokis</span><span class="rb-op__r">Cómo suena al hablar</span></summary>
                                             <div class="rb-op__c">
                                                 <div class="rb-seg" role="radiogroup" aria-label="Cómo habla Yokis">
-                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-off" checked><span>Voz del teléfono</span></label>
-                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-on"><span>Voz con IA</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-on" checked><span>Voz con IA</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-off"><span>Solo del teléfono</span></label>
+                                                </div>
+                                                <div id="rb-voz-ia" class="stack">
+                                                    <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
+                                                    <p class="hint">Se usa siempre que se puede. Sin internet o sin llave habla la voz del teléfono.</p>
                                                 </div>
                                                 <div id="rb-voz-tel" class="stack">
+                                                    <span class="rb-fn-t">Voz del teléfono (sin internet)</span>
                                                     <label class="field"><span class="field__label">Voz</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
                                                     <div class="rb-calib">
                                                         <label class="field"><span class="field__label">Grave ← → aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
                                                         <label class="field"><span class="field__label">Calmada ← → enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
                                                     </div>
-                                                </div>
-                                                <div id="rb-voz-ia" class="stack" hidden>
-                                                    <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
-                                                    <p class="hint">Necesita la llave de «IA gratis». Tarda un par de segundos; si falla, habla el teléfono.</p>
                                                 </div>
                                                 <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se menee al contestar</span></label>
                                                 <div class="btn-row">
@@ -1248,18 +1248,28 @@
                                         <button type="button" id="rb-lienzo-ir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Recorrer</button>
                                         <button type="button" id="rb-lienzo-borrar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Borrar</button>
                                     </div>
-                                    <h4 class="rb-fn-t">Regresar a casa</h4>
-                                    <p class="hint">Marca un punto de salida y maneja con el mando; después el robot deshace lo que recorrió.</p>
+                                    <div class="rb-ops">
+                                    <details class="rb-op">
+                                    <summary><span class="rb-op__t">Regresar a casa</span><span class="rb-op__r">Deshace lo que recorrió</span></summary>
+                                    <div class="rb-op__c">
+                                    <p class="hint">Marca un punto de salida y maneja con el mando; después el robot vuelve solo.</p>
                                     <div class="btn-row">
                                         <button type="button" id="rb-casa-marca" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-casa"/></svg> Marcar casa aquí</button>
                                         <button type="button" id="rb-casa-ir" class="btn btn--primary btn--sm">Regresar a casa</button>
                                     </div>
-                                    <h4 class="rb-fn-t">Calibración</h4>
+                                    </div>
+                                    </details>
+                                    <details class="rb-op">
+                                    <summary><span class="rb-op__t">Calibración</span><span class="rb-op__r">Para que el dibujo salga medido</span></summary>
+                                    <div class="rb-op__c">
                                     <div class="rb-calib">
                                         <label class="field"><span class="field__label">Velocidad (cm por segundo)</span><input id="rb-cal-vel" class="input" type="number" inputmode="numeric" min="5" max="80" step="1" value="22"></label>
                                         <label class="field"><span class="field__label">Giro de 90° (ms)</span><input id="rb-cal-giro" class="input" type="number" inputmode="numeric" min="150" max="2000" step="10" value="500"></label>
                                     </div>
-                                    <p class="hint">Sin sensores en las ruedas el dibujo es aproximado: mide lo que avanza en 1 s y lo que tarda en girar 90° y pon esos valores. Se guardan solos.</p>
+                                    <p class="hint">Mide lo que avanza en 1 s y lo que tarda en girar 90° y pon esos valores. Se guardan solos.</p>
+                                    </div>
+                                    </details>
+                                    </div>
                                     <p id="rb-dib-msg" class="msg" role="status"></p>
                                 </div>
                             </div>

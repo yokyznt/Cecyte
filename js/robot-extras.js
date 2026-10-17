@@ -418,7 +418,7 @@
     const VIA = { audio: null, fuente: null, cache: new Map(), pausaHasta: 0 };
 
     function ajustesVozIA() {
-        const a = { on: false, voz: 'Charon' };
+        const a = { on: true, voz: 'Charon' };
         try { Object.assign(a, JSON.parse(localStorage.getItem(CLAVE_VOZIA)) || {}); } catch (e) { return a; }
         if (!VOCES_IA.some(v => v[0] === a.voz)) a.voz = 'Charon';
         return a;
@@ -471,6 +471,7 @@
             const clave = a.voz + '|' + texto;
             let datos = VIA.cache.get(clave);
             if (!datos) {
+                if (raiz.navigator.onLine === false) return false;
                 datos = await pedirVozIA(texto, a);
                 if (!datos) return false;
                 VIA.cache.set(clave, datos);
@@ -497,7 +498,6 @@
         off.checked = !a.on;
         sel.value = a.voz;
         const mostrar = () => {
-            $('rb-voz-tel').hidden = on.checked;
             $('rb-voz-ia').hidden = !on.checked;
         };
         const guardar = () => {

@@ -436,7 +436,7 @@ const FUNCIONES = [
 ];
 
 const GRUPOS_FN = [
-    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano', 'linea', 'estacionar'] },
+    { id: 'sensor', nombre: 'Con sensor', ids: ['esquivar', 'mano', 'linea', 'estacionar'] },
     { id: 'rectas', nombre: 'Rectas y patrullas', ids: ['avanzar', 'cuadrado', 'idavuelta', 'vigilante'] },
     { id: 'curvas', nombre: 'Curvas', ids: ['zigzag', 'circulos', 'ocho', 'slalom'] },
     { id: 'giros', nombre: 'Giros y trucos', ids: ['trompo', 'sirena', 'arrancon', 'derrape'] },
@@ -2432,16 +2432,21 @@ function pintarFunciones() {
         + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
         + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}${x.id === '' ? '' : '<span class="rb-fn__cfg">Toca otra vez para ajustar</span>'}</label>`;
     const ninguna = tarjeta({ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' });
+    const previas = document.querySelector('#rb-fn-lista details');
+    const abiertos = new Set([...document.querySelectorAll('#rb-fn-lista details[open]')].map(d => d.dataset.g));
     const grupos = GRUPOS_FN.map(g => {
         const fs = FUNCIONES.filter(x => x.v.includes(v.id) && g.ids.includes(x.id));
-        return fs.length ? `<h4 class="rb-fn-t">${g.nombre}</h4><div class="rb-fn-rejilla">${fs.map(tarjeta).join('')}</div>` : '';
+        if (!fs.length) return '';
+        const abre = fs.some(x => x.id === S.funcion) || (previas ? abiertos.has(g.id) : false);
+        return `<details class="rb-op" data-g="${g.id}"${abre ? ' open' : ''}><summary><span class="rb-op__t">${g.nombre}</span><span class="rb-op__r">${fs.length} ${fs.length === 1 ? 'función' : 'funciones'}</span></summary>`
+            + `<div class="rb-op__c"><div class="rb-fn-rejilla">${fs.map(tarjeta).join('')}</div></div></details>`;
     }).join('');
     const baile = tarjeta({ id: 'baile', nombre: 'Baile', desc: 'Mueve las ruedas al ritmo de una canción, con luces. Al elegirlo se abren sus ajustes.' });
     $('rb-baile-panel').hidden = !(S.modoBaile && !S.funcion);
     $('rb-ruleta-panel').hidden = !(S.modoRuleta && !S.funcion);
     $('rb-rul-sonido').checked = S.ruletaSonido;
     const ruleta = tarjeta({ id: 'ruleta', nombre: 'Ruleta', desc: 'Ruleta de casino con los LEDs: rojo y negro, una bolita que gira, va frenando y cae en un número.' });
-    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}${ruleta}</div>${grupos}`;
+    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}${baile}${ruleta}</div><div class="rb-ops">${grupos}</div>`;
     $('rb-fn-modelos').innerHTML = VARIANTES.map(x =>
         `<button type="button" role="radio" class="rb-modelo" data-v="${x.id}" aria-checked="${x.id === v.id}">`
         + `<svg class="icon" aria-hidden="true"><use href="#i-mod-${x.id}"/></svg><span>${x.nombre}</span></button>`).join('');
