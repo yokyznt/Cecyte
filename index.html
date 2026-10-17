@@ -119,10 +119,13 @@
             <div class="today-grid">
                 <!-- Grupo: la primera decisión del alumno, antes de ver su día -->
                 <div class="group-bar">
-                    <label for="group-selector" class="group-bar__label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Mi grupo</label>
+                    <label for="group-selector" class="group-bar__label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span class="sr-only">Mi grupo</span></label>
                     <select id="group-selector" onchange="changeGroup(this.value)" class="select">
                         <option value="">Cargando grupos...</option>
                     </select>
+                    <button type="button" id="ics-btn" class="icon-btn" onclick="descargarCalendario()" title="Agregar mi horario a mi calendario" aria-label="Agregar mi horario a mi calendario">
+                        <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>
+                    </button>
                 </div>
 
                 <!-- Clase en curso -->
@@ -153,8 +156,6 @@
                         </div>
                     </div>
 
-                    <ol id="day-strip" class="strip" aria-hidden="true"></ol>
-
                     <div class="now__next">
                         <span class="now__next-label">Siguiente clase</span>
                         <strong id="next-subject-name">—</strong>
@@ -176,24 +177,19 @@
                 <div class="notify__who">
                     <div class="notify__icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg></div>
                     <div>
-                        <h3 class="notify__title">Recibe avisos de cambio de clase</h3>
-                        <p class="notify__status">Estado en este dispositivo: <strong id="notification-status">Sin activar</strong></p>
+                        <h3 class="notify__title">Notificaciones</h3>
+                        <p class="notify__status"><strong id="notification-status">Sin activar</strong></p>
                     </div>
                 </div>
                 <div class="notify__actions">
-                    <button type="button" onclick="requestNotificationPermission()" class="btn btn--primary">Activar Notificaciones</button>
+                    <button type="button" onclick="requestNotificationPermission()" class="btn btn--primary">Activar</button>
                     <button type="button" onclick="testNotification()" class="btn btn--secondary">Probar</button>
                 </div>
             </section>
 
             <!-- Horario semanal -->
             <section class="panel" aria-labelledby="schedule-heading">
-                <div class="panel__head">
-                    <h3 id="schedule-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Horario de Clases</h3>
-                    <button type="button" id="ics-btn" class="btn btn--secondary btn--sm" onclick="descargarCalendario()" title="Descarga un archivo para agregar tu horario a Google Calendar, Apple u Outlook">
-                        <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg> Agregar a mi calendario
-                    </button>
-                </div>
+                <h3 id="schedule-heading" class="sr-only">Horario de clases</h3>
 
                 <div id="schedule-empty" class="empty-state hidden">
                     <strong>Este grupo todavía no tiene materias</strong>

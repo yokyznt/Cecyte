@@ -92,12 +92,11 @@ function updateCurrentClassCard() {
     const teacherLine = (iconName, text) => `${icon(iconName)}<span>${esc(text)}</span>`;
     const setState = (state, label) => { panel.dataset.state = state; stateEl.innerText = label; };
 
-    // Cuando cambia el bloque, repinta el horario (resalta la hora actual) y la tira del dia
+    // Cuando cambia el bloque, repinta el horario (resalta la hora actual)
     const nowKey = `${day}|${slot ? slot.key : 'none'}`;
     if (nowKey !== lastRenderedNowKey) {
         lastRenderedNowKey = nowKey;
         renderStudentSchedule();
-        renderDayStrip(day, slot);
     }
 
     if (!slot) {
@@ -149,22 +148,6 @@ function updateCurrentClassCard() {
     trackEl.setAttribute('aria-valuenow', String(percent));
     countdownEl.innerText = `${remMin}:${remSec}`;
     nextEl.innerText = findNextClassLabel(day, slot.key) || 'Sin más clases hoy';
-}
-
-// Tira del dia: un segmento por bloque, proporcional a su duracion (pasado / ahora / por venir)
-function renderDayStrip(day, slot) {
-    const strip = document.getElementById('day-strip');
-    if (!strip) return;
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    strip.innerHTML = timeSlots.map(s => {
-        const [start, end] = s.key.split(' - ').map(timeToMinutes);
-        const isNow = !!(slot && slot.key === s.key);
-        const isPast = !!day && end <= nowMinutes;
-        const cls = ['strip__seg', s.receso ? 'is-recess' : '', isNow ? 'is-now' : (isPast ? 'is-past' : '')].join(' ').trim();
-        return `<li class="${cls}" style="flex:${end - start}" title="${esc(s.label)}"><span class="strip__label">${s.key.slice(0, 5)}</span></li>`;
-    }).join('');
 }
 
 // Entrada escalonada de una lista: solo la primera vez que se pinta (o al cambiar de grupo), no en cada repintado
