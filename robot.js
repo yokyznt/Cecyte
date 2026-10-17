@@ -1484,7 +1484,7 @@ function alListo() {
     ponEstado('listo');
     S.cola.enviar([{ l: 'MODE 4', ex: true }]);     // lo guardado que arranca solo no corre mientras la página lo controla
     mensaje('Listo. Lo que cambies aquí se aplica en el robot al instante.', 'ok');
-    S.cola.enviar(['MODE 4']);
+    S.cola.enviar(['MODE 4', 'INFO']);              // por Bluetooth la placa no se reinicia, así que no manda su INFO sola: se la pedimos
     S.sucio = true;
 }
 
