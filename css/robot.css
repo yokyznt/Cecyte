@@ -192,6 +192,13 @@
     padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
 }
 .rb-card--ancho { grid-column: 1 / -1; }
+.rb-serie__lista { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.rb-serie__it { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.rb-serie__it.is-activa { border-color: var(--primary, currentColor); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, currentColor) 25%, transparent); }
+.rb-serie__it b { flex: 1 1 140px; min-width: 0; }
+.rb-serie__n { inline-size: 1.6em; block-size: 1.6em; display: grid; place-items: center; border-radius: 50%; background: var(--line); font-size: .85em; }
+.rb-serie__seg { display: inline-flex; align-items: center; gap: 4px; }
+.rb-serie__seg input { inline-size: 4.2em; }
 .rb-card > .panel__sub { font-size: var(--fs-md); padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .rb-card .rb-leds { margin-top: 2px; }
 .rb-apartado > .rb-conexion { margin-bottom: 18px; }

@@ -388,6 +388,8 @@ const FUNCIONES = [
     { id: 'esquivar', v: ['tanque', 'raptor'], nombre: 'Esquivar obstáculos', desc: 'Avanza solo; si algo está a menos de 20 cm, retrocede y gira hacia un lado al azar. Usa su sensor ultrasónico.', modo: 1 },
     { id: 'mano', v: ['tanque', 'raptor'], nombre: 'Seguir mi mano', desc: 'Se acerca si tu mano está entre 12 y 40 cm, retrocede si la pones a menos de 8 cm y se queda quieto si no hay nada.', modo: 2 },
     { id: 'linea', v: ['raptor'], nombre: 'Seguir la línea', desc: 'Sigue una línea negra del piso con los dos sensores del puerto 9: corrige con suavidad, baja la velocidad en las curvas y la busca si la pierde.', modo: 6 },
+    { id: 'estacionar', v: ['tanque', 'raptor'], nombre: 'Acercarse a la pared', desc: 'Avanza despacio hacia lo que tenga enfrente y se detiene a 10 cm, pitando cada vez más rápido, como el sensor de un coche al estacionar. Usa su sensor ultrasónico.', modo: 7 },
+    { id: 'sirena', v: ['tanque'], nombre: 'Patrulla con sirena', desc: 'Gira en su sitio con las luces rojas y azules corriendo y una sirena de dos tonos, como una patrulla.', pasos: 'GI 3 GD 3', notas: 'A5/8 E5/8 A5/8 E5/8 A5/8 E5/8 A5/8 E5/8', luces: 'sirena' },
     { id: 'cuadrado', v: ['tanque', 'raptor'], nombre: 'Patrulla cuadrada', desc: 'Avanza, gira 90° y repite: recorre un cuadrado una y otra vez.', pasos: 'AD 1.5 GD 90°' },
     { id: 'idavuelta', v: ['tanque'], nombre: 'Ida y vuelta', desc: 'Avanza 2 s, para, retrocede 2 s y vuelve a empezar, como un guardia en su pasillo.', pasos: 'AD 2 PA 0.5 AT 2 PA 0.5' },
     { id: 'vigilante', v: ['tanque'], nombre: 'Vigilante', desc: 'Sin moverse del sitio, barre a un lado y al otro con pausas, como mirando que todo esté bien.', pasos: 'GI 45° PA 1 GD 90° PA 1 GI 45° PA 1' },
@@ -404,10 +406,10 @@ const FUNCIONES = [
 ];
 
 const GRUPOS_FN = [
-    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano', 'linea'] },
+    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano', 'linea', 'estacionar'] },
     { id: 'rectas', nombre: 'Rectas y patrullas', ids: ['avanzar', 'cuadrado', 'idavuelta', 'vigilante'] },
     { id: 'curvas', nombre: 'Curvas', ids: ['zigzag', 'circulos', 'ocho', 'slalom'] },
-    { id: 'giros', nombre: 'Giros y trucos', ids: ['trompo', 'arrancon', 'derrape'] },
+    { id: 'giros', nombre: 'Giros y trucos', ids: ['trompo', 'sirena', 'arrancon', 'derrape'] },
     { id: 'suave', nombre: 'Movimientos suaves', ids: ['picoteo', 'paso', 'mirada'] },
 ];
 
@@ -900,6 +902,62 @@ function programaParaRobot(cmds) {
     return { lineas, bytes, cabe: bytes <= PGM_MAX };
 }
 
+const SIRENA_COLORES = Array.from({ length: LEDS }, (_, i) => (i < LEDS / 2 ? [255, 0, 0] : [0, 0, 255]));
+const SERIE_MAX = 30;
+
+function itemsDeSerie(serie, variante) {
+    const items = [];
+    serie.forEach((x, i) => {
+        const f = FUNCIONES.find(g => g.id === x.id);
+        if (f && f.v.includes(variante)) items.push({ f, seg: x.seg, i });
+    });
+    return items;
+}
+
+function programaDeSerie(items, { giro90 = 500, bpm = 120, vel = 110, notasDe = () => [] } = {}) {
+    const lineas = [];
+    let bytes = 0;
+    for (const { f, seg } of items) {
+        if (f.modo) {
+            lineas.push(`PADD O ${f.modo} ${seg}`);
+            bytes += 3;
+            continue;
+        }
+        const { cmds } = compilar({ notas: notasDe(f, seg), pasos: pasosDeFuncion(f.pasos, giro90, bpm, seg), bpm, vel, continuo: true });
+        const p = programaParaRobot(cmds);
+        lineas.push(...p.lineas, 'PADD S');
+        bytes += p.bytes + 1;
+    }
+    return { lineas, bytes, cabe: bytes <= PGM_MAX };
+}
+
+function trazoDeSerie(items, giro90 = 500, cmS = 22) {
+    let x = 0, y = 0, a = -Math.PI / 2;
+    const puntos = [{ x, y }];
+    for (const { f, seg } of items) {
+        if (f.modo) continue;
+        for (const p of pasosDeFuncion(f.pasos, giro90, 120, seg)) {
+            const s = p.beats / 2;
+            const giro = 90 / (giro90 / 1000) * Math.PI / 180;
+            if (p.mov === 'GI' || p.mov === 'GD') {
+                a += (p.mov === 'GD' ? 1 : -1) * giro * s;
+                continue;
+            }
+            if (p.mov === 'PA') continue;
+            const n = Math.max(1, Math.ceil(s / 0.1));
+            const dt = s / n;
+            for (let k = 0; k < n; k++) {
+                if (p.mov === 'CI' || p.mov === 'CD') a += (p.mov === 'CD' ? 1 : -1) * (cmS / 30) * dt;
+                const d = (p.mov === 'AT' ? -1 : 1) * cmS * dt;
+                x += Math.cos(a) * d;
+                y += Math.sin(a) * d;
+                puntos.push({ x, y });
+            }
+        }
+    }
+    return puntos;
+}
+
 // ---------- Batería: porcentaje y cuánto va a durar ----------
 // El robot mide el voltaje de sus 6 pilas AA. Cada curva es por celda, [voltios, %] de mayor a menor; el
 // porcentaje del paquete sale de interpolar (voltaje / 6). Con los motores andando el voltaje cae mucho
@@ -1346,7 +1404,7 @@ const lib = {
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
-    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
+    hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
 };
@@ -1388,6 +1446,8 @@ const S = {
     fwDist: false,            // su INFO trae DIST=1: entiende la orden DIST
     fwDir: false,             // su INFO trae DIR=1: entiende las órdenes DIR y LUZ
     fwLin: false,             // su INFO trae LIN=1: tiene el seguidor de línea (modo 6, órdenes LINEA y SENS)
+    fwPark: false,            // su INFO trae PARK=1: tiene el modo 7 (acercarse a la pared) y las series guardadas (PADD O)
+    serie: [], serieAuto: false, serieOn: false, serieT: 0, serieK: -1,   // serie de demostración: [{ id, seg }]
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
     ruleta: null, modoRuleta: false, ruletaSonido: true,
@@ -1399,8 +1459,8 @@ let musicaCargada = null;     // audio o MIDI elegido para convertir en ritmo (n
 
 function guardar() {
     try {
-        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile } = S;
-        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile }));
+        const { leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto } = S;
+        localStorage.setItem(LLAVE, JSON.stringify({ leds, brillo, efecto, velFx, vol, vivo, repetir, cancion, notas, bpm, baile, pasos, vel, guardadas, rec, bateria, variante, funcion, funLuces, funMusica, giro90, funAuto, baileAuto, fuerte, trim, linea, modoBaile, serie, serieAuto }));
     } catch (e) { /* sin almacenamiento: no se recuerda nada */ }
 }
 
@@ -1447,6 +1507,12 @@ function cargar() {
     S.trim = clamp(Math.round(Number(S.trim) || 0), -30, 30);
     S.giro90 = clamp(Math.round(Number(S.giro90) || 500), 200, 1500);
     S.corriendoFuncion = false; S.autonomo = 0; S.salirModo = false;
+    S.serie = (Array.isArray(S.serie) ? S.serie : [])
+        .filter(x => x && FUNCIONES.some(f => f.id === x.id))
+        .map(x => ({ id: x.id, seg: clamp(Math.round(Number(x.seg)) || 20, 1, 255) }))
+        .slice(0, SERIE_MAX);
+    S.serieAuto = S.serieAuto === true;
+    S.serieOn = false;
 }
 
 function mensaje(texto, tipo) {
@@ -1479,7 +1545,7 @@ function ponEstado(est) {
     $('rb-badge').className = 'badge badge--' + clase;
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
-    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar']) $(id).disabled = est !== 'listo';
+    for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar', 'rb-serie-play', 'rb-serie-guardar', 'rb-serie-borrar']) $(id).disabled = est !== 'listo';
     if (est === 'sinprograma') {
         if ($('rb-instalar')) $('rb-instalar').open = true;
         if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
@@ -1527,6 +1593,7 @@ function alLinea(l) {
         S.fwDist = kv.DIST === 1;          // y, si trae DIST=1, también la orden DIST (el mando frena por obstáculo)
         S.fwDir = kv.DIR === 1;
         S.fwLin = kv.LIN === 1;
+        S.fwPark = kv.PARK === 1;
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
@@ -1788,9 +1855,30 @@ function escucharAqui() {
 function coloresBase() { return S.leds.map(hexARgb); }
 
 // La línea FX que toca ahora: las luces de la pantalla, o apagadas si una función en marcha las desactivó.
-function lineaLuces() {
-    if (S.corriendoFuncion && !S.funLuces) return fxLinea('fijo', 0, coloresBase(), 100);
+function fxDe(f) {
+    if (f && f.luces === 'sirena') return fxLinea('persecucion', Math.max(S.brillo, 40), SIRENA_COLORES, 160);
     return fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx);
+}
+
+function lineaLuces(f = S.corriendoFuncion ? funcionActual() : null) {
+    if (S.corriendoFuncion && !S.funLuces) return fxLinea('fijo', 0, coloresBase(), 100);
+    return fxDe(f);
+}
+
+function notasDeFuncion(f, minS) {
+    if (f.notas) {
+        const base = notasRobot(leerNotas(f.notas).notas);
+        const beatMs = 60000 / clamp(S.bpm, 30, 300);
+        const ciclo = base.reduce((a, n) => a + (n.ms !== undefined ? n.ms : n.beats * beatMs), 0);
+        const meta = (minS || cicloPasosS(f)) * 1000;
+        const veces = ciclo > 0 ? clamp(Math.ceil(meta / ciclo), 1, 200) : 1;
+        return Array.from({ length: veces }, () => base).flat();
+    }
+    return S.funMusica ? notasRobot(leerNotas(S.notas).notas) : [];
+}
+
+function cicloPasosS(f) {
+    return pasosDeFuncion(f.pasos || '', S.giro90, S.bpm, 0).reduce((a, p) => a + p.beats, 0) * 60 / S.bpm;
 }
 
 // Las notas de la canción tal como suenan en el robot (más agudas si está marcado "que suene más fuerte")
@@ -1869,12 +1957,11 @@ function funcionActual() {
     return FUNCIONES.find(f => f.id === S.funcion && f.v.includes(S.variante)) || null;
 }
 
-function armarFuncion(f) {
-    const n = leerNotas(S.notas);
-    mostrarErrores(n.errores, leerBaile(S.pasos).errores);
+function armarFuncion(f, minS = 30) {
+    mostrarErrores(leerNotas(S.notas).errores, leerBaile(S.pasos).errores);
     return compilar({
-        notas: S.funMusica ? notasRobot(n.notas) : [],
-        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm),
+        notas: notasDeFuncion(f, minS),
+        pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, minS),
         bpm: S.bpm, vel: S.vel, continuo: true,
     });
 }
@@ -1905,6 +1992,7 @@ function iniciarFuncion(reinicio) {
     }
     S.guardarEn = 0;                       // unas luces apagadas por la función no se guardan en el robot
     if (f.modo === 6 && !S.fwLin) return mensaje('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
+    if (f.modo === 7 && !S.fwPark) return mensaje('El programa que lleva el robot no trae esta función: instálalo otra vez en Conexión.', 'err');
     if (f.modo) {
         S.actuando = false;
         S.corriendoFuncion = true;
@@ -1928,7 +2016,7 @@ function funInfo(texto, tipo) {
 }
 
 function luzGuardada() {          // lo que queda guardado: las luces de la pantalla, o apagadas si la casilla está sin marcar
-    return S.funLuces ? fxLinea(S.efecto, S.brillo, coloresBase(), S.velFx) : fxLinea('fijo', 0, coloresBase(), 100);
+    return S.funLuces ? fxDe(funcionActual()) : fxLinea('fijo', 0, coloresBase(), 100);
 }
 
 function guardarFuncion() {
@@ -1936,6 +2024,7 @@ function guardarFuncion() {
     if (!f) return funInfo('Elige una función primero.', 'err');
     if (S.estado !== 'listo') return funInfo('Conecta el robot primero.', 'err');
     if (f.modo === 6) return funInfo('El seguidor de línea no se guarda en el robot: se inicia desde aquí.', 'err');
+    if (f.modo === 7) return funInfo('Esta función no se guarda sola: añádela a una serie de demostración y guarda la serie.', 'err');
     if (S.corriendoFuncion) paro();
     S.guardarEn = 0;
     const solo = S.funAuto ? 1 : 0;
@@ -1956,8 +2045,7 @@ function guardarFuncion() {
         ordenes = ['MODE 4', 'SPD ' + velAuto()].concat(musica, ['FSAVE ' + f.modo + ' ' + solo, 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]);
     } else {
         // una vuelta de la función (con la canción si está marcada) que el robot repite sin parar
-        const n = leerNotas(S.notas);
-        const { cmds, ms } = compilar({ notas: S.funMusica ? notasRobot(n.notas) : [], pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
+        const { cmds, ms } = compilar({ notas: notasDeFuncion(f, 0), pasos: pasosDeFuncion(f.pasos, S.giro90, S.bpm, 0), bpm: S.bpm, vel: S.vel, continuo: true });
         if (!ms) return funInfo('Esa función no tiene pasos.', 'err');
         const prog = programaParaRobot(cmds);
         if (!prog.cabe) return funInfo(`Es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): usa una canción más corta o quita la música.`, 'err');
@@ -2006,6 +2094,143 @@ function guardarBaile() {
 function borrarFuncionGuardada() {
     if (S.estado !== 'listo') return funInfo('Conecta el robot primero.', 'err');
     S.cola.enviar(['MODE 4', { l: 'FCLR', ex: true }, { l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }], () => funInfo('Se borró lo guardado en el robot (función y show).', 'ok'));
+}
+
+// ---- Serie de demostración: varias funciones una tras otra, en la página o guardadas en el robot ----
+
+function serieInfo(texto, tipo) {
+    const el = $('rb-serie-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function pararSerie() {
+    clearTimeout(S.serieT);
+    S.serieOn = false;
+    S.serieK = -1;
+}
+
+function pasoSerie(k) {
+    if (!S.serieOn) return;
+    const items = itemsDeSerie(S.serie, S.variante);
+    if (!items.length) { pararSerie(); return pintarSerie(); }
+    S.serieK = k % items.length;
+    const { f, seg } = items[S.serieK];
+    pintarSerie();
+    S.ultimaActividad = Date.now();
+    const luz = { l: lineaLuces(f), ex: true };
+    const siguiente = () => pasoSerie(S.serieK + 1);
+    S.actuando = false;
+    if (f.modo) {
+        S.autonomo = f.modo;
+        S.cola.enviar(['MODE 4'].concat(f.modo === 6 ? lineaOrdenes() : [], ['SPD ' + velAuto(), { l: 'MODE ' + f.modo, ex: true }, luz, 'VOL ' + S.vol]));
+        S.serieT = setTimeout(siguiente, seg * 1000);
+        return;
+    }
+    S.autonomo = 0;
+    const { cmds, ms } = armarFuncion(f, seg);
+    if (!ms) return siguiente();
+    S.cola.enviar(['MODE 4', luz, 'VOL ' + S.vol].concat(cmds), () => { if (S.serieOn) siguiente(); });
+}
+
+function esperarYSerie() {
+    if (S.cola.ocupado()) return setTimeout(esperarYSerie, 40);
+    iniciarSerie(true);
+}
+
+function iniciarSerie(listo) {
+    const items = itemsDeSerie(S.serie, S.variante);
+    if (!items.length) return serieInfo('Añade al menos una función a la serie.', 'err');
+    if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
+    if (!listo && (S.corriendoFuncion || S.actuando || S.serieOn)) {
+        paro();
+        return esperarYSerie();
+    }
+    if (items.some(x => x.f.modo === 6) && !S.fwLin) return serieInfo('El programa que lleva el robot no trae el seguidor de línea: instálalo otra vez en Conexión.', 'err');
+    if (items.some(x => x.f.modo === 7) && !S.fwPark) return serieInfo('El programa que lleva el robot no trae «Acercarse a la pared»: instálalo otra vez en Conexión.', 'err');
+    S.guardarEn = 0;
+    S.corriendoFuncion = true;
+    S.serieOn = true;
+    pasoSerie(0);
+    serieInfo('Serie en marcha: repite todo hasta que pulses Paro.', 'ok');
+}
+
+function guardarSerie() {
+    const items = itemsDeSerie(S.serie, S.variante);
+    if (!items.length) return serieInfo('Añade al menos una función a la serie.', 'err');
+    if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
+    if (!S.fwPark) return serieInfo('El programa que lleva el robot no sabe guardar series: instálalo otra vez en Conexión.', 'err');
+    const prog = programaDeSerie(items, { giro90: S.giro90, bpm: S.bpm, vel: S.vel, notasDe: notasDeFuncion });
+    if (!prog.cabe) return serieInfo(`La serie es demasiado larga para el robot (${prog.bytes} de ${PGM_MAX} bytes): quita funciones o baja los segundos.`, 'err');
+    if (S.corriendoFuncion || S.actuando || S.serieOn) paro();
+    S.guardarEn = 0;
+    const fx = { l: S.funLuces ? fxDe(null) : fxLinea('fijo', 0, coloresBase(), 100), ex: true };
+    serieInfo(`Guardando la serie (${items.length} funciones, ${prog.bytes} de ${PGM_MAX} bytes)… no lo desconectes.`);
+    S.cola.enviar(['MODE 4', 'SPD ' + velAuto(), { l: 'FCLR', ex: true }, 'PCLR'].concat(prog.lineas, ['PEND ' + ((S.serieAuto ? 1 : 0) | 2), 'VOL ' + S.vol, fx, { l: 'SAVE', ex: true }]), () => {
+        S.sucio = true;
+        serieInfo(`Listo: el robot ya hace la serie sin la página, una función tras otra y repitiéndola`
+            + (S.serieAuto ? ', y empieza sola 2,5 s después de encenderlo' : '')
+            + '. Con el botón de la placa se elige o se corta. Mientras esté conectado a la página no arranca sola.', 'ok');
+    });
+}
+
+function borrarSerieGuardada() {
+    if (S.estado !== 'listo') return serieInfo('Conecta el robot primero.', 'err');
+    S.cola.enviar(['MODE 4', { l: 'FCLR', ex: true }, { l: 'PCLR', ex: true }, { l: 'PEND 0', ex: true }], () => serieInfo('Se borró lo guardado en el robot (función, serie y show).', 'ok'));
+}
+
+function dibujarMapaSerie(items) {
+    const c = $('rb-serie-mapa');
+    const puntos = trazoDeSerie(items, S.giro90, RUTA_CM_S);
+    c.hidden = puntos.length < 3;
+    if (c.hidden) return;
+    const g = c.getContext('2d');
+    const xs = puntos.map(p => p.x), ys = puntos.map(p => p.y);
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const ancho = Math.max(Math.max(...xs) - x0, Math.max(...ys) - y0, 40);
+    const k = (c.width - 24) / ancho;
+    const px = p => 12 + (p.x - x0) * k, py = p => 12 + (p.y - y0) * k;
+    const estilo = getComputedStyle(document.documentElement);
+    g.clearRect(0, 0, c.width, c.height);
+    g.lineWidth = 2;
+    g.lineJoin = 'round';
+    g.strokeStyle = estilo.getPropertyValue('--primary').trim() || '#2a6';
+    g.beginPath();
+    puntos.forEach((p, i) => (i ? g.lineTo(px(p), py(p)) : g.moveTo(px(p), py(p))));
+    g.stroke();
+    const punto = (p, color) => { g.fillStyle = color; g.beginPath(); g.arc(px(p), py(p), 5, 0, Math.PI * 2); g.fill(); };
+    punto(puntos[0], '#2a9d4a');
+    punto(puntos[puntos.length - 1], '#d33');
+}
+
+function pintarSerie() {
+    const items = itemsDeSerie(S.serie, S.variante);
+    const f = funcionActual();
+    const add = $('rb-serie-add');
+    add.textContent = f ? `Añadir «${f.nombre}»` : 'Elige una función arriba para añadirla';
+    add.disabled = !f || S.serie.length >= SERIE_MAX;
+    $('rb-serie-lista').innerHTML = items.length ? items.map((x, n) =>
+        `<li class="rb-serie__it${S.serieOn && S.serieK === n ? ' is-activa' : ''}" data-i="${x.i}">`
+        + `<span class="rb-serie__n">${n + 1}</span><b>${x.f.nombre}</b>`
+        + `<label class="rb-serie__seg"><input type="number" inputmode="numeric" min="1" max="255" value="${x.seg}" data-seg aria-label="Segundos de ${x.f.nombre}"> s</label>`
+        + `<button type="button" class="btn btn--secondary btn--sm" data-acc="sube" aria-label="Subir"${n ? '' : ' disabled'}>↑</button>`
+        + `<button type="button" class="btn btn--secondary btn--sm" data-acc="baja" aria-label="Bajar"${n < items.length - 1 ? '' : ' disabled'}>↓</button>`
+        + `<button type="button" class="btn btn--secondary btn--sm" data-acc="quita">Quitar</button></li>`).join('')
+        : '<li class="hint">La serie está vacía.</li>';
+    $('rb-serie-auto').checked = S.serieAuto;
+    const total = items.reduce((a, x) => a + x.seg, 0);
+    $('rb-serie-total').textContent = items.length ? `${items.length} función(es), ${total} s en total por vuelta` : '';
+    dibujarMapaSerie(items);
+}
+
+function editarSerie(i, acc) {
+    const items = itemsDeSerie(S.serie, S.variante);
+    const n = items.findIndex(x => x.i === i);
+    const vecino = items[acc === 'sube' ? n - 1 : n + 1];
+    if (acc === 'quita') S.serie.splice(i, 1);
+    else if (vecino) [S.serie[i], S.serie[vecino.i]] = [S.serie[vecino.i], S.serie[i]];
+    guardar();
+    pintarSerie();
 }
 
 // Poner una función quita el baile (los dos mueven las ruedas): queda en "Solo luces" y sin pasos.
@@ -2235,10 +2460,14 @@ function pintarFunciones() {
     $('rb-fn-giro').disabled = !!(f && f.modo);                // las de sensor no giran por tiempo
     const op = $('rb-cancion').selectedOptions[0];
     $('rb-fn-cancion').textContent = op ? op.textContent : '';
+    pintarSerie();
 }
 
 function paro() {
     document.dispatchEvent(new CustomEvent('robot-paro'));
+    const habiaSerie = S.serieOn;
+    pararSerie();
+    if (habiaSerie) pintarSerie();
     pararRuleta();
     pararMusicaAutonoma();
     S.ultimaActividad = Date.now();
@@ -3179,6 +3408,30 @@ function iniciar() {
     $('rb-rul-girar').addEventListener('click', () => { if (S.ruleta) paro(); else girarRuleta(Number($('rb-rul-dur').value) || 8); });
     $('rb-rul-sonido').addEventListener('change', e => { S.ruletaSonido = e.target.checked; });
     $('rb-fn-guardar').addEventListener('click', guardarFuncion);
+    $('rb-serie-add').addEventListener('click', () => {
+        const f = funcionActual();
+        if (!f || S.serie.length >= SERIE_MAX) return;
+        S.serie.push({ id: f.id, seg: 20 });
+        guardar();
+        pintarSerie();
+        serieInfo(`«${f.nombre}» añadida a la serie.`, 'ok');
+    });
+    $('rb-serie-lista').addEventListener('click', e => {
+        const b = e.target.closest('[data-acc]');
+        const li = e.target.closest('li[data-i]');
+        if (b && li && !b.disabled) editarSerie(Number(li.dataset.i), b.dataset.acc);
+    });
+    $('rb-serie-lista').addEventListener('change', e => {
+        const li = e.target.closest('li[data-i]');
+        if (!li || !e.target.matches('[data-seg]') || !S.serie[li.dataset.i]) return;
+        S.serie[li.dataset.i].seg = clamp(Math.round(Number(e.target.value)) || 20, 1, 255);
+        guardar();
+        pintarSerie();
+    });
+    $('rb-serie-play').addEventListener('click', () => iniciarSerie());
+    $('rb-serie-guardar').addEventListener('click', guardarSerie);
+    $('rb-serie-borrar').addEventListener('click', borrarSerieGuardada);
+    $('rb-serie-auto').addEventListener('change', e => { S.serieAuto = e.target.checked; guardar(); });
     $('rb-baile-guardar').addEventListener('click', guardarBaile);
     $('rb-baile-auto').addEventListener('change', e => { S.baileAuto = e.target.checked; guardar(); });
     $('rb-fn-trim').addEventListener('input', e => {

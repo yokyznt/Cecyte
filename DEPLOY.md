@@ -204,7 +204,14 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
   cada página haya pasado. Si una subida falla, hay que repetirla entera desde una sesión
   nueva. Además el sketch apaga el watchdog al arrancar (`.init3`) y no usa floats, `math.h`,
   `random()` ni las clases de encoders/zumbador/ultrasonido de Makeblock, para que quepa en
-  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa ~14 KB.
+  menos de 64 páginas (16 KB) y no tocar la zona alta; hoy ocupa 16 090 bytes de los 16 384 y se compila con
+  `-mcall-prologues` (`--build-property compiler.cpp.extra_flags=-mcall-prologues` y lo mismo con `compiler.c.extra_flags`);
+  sin esa bandera ya no cabe.
+- **Serie de demostración:** en Funciones se arma una lista (función + segundos) que la página reproduce sola o guarda
+  como un único show en el robot (`PADD O modo s` para las de sensor, órdenes `M`/`W`/`T` para las demás). El robot la
+  repite hasta cortarla con el botón o un `!`. Modo 7 = «Acercarse a la pared» (se detiene a 10 cm pitando más rápido).
+  `INFO` trae `PARK=1` cuando el programa los entiende.
+- **Giro con giroscopio:** no cabe en la flash de esta placa (~900 bytes); los giros siguen siendo por tiempo (`giro90`).
 - **Pruebas:** `node test/robot.test.js`.
 
 ## Pendiente
@@ -212,7 +219,7 @@ Después, al abrir la pestaña con el robot enchufado, se conecta solo.
 - **Seguir la línea:** se quitó del robot y de la página (el módulo Me Line Follower en el puerto 9 comparte pin con el
   botón de la placa y con solo dos sensores no se distingue "centrada" de "perdida"). Se retomará al armar el Dashing
   Raptor. El historial de git (PR #16, #28 a #31) conserva el código, con el registro `LOG` para afinarlo.
-- El firmware ocupa unos 14 KB de los 16 KB (64 páginas) que admite esta placa; ver la nota del flasheo.
+- El firmware ocupa 16 090 de los 16 384 bytes (64 páginas) que admite esta placa: casi no queda margen; ver la nota del flasheo.
 
 ## Alumnos: instalable, sin conexión, modo oscuro y calendario
 

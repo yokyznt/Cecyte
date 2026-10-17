@@ -34,6 +34,8 @@
     BAT              responde "BAT 7.42" (voltaje de la batería)
     DIST             responde "DIST 23" (cm al obstáculo de enfrente; 400 = sin eco). El mando lo usa para frenar solo
     LINEA clave valor ajustes del seguidor de línea (puerto 9): vel 40..150, giro 10..100, buscar ms, color 0/1
+    MODE 7          se acerca despacio a lo de enfrente y se detiene a 10 cm, pitando más rápido al acercarse (PARK=1 en INFO)
+    PADD O modo s    en el show: corre el modo (1, 2, 6 o 7) durante s segundos (1..255) y sigue con lo siguiente
     SENS             responde "SENS 01": lo que ven los dos sensores de línea (1 = nivel alto)
     DIR i|d|x|o      direccional izquierda, derecha, intermitentes o apagar (se apaga sola a los 4 s sin repetir)
     LUZ f|r|o        luz de freno (roja), de reversa (blanca con pitido) o apagar
@@ -157,6 +159,7 @@ const int PIN_LEDS = 44;
 const int MODO_WEB = 4;
 const int MODO_SHOW = 5;             // el show guardado en la EEPROM: suena y baila solo
 const int MODO_LINEA = 6;            // seguir la línea con el módulo Me Line Follower del puerto 9 (solo por la página)
+const int MODO_PARK = 7;
 bool lnUsa = false;                  // la página ya habló del módulo: el puerto 9 comparte el pin A7 con el botón de la placa
 unsigned long lnT0 = 0;
 const unsigned long SIN_ORDENES_MS = 3000;
@@ -211,14 +214,9 @@ void imprimeDec(int centesimas, int decimales) {          // 742 -> "7.42" (2 de
 // El bootloader de esta placa borra MCUSR antes de arrancar el sketch, así que no se puede saber por
 // qué se reinició; en su lugar se cuenta: BOOT = arranques (conectar por USB cuenta uno), BTN = veces
 // que el botón cambió de modo, RUN = pasadas del show, MIN = voltaje más bajo con las ruedas andando (x10).
-const int EE_BOOT = 2980, EE_BTN = 2981, EE_RUN = 2982, EE_MIN = 2983;
+const int EE_BOOT = 2980;
 uint8_t cuentaEE(int dir) { uint8_t v = EEPROM.read(dir); return v == 0xFF ? 0 : v; }
 void sumaEE(int dir) { uint8_t v = cuentaEE(dir); if (v < 254) EEPROM.update(dir, v + 1); }
-void notaBateria() {
-  uint8_t d = (uint8_t)constrain(bateriaCv() / 10, 0, 254);
-  uint8_t m = EEPROM.read(EE_MIN);
-  if (m == 0xFF || d < m) EEPROM.update(EE_MIN, d);
-}
 
 // izq y der: positivo = esa rueda va hacia adelante.
 // Las ruedas suben en rampa (16 de PWM cada 12 ms): pedirle de golpe toda la corriente a la batería
@@ -226,10 +224,9 @@ void notaBateria() {
 // motores() solo fija el objetivo; la rampa avanza dentro de drenar(), que corre en toda espera y en
 // todo tono, así no se frena la música.
 int izqAct = 0, derAct = 0, izqObj = 0, derObj = 0;
-unsigned long rampaT = 0, bateriaT = 0;
+unsigned long rampaT = 0;
 void rampa() {
   unsigned long t = millis();
-  if (moviendo && t - bateriaT > 50) { bateriaT = t; notaBateria(); }
   if ((izqAct == izqObj && derAct == derObj) || t - rampaT < 12) return;
   rampaT = t;
   // arranque suave: con 30 por paso los motores pedían de golpe tanta corriente que, a pilas y sin USB, el
@@ -710,6 +707,35 @@ void seguirLinea() {
   if (lnS < 0) motores(v - c, v); else motores(v, v - c);
 }
 
+unsigned long parkT = 0, parkBip = 0;
+void parkPaso() {
+  const unsigned long t = millis();
+  if (t - parkT < 60) return;
+  parkT = t;
+  const int d = distanciaCm();
+  if (d <= 10) {
+    parar();
+    tono(1500, 300);
+    modo = 0;
+    return;
+  }
+  adelante(d > 40 ? 130 : 110);
+  if (volumen && (long)(t - parkBip) >= 0) {
+    tonoInicia(1200);
+    tonoFin = t + 40;
+    parkBip = t + constrain(d * 8, 80, 700);
+  }
+}
+
+void pasoModo() {
+  switch (modo) {
+    case 1: esquivar(); break;
+    case 2: seguir(); break;
+    case MODO_LINEA: seguirLinea(); break;
+    case MODO_PARK: parkPaso(); break;
+  }
+}
+
 // ---------- Guardar el efecto: al encender, el robot lo vuelve a poner ----------
 const int EE_DIR = 3000;
 const uint8_t EE_MAGICO = 0xA7;
@@ -788,7 +814,6 @@ bool showCortar() {
   if (abortar || colaN > 0) return true;
   if (botonFlanco() && botonSostenido()) {
     ultimoBoton = millis();
-    sumaEE(EE_BTN);
     modo = 0;
     aplicaModo();
     Serial.print(F("BTN "));
@@ -805,7 +830,6 @@ void correShow() {
   Serial.println(F("SHOW inicio"));
   do {
     int p = 0;
-    sumaEE(EE_RUN);
     while (p < largo && modo == MODO_SHOW) {
       uint8_t op = EEPROM.read(PGM_DIR + 4 + p++);
       if (op == 1 && p + 4 <= largo) {
@@ -824,6 +848,21 @@ void correShow() {
         motores(constrain(izq, -VEL_MAX, VEL_MAX), constrain(der, -VEL_MAX, VEL_MAX));
       } else if (op == 4) {
         parar();
+      } else if (op == 5 && p + 2 <= largo) {
+        const int m = EEPROM.read(PGM_DIR + 4 + p);
+        const unsigned long fin = millis() + 1000UL * EEPROM.read(PGM_DIR + 4 + p + 1);
+        p += 2;
+        modo = m;
+        aplicaModo();
+        bool corta = false;
+        while ((long)(millis() - fin) < 0 && modo == m) {
+          pasoModo();
+          fxPaso();
+          if (showCortar()) { corta = true; break; }
+        }
+        parar();
+        if (corta) { modo = 0; break; }
+        modo = MODO_SHOW;
       } else {
         break;                               // dato raro: se termina el show
       }
@@ -864,20 +903,13 @@ void fnCargar() {
 
 // ---------- Órdenes ----------
 void imprimeInfo() {
-  uint8_t minimo = EEPROM.read(EE_MIN);
   Serial.print(F("INFO BOOT="));
   Serial.print(cuentaEE(EE_BOOT));
-  Serial.print(F(" BTN="));
-  Serial.print(cuentaEE(EE_BTN));
-  Serial.print(F(" RUN="));
-  Serial.print(cuentaEE(EE_RUN));
-  Serial.print(F(" MIN="));
-  imprimeDec(minimo == 0xFF ? 0 : minimo, 1);
   Serial.print(F(" BAT="));
   imprimeDec(bateriaCv(), 2);
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
-  Serial.print(F(" DIST=1 DIR=1 LIN=1"));
+  Serial.print(F(" DIST=1 DIR=1 LIN=1 PARK=1"));
   Serial.println();
 }
 
@@ -991,7 +1023,7 @@ void ejecuta(char *s) {
     Serial.print(digitalRead(LN_S1));
     Serial.println(digitalRead(LN_S2));
   } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
-    for (int dir = EE_BOOT; dir <= EE_MIN; dir++) EEPROM.update(dir, 0xFF);
+    EEPROM.update(EE_BOOT, 0xFF);
     ok();
   } else if (!strcmp(cmd, "PCLR")) {
     EEPROM.update(PGM_DIR, 0);                 // el show queda inválido hasta que PEND lo cierre
@@ -1010,6 +1042,8 @@ void ejecuta(char *s) {
       bien = pgmPon(3) && pgmPon((uint8_t)(int8_t)izq) && pgmPon((uint8_t)(int8_t)der);
     } else if (!strcmp(a, "S")) {
       bien = pgmPon(4);
+    } else if (!strcmp(a, "O") && b && c) {
+      bien = pgmPon(5) && pgmPon(constrain(atoi(b), 0, MODO_PARK)) && pgmPon(constrain(atoi(c), 1, 255));
     }
     if (bien) ok(); else err(F("show"));
   } else if (!strcmp(cmd, "PEND")) {
@@ -1029,7 +1063,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "MODE") && a) {
     int n = atoi(a);
-    if (n < 0 || n > MODO_LINEA) { err(F("modo")); }
+    if (n < 0 || n > MODO_PARK) { err(F("modo")); }
     else {
       modo = n;
       aplicaModo();
@@ -1116,7 +1150,6 @@ void loop() {
   const bool paginaAlMando = ultimaOrden != 0 && millis() - ultimaOrden < 15000UL;
   if (!paginaAlMando && botonFlanco() && botonSostenido() && millis() - ultimoBoton > 300) {
     ultimoBoton = millis();
-    sumaEE(EE_BTN);
     if (modo == 3 && pgmValido()) { modo = MODO_SHOW; showT0 = millis() + 600; }
     else modo = (modo >= 3) ? 0 : modo + 1;
     aplicaModo();
@@ -1132,12 +1165,9 @@ void loop() {
   }
 
   switch (modo) {
-    case 1: esquivar();    break;
-    case 2: seguir();      break;
     case 3: testMotores(); break;
     case MODO_SHOW: if ((long)(millis() - showT0) >= 0) correShow(); break;
-    case MODO_LINEA: seguirLinea(); break;
-    default: break;
+    default: pasoModo(); break;
   }
 
   // Seguro: si la página se calla con los motores andando, se paran solos
