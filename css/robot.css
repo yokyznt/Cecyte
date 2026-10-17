@@ -557,7 +557,6 @@
     .es-app .rb-ent-frase.is-cambia { animation: app-frase 400ms var(--ease-out); }
     @keyframes app-frase { from { opacity: 0; transform: translateX(30px) scale(0.98); } }
     .es-app .rb-ent-botones .btn.is-grabando, .es-app .rb-ent-audio .btn.is-grabando { animation: rb-latido 0.9s ease-in-out infinite; }
-    .es-app .rb-ent-prog progress::-webkit-progress-value { transition: width 420ms var(--ease-out); }
 
     .es-app .rb-barra { animation: app-barra 560ms var(--resorte) backwards; }
     @keyframes app-barra { from { transform: translateY(130%); opacity: 0; } }
