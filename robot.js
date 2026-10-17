@@ -403,6 +403,14 @@ const FUNCIONES = [
     { id: 'mirada', v: ['pajaro'], nombre: 'Mirar a los lados', desc: 'Gira un poco a un lado, luego al otro y regresa al centro.', pasos: 'GI 20° PA 0.8 GD 40° PA 0.8 GI 20° PA 1.2' },
 ];
 
+const GRUPOS_FN = [
+    { id: 'sensor', nombre: 'Con sensor: la hace el robot solo', ids: ['esquivar', 'mano'] },
+    { id: 'rectas', nombre: 'Rectas y patrullas', ids: ['avanzar', 'cuadrado', 'idavuelta', 'vigilante'] },
+    { id: 'curvas', nombre: 'Curvas', ids: ['zigzag', 'circulos', 'ocho', 'slalom'] },
+    { id: 'giros', nombre: 'Giros y trucos', ids: ['trompo', 'arrancon', 'derrape'] },
+    { id: 'suave', nombre: 'Movimientos suaves', ids: ['picoteo', 'paso', 'mirada'] },
+];
+
 // Pasos de una función ya en tiempos del bpm dado (para que compilar() los pueda mezclar con una canción)
 // y repetidos hasta cubrir al menos minS segundos, así la página no tiene que reiniciarlos a cada rato.
 function pasosDeFuncion(texto, giro90 = 500, bpm = 120, minS = 30) {
@@ -1146,7 +1154,7 @@ const lib = {
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz,
     BAUDIOS, VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX, TONOS_RITMO,
-    PGM_MAX, VARIANTES, FUNCIONES, pasosDeFuncion, realzarNotas,
+    PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, senalesDeMovimiento,
     hsv, hexARgb, marcoHex, fxLinea, ritmoATexto, programaParaRobot,
     melodiaDeAudio, melodiaDeAudioGen, melodiaAuto, melodiaAutoGen, melodiaDeMidi, nombreMidi, grabacionATexto, TECLAS_PIANO,
@@ -1812,11 +1820,18 @@ function pintarFunciones() {
     const f = funcionActual();
     $('rb-fn-var').value = v.id;
     $('rb-fn-nota').textContent = v.nota;
-    const lista = [{ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' }]
-        .concat(FUNCIONES.filter(x => x.v.includes(v.id)));
-    $('rb-fn-lista').innerHTML = lista.map(x =>
-        `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${x.id === S.funcion ? ' checked' : ''}>`
-        + `<span><b>${x.nombre}</b><small>${x.desc}${x.modo ? ' <em>La hace el robot solo.</em>' : ''}</small></span></label>`).join('');
+    const tarjeta = x => `<label class="rb-fn"><input type="radio" name="rb-fn" value="${x.id}"${x.id === S.funcion ? ' checked' : ''}>`
+        + `<span class="rb-fn__ico"><svg class="icon" aria-hidden="true"><use href="#i-fn-${x.id || 'ninguna'}"/></svg></span>`
+        + `<b>${x.nombre}</b><small>${x.desc}</small>${x.modo ? '<em class="rb-fn__tag">La hace el robot solo</em>' : ''}</label>`;
+    const ninguna = tarjeta({ id: '', nombre: 'Ninguna', desc: 'El robot solo hace lo que le mandes desde las otras secciones.' });
+    const grupos = GRUPOS_FN.map(g => {
+        const fs = FUNCIONES.filter(x => x.v.includes(v.id) && g.ids.includes(x.id));
+        return fs.length ? `<h4 class="rb-fn-t">${g.nombre}</h4><div class="rb-fn-rejilla">${fs.map(tarjeta).join('')}</div>` : '';
+    }).join('');
+    $('rb-fn-lista').innerHTML = `<div class="rb-fn-rejilla">${ninguna}</div>${grupos}`;
+    $('rb-fn-modelos').innerHTML = VARIANTES.map(x =>
+        `<button type="button" role="radio" class="rb-modelo" data-v="${x.id}" aria-checked="${x.id === v.id}">`
+        + `<svg class="icon" aria-hidden="true"><use href="#i-mod-${x.id}"/></svg><span>${x.nombre}</span></button>`).join('');
     $('rb-fn-luces').checked = S.funLuces;
     $('rb-fn-auto').checked = S.funAuto;
     $('rb-baile-auto').checked = S.baileAuto;
@@ -1833,6 +1848,7 @@ function pintarFunciones() {
 }
 
 function paro() {
+    document.dispatchEvent(new CustomEvent('robot-paro'));
     pararMusicaAutonoma();
     S.ultimaActividad = Date.now();
     S.actuando = false;
@@ -2463,7 +2479,7 @@ function seccionRobotActual() {
 function pintarBarra() {
     const sec = seccionRobotActual();
     $('rb-barra-que').textContent = QUE_REPRODUCE[sec] || 'nada';
-    $('rb-barra-play').disabled = sec === 'robot-instalar' || sec === 'robot-control';
+    $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar'].includes(sec);
 }
 
 // Con el robot conectado se reproduce en el robot; si no, la música suena en la página
@@ -2619,6 +2635,12 @@ function iniciar() {
     $('rb-fn-vel').addEventListener('input', ponVel);
 
     // Funciones por modelo
+    $('rb-fn-modelos').addEventListener('click', e => {
+        const b = e.target.closest('[data-v]');
+        if (!b) return;
+        $('rb-fn-var').value = b.dataset.v;
+        $('rb-fn-var').dispatchEvent(new Event('change'));
+    });
     $('rb-fn-var').addEventListener('change', e => {
         if (S.corriendoFuncion) paro();
         S.variante = e.target.value;
