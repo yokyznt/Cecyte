@@ -1200,7 +1200,7 @@ function numerosEnPalabras(t) {
     return sal.join(' ');
 }
 
-const NOMBRE_VOZ = /^(?:(?:oye|hey|ok|okay|hola|eh|buenas|que onda|quihubo)\s+)?(?:(?:y|ll|j)o ?(?:k|qu|ck|c)[iey]s?z?)\b[,.]?\s*/;
+const SALUDOS_VOZ = /^(?:(?:oye|hey|ey|ok|okay|hola|eh|buenas|que onda|quihubo|quiubo|escucha|pues|bueno|a ver|dime)\s+)+/;
 const COLORES_VOZ = {
     rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
     verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
@@ -1220,13 +1220,75 @@ const CANCIONES_VOZ = [
     ['alegria', /alegria|beethoven/], ['jingle', /jingle|navidad|campanas/], ['elisa', /elisa/], ['santiago', /santiago|fray/], ['escala', /escala|afinar/],
 ];
 
+function fonetica(p) {
+    return String(p || '').replace(/ch/g, '#').replace(/ll/g, 'y').replace(/qu/g, 'k').replace(/gu([ei])/g, 'g$1').replace(/g([ei])/g, 'j$1')
+        .replace(/c([ei])/g, 's$1').replace(/c/g, 'k').replace(/z/g, 's').replace(/v/g, 'b').replace(/h/g, '').replace(/x/g, 'ks')
+        .replace(/w/g, 'u').replace(/(.)\1+/g, '$1');
+}
+
+function distancia(a, b) {
+    let fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        const nueva = [i];
+        for (let j = 1; j <= b.length; j++) nueva[j] = Math.min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        fila = nueva;
+    }
+    return fila[b.length];
+}
+
+function quitarNombre(t) {
+    const sin = t.replace(SALUDOS_VOZ, '');
+    const w = sin.split(' ');
+    if (!/^(y|j|ll)/.test(w[0])) return null;
+    for (let n = 1; n <= 3 && n <= w.length; n++) {
+        const f = fonetica(w.slice(0, n).join('')).replace(/^j/, 'y');
+        if (/^y[aou]?[kg][ie]{1,2}y?s?$/.test(f)) return w.slice(n).join(' ');
+    }
+    return null;
+}
+
+const VOCABULARIO_VOZ = (
+    'avanza avanzar adelante atras reversa retrocede retroceder camina caminar anda andar sigue seguir derecho recto muevete mover hacia ' +
+    'metro metros centimetros segundo segundos medio vuelta gira girar gire giro voltea voltear dobla doblar rota rotar vira virar ' +
+    'izquierda izquierdo derecha grados completa para alto detente detener frena frenar stop basta quieto quieta espera ' +
+    'luz luces foco focos ilumina enciende prende apaga apagar quita quitar desactiva activa activar rojo roja rojas rojos azul azules verde verdes ' +
+    'amarillo amarilla naranja morado morada rosa blanco blanca respira respirar pulso persecucion arcoiris ' +
+    'baila bailar baile bailando cancion canciones musica melodia toca tocar pon poner reproduce canta cantar suena estrellita cumpleanos ' +
+    'cucaracha alegria jingle navidad elisa santiago escala esquivar esquiva obstaculos evita sigueme linea lineas seguidor trompo zigzag ' +
+    'slalom derrape arrancon vigilante circulos circulo pajarito patrulla cuadrada cuadrado triangulo estrella funcion modo inicia iniciar ' +
+    'ejecuta empieza arranca guardia vigila vigilar radar escanea escaner turbo casa claxon pito bocina bateria pilas carga ruleta casino ' +
+    'apuesta chiste chistes hora fecha gracias adios fact facto dato curioso hola quien eres ayuda comandos presentate'
+).split(' ');
+const VOCABULARIO_CLAVES = VOCABULARIO_VOZ.map(w => [w, fonetica(w)]);
+const PROTEGIDAS_VOZ = new Set(Object.keys(NUMEROS_VOZ).concat((
+    'para por favor que como cual cuando cuanta cuantas cuanto cuantos tienes tiene quedan queda falta donde esta estas estoy este esto eso esa ese una uno unos unas los las del con sin sobre tras hasta desde ' +
+    'entre mas menos muy tan tanto pero porque pues tambien ahora antes luego siempre nunca algo nada todo toda todos cada otra otro tiene tienes ' +
+    'tengo puedo puedes quiero quieres dame hazme hace haces hacer dice dices dijo vamos mismo misma poco mucho mucha bien mejor peor buen buena ' +
+    'dias hoy manana noche tarde tardes noches nombre amigo robot carro cosa cosas pasos lado lados arriba abajo cerca lejos dentro fuera aqui ' +
+    'alli alla veces vez rato momento primero segunda tercero luego despues enfrente atras'
+).split(' ')));
+
+function corregirPalabra(w) {
+    if (w.length < 3 || VOCABULARIO_VOZ.includes(w) || PROTEGIDAS_VOZ.has(w)) return w;
+    const k = fonetica(w), tope = k.length >= 8 ? 2 : k.length >= 5 ? 1 : 0;
+    let mejor = null, d = tope + 1, empate = false;
+    for (const [v, kv] of VOCABULARIO_CLAVES) {
+        if (Math.abs(kv.length - k.length) > tope) continue;
+        const x = distancia(k, kv);
+        if (x < d) { d = x; mejor = v; empate = false; } else if (x === d && v !== mejor) empate = true;
+    }
+    return mejor && d <= tope && !(empate && d > 0) ? mejor : w;
+}
+
+function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
+
 function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
-    const nombre = t.match(NOMBRE_VOZ);
-    if (!nombre) return { a: 'sinNombre' };
-    t = t.slice(nombre[0].length)
+    const resto = quitarNombre(t);
+    if (resto === null) return { a: 'sinNombre' };
+    t = corregirVocabulario(resto
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
-        .replace(/\s+/g, ' ').trim();
+        .replace(/\s+/g, ' ').trim());
     if (!t) return { a: 'saludo' };
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
@@ -1301,6 +1363,58 @@ function ordenDeVoz(texto) {
     return null;
 }
 
+const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
+const CHARLAS_IA = ['gracias', 'estado', 'chiste', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja', 'fact'];
+const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
+const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
+
+function promptIA() {
+    return [
+        'Eres el intérprete de voz de Yokis, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores).',
+        'El robot solo obedece si la frase empieza llamándolo «Yokis». El micrófono lo escribe como: yakis, yo kiss, yoquis, jokis, llokis, yoki, jockeys, yo que is. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
+        'Contesta SOLO un JSON con una de estas acciones (sin texto extra):',
+        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
+        '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
+        '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
+        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
+        '{"a":"turbo","on":true|false} · {"a":"guardia","on":true|false}',
+        '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"' + COLORES_IA.join('|') + '|apagado"}  el color solo va con el efecto fijo',
+        '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
+        '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
+        '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
+        '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación: gracias, cómo estás, chiste, hora, fecha, quién eres, ayuda, adiós, elogio, queja, un fact o dato curioso',
+        'Si la frase tiene el nombre pero no pide nada que el robot pueda hacer, contesta {"a":"noEntendi"}.',
+    ].join('\n');
+}
+
+function validarOrdenIA(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    const a = String(o.a);
+    const num = (v, lo, hi) => { const n = Number(v); return v !== null && v !== undefined && Number.isFinite(n) ? clamp(n, lo, hi) : null; };
+    switch (a) {
+        case 'mover': return { a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) };
+        case 'giro': { const g = num(o.grados, -720, 720); return g ? { a, grados: Math.round(g) } : null; }
+        case 'figura': return FIGURAS_IA.includes(o.f) ? { a, f: o.f } : null;
+        case 'casa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
+        case 'turbo': case 'guardia': return { a, on: o.on !== false };
+        case 'luces': {
+            if (!EFECTOS_IA.includes(o.efecto)) return null;
+            if (o.efecto !== 'fijo') return { a, efecto: o.efecto };
+            const c = sinAcentos(o.color);
+            const color = c === 'apagado' ? '#000000' : Object.prototype.hasOwnProperty.call(COLORES_VOZ, c) ? COLORES_VOZ[c] : null;
+            return color ? { a, efecto: 'fijo', color } : null;
+        }
+        case 'baile': return { a, id: BAILES_VOZ.some(b => b[0] === o.id) ? o.id : null, cancion: CANCIONES_VOZ.some(c => c[0] === o.cancion) ? o.cancion : null };
+        case 'funcion': return FUNCIONES.some(f => f.id === o.id) ? { a, id: o.id } : null;
+        case 'cancion': {
+            const id = CANCIONES_VOZ.some(c => c[0] === o.id) ? o.id : null;
+            return id ? { a, id } : { a, id: null, q: sinAcentos(o.q).slice(0, 40) };
+        }
+        case 'charla': return CHARLAS_IA.includes(o.t) ? { a, t: o.t } : null;
+        default: return null;
+    }
+}
+
 // ---------- Freno por obstáculo del mando ----------
 // Si va hacia adelante y las dos últimas lecturas de DIST están más cerca que el umbral (15 cm; 35 en turbo, que frena peor),
 // no avanza. Retroceder y girar en el sitio siguen permitidos. Una lectura vieja (el robot dejó de contestar) no frena:
@@ -1364,7 +1478,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

@@ -23,7 +23,7 @@
         dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo respecto al teléfono y el robot gira hacia él y avanza
         estilo: 'palanca', pad: new Map(), px: 0, py: 0,   // estilo de control (palanca, flechas o pedales): botones sostenidos y su aceleración gradual
         sIzq: 0, sDer: 0,                  // salida suavizada de las ruedas
-        fi: 0, fi0: 0, brujulaT: 0,        // hacia dónde apunta el teléfono (brújula, siempre al día), y hacia dónde apuntaba al alinear
+        fi: 0, fiF: 0, fi0: 0, brujulaT: 0,   // fiF: el rumbo del teléfono sin temblor (solo se mueve cuando cambia más de 5°)        // hacia dónde apunta el teléfono (brújula, siempre al día), y hacia dónde apuntaba al alinear
         inclinar: false, ref: null, armaEn: 0, g: { x: 0, y: 0, z: 0 }, tilt: { x: 0, y: 0 },
         activa: false, claxon: null, vigila: null,
         turbo: false, vmaxPrev: 60, luzPrev: null, carga: 0, enfriaHasta: 0, ultimaRev: 0,
@@ -140,7 +140,7 @@
             if (C.movido) { enlace().rumbo(0, 0); C.movido = false; C.ultimo = ''; C.ultimoEnvio = ahora; }
             return;
         }
-        const g = Math.round(raiz.Robot.rumboRelativo(hayBrujula() ? C.fi : C.fi0, r.grados, C.fi0) / 2) * 2, v = Math.round(r.v / 5) * 5;
+        const g = Math.round(raiz.Robot.rumboRelativo(hayBrujula() ? C.fiF : C.fi0, r.grados, C.fi0) / 2) * 2, v = Math.round(r.v / 5) * 5;
         if (C.turbo) guardaCalor({ izq: v, der: v }, ahora);
         C.movido = true;
         const clave = g + ',' + v;
@@ -160,14 +160,21 @@
             const ang = (raiz.screen && raiz.screen.orientation && raiz.screen.orientation.angle) || 0;
             const fi = raiz.Robot.rumboDeOrientacion(e.alpha, e.beta, e.gamma, ang);
             if (fi === null) return;
-            C.fi = hayBrujula() ? (C.fi + ((fi - C.fi + 540) % 360 - 180) * 0.3 + 360) % 360 : fi;
+            const primera = !hayBrujula();
+            C.fi = primera ? fi : (C.fi + ((fi - C.fi + 540) % 360 - 180) * 0.3 + 360) % 360;
+            if (primera) C.fiF = C.fi;
+            else {
+                const d = (C.fi - C.fiF + 540) % 360 - 180;
+                if (d > 5) C.fiF = (C.fiF + d - 5 + 360) % 360;
+                else if (d < -5) C.fiF = (C.fiF + d + 5 + 360) % 360;
+            }
             C.brujulaT = Date.now();
         }, true);
     }
 
     function alinearRumbo() {
         frenar(false);
-        C.fi0 = hayBrujula() ? C.fi : 0;
+        C.fi0 = hayBrujula() ? C.fiF : 0;
         C.dirListoEn = Date.now() + 900;
         if (listo()) enlace().rumboIniciar(true);
         vibrar([20, 30, 20]);
@@ -178,11 +185,12 @@
         const e = enlace();
         if (si && !(listo() && e.soportaRumbo && e.soportaRumbo())) { vibrar([30, 40, 30]); return; }
         if (si && C.inclinar) ponerInclinar(false);
+        if (si) { cerrarMenus(null); pararGrabacion(true); }
         frenar(false);
         C.dirModo = si;
         $('rb-mando').classList.toggle('es-dir', si);
         C.dirListoEn = si ? Date.now() + 900 : 0;
-        if (si) C.fi0 = hayBrujula() ? C.fi : 0;
+        if (si) C.fi0 = hayBrujula() ? C.fiF : 0;
         if (listo()) e.rumboIniciar(si);
         vibrar(si ? [20, 30, 20] : 14);
         pintarCel();

@@ -496,6 +496,11 @@
 .rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara { translate: none; grid-area: 1 / auto; }
 .rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara.is-down, .rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara:active { translate: 0 4px; }
 
+/* Cada botón sale solo en los modos donde sirve: inclinar el celular no usa palanca, flechas ni pedales; el modo dirección no
+   graba recorridos ni lleva el freno automático (el robot no sabe hacia dónde mira el sensor mientras gira) */
+.rb-mando.es-incl .rb-estilo { display: none; }
+.rb-mando.es-dir #rb-ctl-ruta, .rb-mando.es-dir .rb-freno { display: none; }
+
 /* Sin enlace: lo que depende del robot se ve apagado; el paro siempre queda vivo */
 .is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl, .is-sin-enlace .rb-flechas, .is-sin-enlace .rb-pedales { opacity: 0.35; }
 

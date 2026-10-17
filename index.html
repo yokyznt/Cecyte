@@ -1135,6 +1135,13 @@
                                         <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
                                     </div>
                                     <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
+                                    <h4 class="rb-fn-t">IA de respaldo (gratis)</h4>
+                                    <p class="hint">Yokis ya corrige solo lo que el micrófono oye mal. Si aun así no entiende, puede preguntarle a Gemini, que es gratis: consigue una llave en aistudio.google.com/apikey y pégala aquí. Sin llave funciona igual, solo sin este respaldo. Solo se manda lo que dijiste.</p>
+                                    <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
+                                    <div class="btn-row">
+                                        <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                    </div>
+                                    <p id="rb-ia-estado" class="hint" role="status"></p>
                                     <h4 class="rb-fn-t">Voces entrenadas</h4>
                                     <p class="hint">Entrena una voz con un amigo: lee unas frases, la guardas con un nombre y Yokis habla con ella. Con su propia voz solo dice las frases que se grabaron; en lo demás ajusta la voz del teléfono al tono de tu amigo. No es una clonación perfecta.</p>
                                     <ul id="rb-vz-lista" class="rb-vz-lista"></ul>

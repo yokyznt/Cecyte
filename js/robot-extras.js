@@ -812,6 +812,56 @@
         return bueno || lista[0] || '';
     }
 
+    const CLAVE_IA = 'cecyte_yokis_ia';
+    const MODELOS_IA = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+
+    function llaveIA() {
+        try { return (localStorage.getItem(CLAVE_IA) || '').trim(); } catch (e) { return ''; }
+    }
+
+    async function consultarIA(alternativas) {
+        const llave = llaveIA();
+        if (!llave || !alternativas.length) return null;
+        const cuerpo = JSON.stringify({
+            systemInstruction: { parts: [{ text: raiz.Robot.promptIA() }] },
+            contents: [{ role: 'user', parts: [{ text: alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n') }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+        });
+        for (const modelo of MODELOS_IA) {
+            const corte = new AbortController();
+            const reloj = setTimeout(() => corte.abort(), 6000);
+            try {
+                const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, body: cuerpo, signal: corte.signal,
+                });
+                if (!r.ok) continue;
+                const j = await r.json();
+                const o = raiz.Robot.validarOrdenIA(JSON.parse(j.candidates[0].content.parts[0].text));
+                if (o) return o;
+            } catch (e) {
+                continue;
+            } finally {
+                clearTimeout(reloj);
+            }
+        }
+        return null;
+    }
+
+    function iniciarIA() {
+        const campo = $('rb-ia-llave');
+        if (!campo) return;
+        campo.value = llaveIA();
+        campo.addEventListener('change', () => {
+            try { localStorage.setItem(CLAVE_IA, campo.value.trim()); } catch (e) { return; }
+            $('rb-ia-estado').textContent = campo.value.trim() ? 'IA de respaldo activada.' : 'IA de respaldo apagada.';
+        });
+        $('rb-ia-probar').addEventListener('click', async () => {
+            campo.dispatchEvent(new Event('change'));
+            const o = await consultarIA(['yakis avanza dos metros', 'yo kiss avanza dos metros']);
+            $('rb-ia-estado').textContent = o && o.a === 'mover' ? 'Funciona: la IA entendió «yakis avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
+        });
+    }
+
     async function escuchar() {
         if (E.escuchando) return;
         const SR = raiz.Plataforma && raiz.Plataforma.plugin('SpeechRecognition');
@@ -821,27 +871,33 @@
         boton.classList.add('is-activo');
         aviso('Escuchando…');
         try {
-            let texto = '';
+            let lista = [];
             if (SR) {
                 const p = await SR.requestPermissions();
                 if (p.speechRecognition !== 'granted') { di('sinMicro'); return; }
                 const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, we', partialResults: false, popup: true });
-                texto = elegirTexto(r.matches);
+                lista = (r.matches || []).filter(Boolean);
             } else if (Web) {
-                texto = await new Promise((res, rej) => {
+                lista = await new Promise((res, rej) => {
                     const rec = new Web();
                     rec.lang = 'es-MX';
                     rec.maxAlternatives = 5;
-                    rec.onresult = e => res(elegirTexto(Array.from(e.results[0]).map(x => x.transcript)));
+                    rec.onresult = e => res(Array.from(e.results[0]).map(x => x.transcript).filter(Boolean));
                     rec.onerror = e => rej(e);
-                    rec.onend = () => res('');
+                    rec.onend = () => res([]);
                     rec.start();
                 });
             } else { di('sinVoz'); return; }
+            const texto = elegirTexto(lista);
             if (!texto) { di('nada'); return; }
             historial('yo', texto);
             aviso('«' + texto + '»');
-            ejecutar(raiz.Robot.ordenDeVoz(texto));
+            let orden = raiz.Robot.ordenDeVoz(texto);
+            if (!orden || orden.a === 'sinNombre') {
+                const ia = await consultarIA(lista.slice(0, 4));
+                if (ia) orden = ia;
+            }
+            ejecutar(orden);
         } catch (e) {
             di('fallo');
         } finally {
@@ -864,6 +920,7 @@
         $('rb-jarvis').addEventListener('click', escuchar);
         ['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido'].forEach(id => $(id).addEventListener('change', guardaVoz));
         iniciarFacts();
+        iniciarIA();
         iniciarMeneo();
         $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
         pintarVoces();
