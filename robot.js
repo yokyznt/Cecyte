@@ -1301,16 +1301,37 @@ const RULETA_ROJO = [170, 0, 0], RULETA_NEGRO = [6, 6, 6], RULETA_BOLA = [0, 255
 
 function ruletaColor(i) { return i % 2 === 0 ? 'rojo' : 'negro'; }
 
-function ruletaPos(inicio, total, u) {
-    const p = 1 - Math.pow(1 - clamp(u, 0, 1), 3);
-    return (inicio + Math.floor(total * p)) % RULETA_N;
+function ruletaPlan(azar, vueltas, duracionMs) {
+    const r = typeof azar === 'function' ? azar : Math.random;
+    const laps = Math.round(clamp(vueltas, 1, 14));
+    const dur = duracionMs || laps * 2250;
+    const inicio = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N)), destino = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N));
+    const rnd = r();
+    const tipo = rnd < 0.4 ? 'directo' : rnd < 0.7 ? 'rebote' : 'doble';
+    const llegada = tipo === 'rebote' ? (destino + 1) % RULETA_N : tipo === 'doble' ? (destino + RULETA_N - 1) % RULETA_N : destino;
+    const n = laps * RULETA_N + ((llegada - inicio + RULETA_N) % RULETA_N);
+    const c = 1.7 + r() * 0.9;
+    const d0 = dur * c / (n * (Math.exp(c) - 1));
+    const pasos = [];
+    let t = 0;
+    for (let k = 1; k <= n; k++) {
+        t += d0 * Math.exp(c * k / n) * (0.88 + r() * 0.24);
+        pasos.push({ pos: (inicio + k) % RULETA_N, t: Math.round(t) });
+    }
+    if (tipo === 'rebote') {
+        t += 160 + r() * 260;
+        pasos.push({ pos: destino, t: Math.round(t) });
+    } else if (tipo === 'doble') {
+        t += 280 + r() * 520;
+        pasos.push({ pos: destino, t: Math.round(t) });
+    }
+    return { inicio, destino, tipo, pasos, dur: Math.round(t + 350), num: destino + 1, color: ruletaColor(destino) };
 }
 
-function ruletaPlan(azar, vueltas) {
-    const r = typeof azar === 'function' ? azar : Math.random;
-    const inicio = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N)), destino = Math.min(RULETA_N - 1, Math.floor(r() * RULETA_N));
-    const total = Math.round(clamp(vueltas, 1, 14)) * RULETA_N + ((destino - inicio + RULETA_N) % RULETA_N);
-    return { inicio, destino, total, num: destino + 1, color: ruletaColor(destino) };
+function ruletaPosEn(plan, t) {
+    let pos = plan.inicio;
+    for (const p of plan.pasos) { if (p.t <= t) pos = p.pos; else break; }
+    return pos;
 }
 
 function ruletaColores(pos, bola) {
@@ -1318,7 +1339,7 @@ function ruletaColores(pos, bola) {
 }
 
 const lib = {
-    ruletaColor, ruletaPos, ruletaPlan, ruletaColores, RULETA_N,
+    ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
@@ -2045,7 +2066,7 @@ function girarRuleta(vueltas, alTerminar) {
     if (S.ruleta) return false;
     if (S.corriendoFuncion || S.actuando) paro();
     const plan = ruletaPlan(Math.random, vueltas || 8);
-    const R = { plan, t0: performance.now(), T: Math.round(clamp(vueltas || 8, 1, 14) * 2250), ult: -1, timer: null, parpadeo: null };
+    const R = { plan, t0: performance.now(), ult: -1, timer: null, parpadeo: null };
     S.ruleta = R;
     S.guardarEn = 0;
     $('rb-rul-girar').textContent = 'Parar';
@@ -2055,9 +2076,9 @@ function girarRuleta(vueltas, alTerminar) {
     const frame = (pos, bola) => 'LS ' + marcoHex(ruletaColores(pos, bola), Math.max(S.brillo, 30));
     R.timer = setInterval(() => {
         if (S.estado !== 'listo') { pararRuleta(); return; }
-        const u = (performance.now() - R.t0) / R.T;
-        if (u < 1) {
-            const pos = ruletaPos(plan.inicio, plan.total, u);
+        const ms = performance.now() - R.t0;
+        if (ms < plan.dur) {
+            const pos = ruletaPosEn(plan, ms);
             if (pos === R.ult) return;
             R.ult = pos;
             if (!S.cola.ocupado()) S.cola.ultimo('RL', frame(pos, true));
@@ -2438,6 +2459,98 @@ function convertirAudio() {
     cambio('cancion');
     const que = melodia ? n.filter(x => x.hz > 0).length + ' notas' : intervalos.length + ' golpes';
     infoAudio(`Listo: ${que} en ${(total / 1000).toFixed(1)} s${bpm ? ` (unos ${bpm} tiempos por minuto)` : ''}.${aviso} Escúchalo aquí o guárdalo con un nombre.`, 'ok');
+}
+
+const REGISTROS_CANTO = { hombre: [80, 400], media: [120, 700], aguda: [200, 1000] };
+let cantando = null;
+
+function infoCanto(texto, tipo) {
+    const el = $('rb-cant-info');
+    el.textContent = texto || '';
+    el.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+}
+
+function dibujarNivelCanto(niveles) {
+    const cv = $('rb-cant-nivel'), g = cv.getContext('2d'), n = 48, ancho = cv.width / n, falta = n - niveles.length;
+    g.clearRect(0, 0, cv.width, cv.height);
+    for (let i = 0; i < n; i++) {
+        const v = i >= falta ? niveles[i - falta] : undefined;
+        const h = v === undefined ? 3 : Math.max(3, v * (cv.height - 6));
+        g.fillStyle = 'oklch(0.55 0.2 27)';
+        g.beginPath();
+        g.roundRect(i * ancho + 1, (cv.height - h) / 2, ancho - 3, h, 2);
+        g.fill();
+    }
+}
+
+function melodiaDeCanto(buffer) {
+    const { x, sr } = monoVentana(buffer, 0, Math.min(buffer.duration, 60));
+    const reg = REGISTROS_CANTO[$('rb-cant-voz').value] || REGISTROS_CANTO.media;
+    const r = melodiaDeAudio(x, sr, { fMin: reg[0], fMax: reg[1], sens: 60, tonalidad: $('rb-cant-tonal').checked, subir: true });
+    if (!r.texto) return infoCanto('No encontré una melodía clara. Canta más fuerte y cerca del micrófono, sin ruido ni música de fondo.', 'err');
+    const n = leerNotas(r.texto).notas;
+    const total = n.reduce((suma, q) => suma + (q.ms || 0), 0);
+    const bpm = estimarBpm(r.intervalos);
+    S.notas = r.texto;
+    S.cancion = 'propia';
+    if (bpm) S.bpm = bpm;
+    $('rb-nombre').value = '';
+    pintarCanciones();
+    pintarTodo();
+    cambio('cancion');
+    infoCanto(`Listo: ${n.filter(q => q.hz > 0).length} notas en ${(total / 1000).toFixed(1)} s.${r.tonalidad ? ' Tonalidad: ' + r.tonalidad + '.' : ''} Ponle nombre arriba (Canción) para guardarla.`, 'ok');
+    if ($('rb-cant-oir').checked) { if (S.estado === 'listo') actuar(true, false); else escucharAqui(); }
+}
+
+async function alternarCanto() {
+    if (cantando) { cantando.parar(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) return infoCanto('Este celular no deja grabar audio aquí.', 'err');
+    let flujo;
+    try {
+        flujo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch (e) {
+        return infoCanto('No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.', 'err');
+    }
+    detenerAudio();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx(), analizador = ctx.createAnalyser();
+    analizador.fftSize = 512;
+    ctx.createMediaStreamSource(flujo).connect(analizador);
+    const buf = new Uint8Array(analizador.fftSize), niveles = [], trozos = [], rec = new MediaRecorder(flujo), t0 = Date.now();
+    const b = $('rb-cant-grabar');
+    b.lastChild.textContent = ' Parar';
+    b.classList.add('is-grabando');
+    infoCanto('Cantando… pulsa Parar cuando termines (máximo 60 s).');
+    const timer = setInterval(() => {
+        analizador.getByteTimeDomainData(buf);
+        let suma = 0;
+        for (let j = 0; j < buf.length; j++) { const v = (buf[j] - 128) / 128; suma += v * v; }
+        niveles.push(Math.min(1, Math.sqrt(suma / buf.length) * 4));
+        const seg = Math.floor((Date.now() - t0) / 1000);
+        $('rb-cant-tiempo').textContent = `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+        dibujarNivelCanto(niveles.slice(-48));
+        if (Date.now() - t0 > 60000 && rec.state === 'recording') rec.stop();
+    }, 70);
+    cantando = { parar: () => { if (rec.state === 'recording') rec.stop(); } };
+    rec.ondataavailable = e => { if (e.data && e.data.size) trozos.push(e.data); };
+    rec.onstop = async () => {
+        clearInterval(timer);
+        flujo.getTracks().forEach(t => t.stop());
+        cantando = null;
+        b.lastChild.textContent = ' Grabar';
+        b.classList.remove('is-grabando');
+        const blob = new Blob(trozos, { type: rec.mimeType || 'audio/webm' });
+        try {
+            if (blob.size < 2000) return infoCanto('No se oyó nada: intenta otra vez más cerca del micrófono.', 'err');
+            infoCanto('Convirtiendo tu voz en pitidos…');
+            melodiaDeCanto(await ctx.decodeAudioData(await blob.arrayBuffer()));
+        } catch (e) {
+            infoCanto('No pude analizar la grabación. Intenta otra vez.', 'err');
+        } finally {
+            ctx.close();
+        }
+    };
+    rec.start();
 }
 
 // Corre un generador cediendo el hilo entre pasos, para mostrar el avance sin congelar la página
@@ -2941,6 +3054,7 @@ function iniciar() {
     });
     $('rb-aud-sens').addEventListener('input', e => { $('rb-aud-sens-v').textContent = e.target.value; });
     $('rb-aud-convertir').addEventListener('click', convertirAudio);
+    $('rb-cant-grabar').addEventListener('click', alternarCanto);
     $('rb-bpm').addEventListener('input', e => {
         S.bpm = Number(e.target.value);
         $('rb-bpm-v').textContent = S.bpm + ' tiempos por minuto';

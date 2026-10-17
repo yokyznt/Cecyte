@@ -63,35 +63,44 @@
         return mx.find(v => PISTAS_HOMBRE.test(v.nombre)) || lista.find(v => PISTAS_HOMBRE.test(v.nombre)) || mx[0] || lista[0] || null;
     }
 
-    const CLAVE_USAR = 'cecyte_voz_usar';
-    const ENT = { claves: new Set(), usar: false, audio: null, grabando: null, bd: null };
-    const PRIORIDAD_ENT = ['saludo', 'estado', 'paro', 'mover', 'giro', 'baile', 'ruleta', 'cancion', 'luces', 'casa', 'radar', 'guardiaOn', 'alerta', 'gracias', 'elogio', 'adios', 'claxon', 'sinNombre', 'noEntendi', 'sinRobot', 'cancionParar', 'lucesOff', 'guardiaOff', 'reversa', 'quien', 'queja', 'ocupado', 'nada', 'fallo'];
+    const CLAVE_ACTIVA = 'cecyte_voz_activa';
+    const ENT = { activa: '', claves: new Set(), voces: [], audio: null, bd: null };
+    const PRIORIDAD_ENT = ['saludo', 'estado', 'paro', 'mover', 'giro', 'baile', 'ruleta', 'cancion', 'luces', 'casa', 'radar', 'guardiaOn', 'alerta', 'gracias', 'elogio', 'adios', 'claxon', 'sinNombre', 'noEntendi', 'sinRobot'];
+    const PASOS_ENT = 12, MS_NIVEL = 70, BARRAS = 48;
+    const W = { i: 0, frases: [], blobs: [], ondas: [], durs: [], niveles: [], rec: null, flujo: null, ctx: null, timer: null, audio: null };
 
     function abrirBD() {
         if (ENT.bd) return ENT.bd;
         ENT.bd = new Promise((res, rej) => {
-            const q = raiz.indexedDB.open('cecyte_voz_entrenada', 1);
-            q.onupgradeneeded = () => q.result.createObjectStore('f');
+            const q = raiz.indexedDB.open('cecyte_voz_entrenada', 2);
+            q.onupgradeneeded = () => {
+                const db = q.result;
+                if (!db.objectStoreNames.contains('f')) db.createObjectStore('f');
+                if (!db.objectStoreNames.contains('v')) db.createObjectStore('v');
+            };
             q.onsuccess = () => res(q.result);
             q.onerror = () => rej(q.error);
         });
         return ENT.bd;
     }
 
-    async function bd(modo, fn) {
+    async function bd(tienda, modo, fn) {
         const db = await abrirBD();
         return new Promise((res, rej) => {
-            const t = db.transaction('f', modo), st = t.objectStore('f');
+            const t = db.transaction(tienda, modo), st = t.objectStore(tienda);
             const r = fn(st);
             t.oncomplete = () => res(r && r.result !== undefined ? r.result : undefined);
             t.onerror = () => rej(t.error);
         });
     }
 
-    const bdGet = k => bd('readonly', st => st.get(k));
-    const bdPut = (k, blob) => bd('readwrite', st => st.put(blob, k));
-    const bdDel = k => bd('readwrite', st => st.delete(k));
-    const bdClaves = () => bd('readonly', st => st.getAllKeys());
+    const bdGet = k => bd('f', 'readonly', st => st.get(k));
+    const bdPut = (k, v) => bd('f', 'readwrite', st => st.put(v, k));
+    const bdDel = k => bd('f', 'readwrite', st => st.delete(k));
+    const bdClaves = () => bd('f', 'readonly', st => st.getAllKeys());
+    const vzTodas = () => bd('v', 'readonly', st => st.getAll());
+    const vzPut = (n, m) => bd('v', 'readwrite', st => st.put(m, n));
+    const vzDel = n => bd('v', 'readwrite', st => st.delete(n));
 
     function frasesEntrenables() {
         const F = raiz.Robot.FRASES;
@@ -101,7 +110,7 @@
 
     async function reproducirGrabada(texto) {
         try {
-            const blob = await bdGet(texto);
+            const blob = await bdGet(ENT.activa + '|' + texto);
             if (!blob) return false;
             if (ENT.audio) ENT.audio.pause();
             const a = new Audio(URL.createObjectURL(blob));
@@ -136,14 +145,12 @@
         return res[Math.floor(res.length / 2)];
     }
 
-    async function estimarTono() {
+    async function estimarTono(blobs) {
         const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
         if (!Ctx) return 0;
         const ctx = new Ctx(), tonos = [];
         try {
-            for (const k of [...ENT.claves].slice(0, 6)) {
-                const blob = await bdGet(k);
-                if (!blob) continue;
+            for (const blob of blobs.filter(Boolean).slice(0, 6)) {
                 try {
                     const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
                     const f = f0Medio(buf.getChannelData(0), buf.sampleRate);
@@ -163,87 +170,247 @@
         if (el) el.textContent = t || '';
     }
 
-    function pintarEntrena() {
-        const ol = $('rb-ent-lista');
-        if (!ol) return;
-        const lista = frasesEntrenables();
-        ol.innerHTML = lista.map((t, i) => {
-            const hecha = ENT.claves.has(t);
-            return `<li class="rb-ent-item${hecha ? ' is-lista' : ''}" data-i="${i}"><p>${t}</p>`
-                + `<button type="button" class="btn ${hecha ? 'btn--secondary' : 'btn--primary'} btn--sm" data-acc="grabar">${hecha ? 'Regrabar' : 'Grabar'}</button>`
-                + (hecha ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="oir">Oír</button><button type="button" class="btn btn--secondary btn--sm" data-acc="borrar">Borrar</button>' : '')
-                + '</li>';
-        }).join('');
-        $('rb-ent-cuenta').textContent = `${ENT.claves.size} de ${lista.length} grabadas`;
+    function ajustarTono(f0) {
+        const a = ajustesVoz();
+        a.pitch = Math.min(1.5, Math.max(0.5, Math.round(f0 / 115 * 20) / 20));
+        try { localStorage.setItem(CLAVE_VOZ, JSON.stringify(a)); } catch (e) { /* sin guardado */ }
+        pintarVoces();
     }
 
-    async function grabarFrase(texto, li) {
-        if (ENT.grabando) { ENT.grabando.stop(); return; }
-        if (!raiz.navigator.mediaDevices || !raiz.MediaRecorder) { mensajeEnt('Este celular no deja grabar audio aquí.'); return; }
+    async function activarVoz(nombre) {
+        ENT.activa = nombre || '';
+        try { localStorage.setItem(CLAVE_ACTIVA, ENT.activa); } catch (e) { /* sin guardado */ }
+        ENT.claves = new Set();
+        if (ENT.activa) {
+            try { (await bdClaves()).filter(k => k.startsWith(ENT.activa + '|')).forEach(k => ENT.claves.add(k.slice(ENT.activa.length + 1))); } catch (e) { /* sin base de datos */ }
+            const m = ENT.voces.find(v => v.nombre === ENT.activa);
+            if (m && m.f0) ajustarTono(m.f0);
+        }
+        pintarVocesEntrenadas();
+    }
+
+    function pintarVocesEntrenadas() {
+        const ul = $('rb-vz-lista');
+        if (!ul) return;
+        const fila = (nombre, detalle, uso, borrable) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
+            + (uso ? '<small>En uso</small>' : '<button type="button" class="btn btn--secondary btn--sm" data-acc="usar">Usar</button>')
+            + (borrable ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="borrar" aria-label="Borrar esta voz">Borrar</button>' : '') + '</li>';
+        ul.innerHTML = fila('Voz del teléfono', 'La voz sintética que ajustaste arriba', !ENT.activa, false)
+            + ENT.voces.map(v => fila(v.nombre, `${v.n} frases${v.f0 ? ' · tono ' + Math.round(v.f0) + ' Hz' : ''}`, v.nombre === ENT.activa, true)).join('');
+    }
+
+    function resumir(niveles, n) {
+        if (!niveles.length) return [];
+        const sal = [];
+        for (let i = 0; i < n; i++) {
+            const a = Math.floor(i * niveles.length / n), b = Math.max(a + 1, Math.floor((i + 1) * niveles.length / n));
+            sal.push(Math.max.apply(null, niveles.slice(a, b)));
+        }
+        return sal;
+    }
+
+    function dibujarOnda(barras, progreso, enVivo) {
+        const cv = $('rb-ent-onda'), g = cv.getContext('2d');
+        g.clearRect(0, 0, cv.width, cv.height);
+        const ancho = cv.width / BARRAS, falta = BARRAS - barras.length;
+        for (let i = 0; i < BARRAS; i++) {
+            const v = enVivo ? (i >= falta ? barras[i - falta] : undefined) : barras[i];
+            const h = v === undefined ? 3 : Math.max(3, v * (cv.height - 6));
+            g.fillStyle = enVivo ? 'oklch(0.55 0.2 27)' : (progreso >= 0 && i / BARRAS <= progreso ? 'oklch(0.47 0.12 153)' : 'oklch(0.6 0.04 150)');
+            g.beginPath();
+            g.roundRect(i * ancho + 1, (cv.height - h) / 2, ancho - 3, h, 2);
+            g.fill();
+        }
+    }
+
+    const mmss = ms => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+
+    function pintarPaso() {
+        const n = W.frases.length, hecha = !!W.blobs[W.i];
+        $('rb-ent-prog').max = n;
+        $('rb-ent-prog').value = W.blobs.filter(Boolean).length;
+        $('rb-ent-paso').textContent = `Frase ${W.i + 1} de ${n}`;
+        $('rb-ent-frase').textContent = W.frases[W.i];
+        $('rb-ent-grabar').textContent = hecha ? 'Volver a grabar' : 'Grabar';
+        $('rb-ent-grabar').classList.remove('is-grabando');
+        $('rb-ent-sig').textContent = W.i === n - 1 ? 'Terminar' : 'Siguiente';
+        $('rb-ent-sig').disabled = !hecha;
+        $('rb-ent-play').disabled = !hecha;
+        $('rb-ent-tiempo').textContent = hecha ? mmss(W.durs[W.i]) : '0:00';
+        dibujarOnda(hecha ? W.ondas[W.i] : [], -1, false);
+    }
+
+    function abrirEntrenamiento() {
+        const d = $('rb-ent-ventana');
+        if (d.open) return;
+        W.i = 0;
+        W.frases = frasesEntrenables().slice(0, PASOS_ENT);
+        W.blobs = [];
+        W.ondas = [];
+        W.durs = [];
+        $('rb-ent-pasos').hidden = false;
+        $('rb-ent-final').hidden = true;
+        $('rb-ent-aviso').textContent = '';
+        $('rb-ent-nombre').value = '';
+        $('rb-ent-guardar').disabled = true;
+        pintarPaso();
+        d.showModal();
+    }
+
+    function limpiarGrabacion() {
+        clearInterval(W.timer);
+        if (W.rec && W.rec.state === 'recording') { W.rec.onstop = null; W.rec.stop(); }
+        if (W.flujo) W.flujo.getTracks().forEach(t => t.stop());
+        if (W.ctx) { try { W.ctx.close(); } catch (e) { /* ya cerrado */ } }
+        if (W.audio) W.audio.pause();
+        W.rec = null;
+        W.flujo = null;
+        W.ctx = null;
+    }
+
+    async function grabarPaso() {
+        if (W.rec) { W.rec.stop(); return; }
+        if (!raiz.navigator.mediaDevices || !raiz.MediaRecorder) { $('rb-ent-aviso').textContent = 'Este celular no deja grabar audio aquí.'; return; }
         let flujo;
         try {
             flujo = await raiz.navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
         } catch (e) {
-            mensajeEnt('No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.');
+            $('rb-ent-aviso').textContent = 'No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.';
             return;
         }
-        const trozos = [];
+        if (W.audio) W.audio.pause();
+        const trozos = [], i = W.i;
+        const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
         const rec = raiz.MediaRecorder.isTypeSupported && raiz.MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? new raiz.MediaRecorder(flujo, { mimeType: 'audio/webm;codecs=opus' }) : new raiz.MediaRecorder(flujo);
-        ENT.grabando = rec;
-        li.classList.add('is-grabando');
-        li.querySelector('[data-acc="grabar"]').textContent = 'Parar';
-        mensajeEnt('Grabando… que lea la frase y pulsa Parar.');
+        W.rec = rec;
+        W.flujo = flujo;
+        W.niveles = [];
+        let analizador = null, buf = null;
+        if (Ctx) {
+            W.ctx = new Ctx();
+            analizador = W.ctx.createAnalyser();
+            analizador.fftSize = 512;
+            W.ctx.createMediaStreamSource(flujo).connect(analizador);
+            buf = new Uint8Array(analizador.fftSize);
+        }
+        $('rb-ent-grabar').textContent = 'Parar';
+        $('rb-ent-grabar').classList.add('is-grabando');
+        $('rb-ent-sig').disabled = true;
+        $('rb-ent-play').disabled = true;
+        $('rb-ent-aviso').textContent = 'Grabando… que lea la frase y pulsa Parar.';
+        const t0 = Date.now();
+        W.timer = setInterval(() => {
+            let nivel = 0.15;
+            if (analizador) {
+                analizador.getByteTimeDomainData(buf);
+                let s = 0;
+                for (let j = 0; j < buf.length; j++) { const v = (buf[j] - 128) / 128; s += v * v; }
+                nivel = Math.min(1, Math.sqrt(s / buf.length) * 4);
+            }
+            W.niveles.push(nivel);
+            $('rb-ent-tiempo').textContent = mmss(Date.now() - t0);
+            dibujarOnda(W.niveles.slice(-BARRAS), 0, true);
+        }, MS_NIVEL);
         const tope = setTimeout(() => { if (rec.state === 'recording') rec.stop(); }, 15000);
         rec.ondataavailable = e => { if (e.data && e.data.size) trozos.push(e.data); };
-        rec.onstop = async () => {
+        rec.onstop = () => {
             clearTimeout(tope);
-            flujo.getTracks().forEach(t => t.stop());
-            ENT.grabando = null;
+            const dur = Date.now() - t0;
+            limpiarGrabacion();
             const blob = new Blob(trozos, { type: rec.mimeType || 'audio/webm' });
-            if (blob.size < 2000) { mensajeEnt('No se oyó nada: intenta otra vez más cerca del micrófono.'); pintarEntrena(); return; }
-            await bdPut(texto, blob);
-            ENT.claves.add(texto);
-            pintarEntrena();
-            const f0 = await estimarTono();
-            if (f0) {
-                const a = ajustesVoz();
-                a.pitch = Math.min(1.5, Math.max(0.5, Math.round(f0 / 115 * 20) / 20));
-                try { localStorage.setItem(CLAVE_VOZ, JSON.stringify(a)); } catch (e) { /* sin guardado */ }
-                pintarVoces();
-                mensajeEnt(`Guardada. Tono medido de tu amigo: ${Math.round(f0)} Hz; ajusté la voz sintética para que se parezca.`);
-            } else mensajeEnt('Guardada.');
+            if (blob.size < 2000 || W.niveles.length < 6) { $('rb-ent-aviso').textContent = 'No se oyó nada: intenta otra vez más cerca del micrófono.'; pintarPaso(); return; }
+            W.blobs[i] = blob;
+            W.ondas[i] = resumir(W.niveles, BARRAS);
+            W.durs[i] = dur;
+            $('rb-ent-aviso').textContent = 'Escúchala; si te gusta, pulsa Siguiente.';
+            pintarPaso();
         };
         rec.start();
     }
 
+    function reproducirPaso() {
+        const i = W.i, blob = W.blobs[i];
+        if (!blob) return;
+        if (W.audio && !W.audio.paused) { W.audio.pause(); return; }
+        const a = new Audio(URL.createObjectURL(blob));
+        W.audio = a;
+        a.ontimeupdate = () => {
+            const dur = W.durs[i] / 1000 || a.duration || 1;
+            dibujarOnda(W.ondas[i], Math.min(1, a.currentTime / dur), false);
+            $('rb-ent-tiempo').textContent = mmss(a.currentTime * 1000);
+        };
+        a.onended = () => { URL.revokeObjectURL(a.src); dibujarOnda(W.ondas[i], -1, false); $('rb-ent-tiempo').textContent = mmss(W.durs[i]); };
+        a.play().catch(() => { $('rb-ent-aviso').textContent = 'No pude reproducir la grabación.'; });
+    }
+
+    function siguientePaso() {
+        if (W.audio) W.audio.pause();
+        if (W.i < W.frases.length - 1) { W.i++; $('rb-ent-aviso').textContent = ''; pintarPaso(); return; }
+        $('rb-ent-pasos').hidden = true;
+        $('rb-ent-final').hidden = false;
+        $('rb-ent-nombre').focus();
+    }
+
+    async function guardarVoz() {
+        const nombre = $('rb-ent-nombre').value.trim().replace(/\|/g, ' ').slice(0, 30);
+        if (!nombre) return;
+        $('rb-ent-guardar').disabled = true;
+        try {
+            for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) await bdDel(k);
+            for (let i = 0; i < W.frases.length; i++) if (W.blobs[i]) await bdPut(nombre + '|' + W.frases[i], W.blobs[i]);
+            const f0 = await estimarTono(W.blobs);
+            await vzPut(nombre, { nombre, f0, n: W.blobs.filter(Boolean).length, fecha: Date.now() });
+            ENT.voces = (await vzTodas()) || [];
+            await activarVoz(nombre);
+            $('rb-ent-ventana').close();
+            mensajeEnt(`Voz «${nombre}» guardada y en uso.${f0 ? ' Tono medido: ' + Math.round(f0) + ' Hz.' : ''}`);
+        } catch (e) {
+            $('rb-ent-guardar').disabled = false;
+            $('rb-ent-aviso').textContent = 'No pude guardar la voz en este teléfono.';
+        }
+    }
+
     async function iniciarEntrena() {
-        if (!$('rb-ent-lista') || !raiz.indexedDB) return;
-        try { ENT.usar = localStorage.getItem(CLAVE_USAR) === '1'; } catch (e) { ENT.usar = false; }
-        $('rb-ent-usar').checked = ENT.usar;
-        $('rb-ent-usar').addEventListener('change', e => {
-            ENT.usar = e.target.checked;
-            try { localStorage.setItem(CLAVE_USAR, ENT.usar ? '1' : '0'); } catch (err) { /* sin guardado */ }
-        });
-        $('rb-ent-lista').addEventListener('click', async e => {
+        if (!$('rb-vz-lista') || !raiz.indexedDB) return;
+        $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
+        $('rb-ent-cerrar').addEventListener('click', () => $('rb-ent-ventana').close());
+        $('rb-ent-ventana').addEventListener('close', limpiarGrabacion);
+        $('rb-ent-grabar').addEventListener('click', grabarPaso);
+        $('rb-ent-play').addEventListener('click', reproducirPaso);
+        $('rb-ent-sig').addEventListener('click', siguientePaso);
+        $('rb-ent-atras').addEventListener('click', () => { $('rb-ent-final').hidden = true; $('rb-ent-pasos').hidden = false; pintarPaso(); });
+        $('rb-ent-nombre').addEventListener('input', () => { $('rb-ent-guardar').disabled = !$('rb-ent-nombre').value.trim(); });
+        $('rb-ent-guardar').addEventListener('click', guardarVoz);
+        $('rb-vz-lista').addEventListener('click', async e => {
             const b = e.target.closest('[data-acc]');
             if (!b) return;
-            const li = b.closest('.rb-ent-item'), texto = frasesEntrenables()[Number(li.dataset.i)];
-            if (b.dataset.acc === 'grabar') await grabarFrase(texto, li);
-            else if (b.dataset.acc === 'oir') { if (!(await reproducirGrabada(texto))) mensajeEnt('No pude reproducir esa grabación.'); }
-            else if (b.dataset.acc === 'borrar') { await bdDel(texto); ENT.claves.delete(texto); pintarEntrena(); }
+            const nombre = b.closest('.rb-vz-item').dataset.n;
+            if (b.dataset.acc === 'usar') { await activarVoz(nombre === 'Voz del teléfono' ? '' : nombre); return; }
+            if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Borrar?'; setTimeout(pintarVocesEntrenadas, 3000); return; }
+            for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) await bdDel(k);
+            await vzDel(nombre);
+            ENT.voces = (await vzTodas()) || [];
+            if (ENT.activa === nombre) await activarVoz('');
+            else pintarVocesEntrenadas();
+            mensajeEnt(`Voz «${nombre}» borrada.`);
         });
-        $('rb-ent-borrar').addEventListener('click', async () => {
-            for (const k of [...ENT.claves]) await bdDel(k);
-            ENT.claves.clear();
-            pintarEntrena();
-            mensajeEnt('Grabaciones borradas.');
-        });
-        try { (await bdClaves()).forEach(k => ENT.claves.add(k)); } catch (e) { /* sin base de datos */ }
-        pintarEntrena();
+        try {
+            const viejas = (await bdClaves()).filter(k => !k.includes('|'));
+            if (viejas.length) {
+                for (const k of viejas) { await bdPut('Voz anterior|' + k, await bdGet(k)); await bdDel(k); }
+                await vzPut('Voz anterior', { nombre: 'Voz anterior', f0: 0, n: viejas.length, fecha: Date.now() });
+            }
+            ENT.voces = (await vzTodas()) || [];
+            let guardada = '';
+            try { guardada = localStorage.getItem(CLAVE_ACTIVA) || ''; } catch (e) { guardada = ''; }
+            await activarVoz(ENT.voces.some(v => v.nombre === guardada) ? guardada : '');
+        } catch (e) {
+            pintarVocesEntrenadas();
+        }
     }
 
     async function voz(texto) {
-        if (ENT.usar && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
+        if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
         try {
@@ -286,7 +453,7 @@
 
     const di = (tipo, datos) => {
         let t = null;
-        if (ENT.usar && !datos) {
+        if (ENT.activa && !datos) {
             const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
             if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
         }

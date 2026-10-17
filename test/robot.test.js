@@ -830,20 +830,28 @@ console.log('robot.test.js: todo bien');
     const plan = R.ruletaPlan(() => 0.5, 3);
     assert.strictEqual(plan.destino, 6);
     assert.strictEqual(plan.inicio, 6);
-    assert.strictEqual(plan.total, 36, 'tres vueltas justas si sale donde empezó');
-    assert.strictEqual(R.ruletaPos(plan.inicio, plan.total, 1), plan.destino, 'al terminar cae en el destino');
-    const azares = [0.1, 0.9, 0.3, 0.7];
-    let k = 0;
-    const p2 = R.ruletaPlan(() => azares[k++ % 4], 3);
-    assert.strictEqual(R.ruletaPos(p2.inicio, p2.total, 1), p2.destino);
-    assert.strictEqual(p2.color, R.ruletaColor(p2.destino));
-    assert.strictEqual(p2.num, p2.destino + 1);
-    const avanzados = [];
-    for (let u = 0; u <= 1.0001; u += 0.01) avanzados.push(R.ruletaPos(0, 60, u));
-    const pasos = [];
-    let acum = 0, prev = avanzados[0];
-    for (const x of avanzados.slice(1)) { acum += (x - prev + 12) % 12; pasos.push(acum); prev = x; }
-    assert(pasos[19] > pasos[99] - pasos[79], 'va desacelerando: en el primer 20 % avanza más que en el último');
+    assert.strictEqual(R.ruletaPosEn(plan, plan.dur), plan.destino, 'al terminar cae en el destino');
+    assert.strictEqual(R.ruletaPosEn(plan, 0), plan.inicio, 'al principio está donde empezó');
+    const finales = new Set(), ultimos = [], duraciones = [];
+    let aleatorio = 0;
+    const gen = () => { aleatorio = (aleatorio * 9301 + 49297) % 233280; return aleatorio / 233280; };
+    for (let i = 0; i < 300; i++) {
+        const p = R.ruletaPlan(gen, 8);
+        finales.add(p.tipo);
+        assert.strictEqual(R.ruletaPosEn(p, p.dur), p.destino, 'siempre cae en su destino');
+        assert.strictEqual(p.color, R.ruletaColor(p.destino));
+        assert.strictEqual(p.num, p.destino + 1);
+        for (let k = 1; k < p.pasos.length; k++) assert(p.pasos[k].t > p.pasos[k - 1].t, 'el tiempo siempre avanza');
+        const ints = p.pasos.map((x, k) => x.t - (k ? p.pasos[k - 1].t : 0));
+        assert(ints[0] < 120, 'arranca rápido');
+        ultimos.push(p.pasos[p.pasos.length - 1].t - p.pasos[p.pasos.length - 2].t);
+        duraciones.push(p.dur);
+    }
+    assert.deepStrictEqual([...finales].sort(), ['directo', 'doble', 'rebote'], 'el final cambia: directo, con rebote o con doble saltito');
+    assert(Math.max.apply(null, ultimos) - Math.min.apply(null, ultimos) > 200, 'el último saltito dura distinto cada vez');
+    assert(Math.max.apply(null, duraciones) < 26000 && Math.min.apply(null, duraciones) > 12000, 'la ruleta normal dura entre 12 y 26 s');
+    const lento = R.ruletaPlan(() => 0.99, 8);
+    assert(lento.pasos[lento.pasos.length - 1].t - lento.pasos[lento.pasos.length - 2].t < 1300, 'el último saltito nunca se eterniza');
     const col = R.ruletaColores(4, true);
     assert.strictEqual(col.length, 12);
     assert.deepStrictEqual(col[4], [0, 255, 60], 'la bolita es verde');
@@ -863,10 +871,22 @@ console.log('robot.test.js: todo bien');
     assert(['rb-fn-ventana', 'rb-fn-almacen', 'rb-fn-generico', 'rb-fn-ventana-cuerpo'].every(id => html.includes(`id="${id}"`)), 'los ajustes de cada función van en una ventana');
     const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function abrirVentanaFuncion/.test(rj) && /previo && c\.querySelector/.test(rj), 'tocar una función elegida abre su ventana');
-    assert(/\* 2250\)/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
-    let saltos = 0, anterior = R.ruletaPos(0, 8 * 12, 0);
-    for (let u = 0.001; u <= 0.05; u += 0.001) { const p = R.ruletaPos(0, 8 * 12, u); if (p !== anterior) saltos++; anterior = p; }
-    assert(saltos >= 8, 'con 8 vueltas arranca rápido: más de 8 casillas en el primer 5 % del tiempo');
+    assert(/laps \* 2250/.test(rj) && /RULETA_BOLA = \[0, 255, 60\]/.test(rj), 'la ruleta dura más y la bolita es verde');
     assert(/<option value="8" selected>Normal \(18 s\)/.test(html), 'la ruleta normal da 8 vueltas en 18 s');
-    assert(['rb-ent-lista', 'rb-ent-usar', 'rb-ent-borrar', 'rb-ent-cuenta'].every(id => html.includes(`id="${id}"`)), 'Yokis puede entrenar una voz');
+    assert(['rb-vz-lista', 'rb-ent-abrir', 'rb-ent-ventana', 'rb-ent-prog', 'rb-ent-frase', 'rb-ent-grabar', 'rb-ent-sig', 'rb-ent-onda', 'rb-ent-nombre', 'rb-ent-guardar'].every(id => html.includes(`id="${id}"`)), 'el entrenamiento de voz es un asistente con progreso, grabar, siguiente, onda y nombre');
+}
+
+{
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(['rb-cant-grabar', 'rb-cant-voz', 'rb-cant-nivel', 'rb-cant-tonal', 'rb-cant-oir', 'rb-cant-info'].every(id => html.includes(`id="${id}"`)), 'se puede cantar y convertir la voz en pitidos');
+    assert(/id="tab-robot-musica"[^>]*>\s*<svg[^>]*><use href="#i-music"\/><\/svg><span>Audio<\/span>/.test(html), 'la pestaña Música ahora se llama Audio');
+    assert(!html.includes('<span>Música</span>'), 'ya no hay pestañas llamadas Música');
+    const rj = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/function melodiaDeCanto/.test(rj) && /REGISTROS_CANTO/.test(rj) && /echoCancellation: false/.test(rj), 'la voz cantada se convierte con el rastreador de melodía y sin filtros que alteren el tono');
+    const sr = 16000, cantadas = [[392, 0.5], [440, 0.5], [523.25, 0.5], [440, 0.5], [392, 0.7]];
+    const x = new Float32Array(Math.floor(cantadas.reduce((a, n) => a + n[1], 0) * sr));
+    let pos = 0;
+    for (const [f, d] of cantadas) { const n = Math.floor(d * sr); for (let k = 0; k < n; k++, pos++) { const env = Math.min(1, k / 400, (n - k) / 400); x[pos] = 0.5 * env * (Math.sin(2 * Math.PI * f * k / sr) + 0.3 * Math.sin(4 * Math.PI * f * k / sr)); } }
+    const melodia = R.melodiaDeAudio(x, sr, { fMin: 120, fMax: 700, sens: 60, tonalidad: true, subir: true });
+    assert.deepStrictEqual(melodia.texto.split(' ').map(t => t.split(':')[0]), ['G5', 'A5', 'C6', 'A5', 'G5'], 'una melodía cantada sol-la-do-la-sol sale como cinco pitidos (subida de octava)');
 }
