@@ -12,6 +12,7 @@
     const ZONA_GRADOS = 7, TOPE_GRADOS = 30;
     const MS_TURBO_MAX = 8000;    // guarda de calor: tras 8 s seguidos arriba de la velocidad normal, vuelve a la normal un rato
     const MS_ENFRIA = 4000;
+    const MS_SENAL = 2000, MS_DIR_RETRASO = 500;
     const $ = id => document.getElementById(id);
 
     const C = {
@@ -25,6 +26,8 @@
         freno: true,                      // freno automático ante obstáculos (necesita el firmware con DIST)
         grab: null,                       // grabando un recorrido: { t0, pasos }
         repro: null,                      // repitiendo uno: { r, t0, ult, envio, timer }
+        enMarcha: false, dirVista: 'o', dirHasta: 0,
+        senal: { dir: 'o', luz: 'o' }, senalT: { dir: 0, luz: 0 },
     };
 
     const vibrar = patron => { try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) { /* sin vibración */ } };
@@ -62,12 +65,15 @@
         const m = raiz.Robot.mezclaJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         // Repitiendo un recorrido: si se toca la palanca, el teclado o el teléfono, el mando recupera el control
         if (C.repro) { if (m.izq || m.der) pararRepro(false); else return; }
+        const pedido = !!(m.izq || m.der);
         // Freno por obstáculo: hacia adelante no pasa de 15 cm (35 en turbo); atrás y girar en el sitio siguen libres
         if (C.freno && enlace().distancias) {
             const d = enlace().distancias();
             const f = raiz.Robot.frenoPorDistancia(m.izq, m.der, d.lecturas, ahora - d.t, turbo);
             m.izq = f.izq; m.der = f.der;
         }
+        const bloqueado = pedido && !m.izq && !m.der;
+        senalizar(m, bloqueado, ahora);
         const clave = m.izq + ',' + m.der;
         if (C.turbo) guardaCalor(m, ahora);
         if (m.izq === 0 && m.der === 0) {
@@ -84,6 +90,27 @@
             mandar(m.izq, m.der);
             C.ultimo = clave;
             C.ultimoEnvio = ahora;
+        }
+    }
+
+    // Direccionales, luz de freno y de reversa: solo se manda cuando cambian, y se repiten cada MS_SENAL mientras duran
+    // (el firmware las apaga solo a los 4 s sin órdenes)
+    function senalizar(m, bloqueado, ahora) {
+        const e = enlace();
+        if (!e.soportaSenal || !e.soportaSenal()) return;
+        const marcha = !!(m.izq || m.der);
+        const s = raiz.Robot.senalesDeMovimiento(m.izq, m.der, bloqueado, C.enMarcha);
+        C.enMarcha = marcha;
+        if (s.dir !== 'o') { C.dirVista = s.dir; C.dirHasta = ahora + MS_DIR_RETRASO; }
+        else if (ahora < C.dirHasta) s.dir = C.dirVista;
+        for (const tipo of ['dir', 'luz']) {
+            const v = s[tipo];
+            const cambio = v !== C.senal[tipo];
+            const latido = v !== 'o' && v !== 'f' && ahora - C.senalT[tipo] >= MS_SENAL;
+            if (!cambio && !latido) continue;
+            e.senal(tipo, v);
+            C.senal[tipo] = v;
+            C.senalT[tipo] = ahora;
         }
     }
 
@@ -660,6 +687,14 @@
         // ~3 veces por segundo, con el mando abierto, se pregunta la distancia (el enlace no pregunta si la cola está ocupada)
         setInterval(() => { if (C.activa && abierto() && listo() && enlace().soportaDistancia()) enlace().pedirDistancia(); }, 330);
         document.addEventListener('robot-distancia', pintarDistancia);
+        document.addEventListener('robot-bateria-baja', e => {
+            const a = $('rb-alerta');
+            a.textContent = (e.detail.nivel === 'critica' ? 'Batería crítica ' : 'Batería baja ') + e.detail.pct + ' %';
+            a.hidden = false;
+            vibrar([200, 100, 200, 100, 200]);
+            clearTimeout(C.alertaT);
+            C.alertaT = setTimeout(() => { a.hidden = true; }, 6000);
+        });
 
         document.addEventListener('robot-estado', pintarEstado);
         document.addEventListener('seccion-admin', e => {

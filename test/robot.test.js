@@ -696,7 +696,8 @@ for (const c of R.CANCIONES) {
     // el firmware responde a DIST, avisa DIST=1 en INFO y la página sabe leerlo
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/!strcmp\(cmd, "DIST"\)/.test(ino) && /Serial\.print\(F\("DIST "\)\)/.test(ino), 'DIST en el firmware');
-    assert(/F\(" DIST=1"\)/.test(ino), 'INFO avisa DIST=1');
+    assert(/F\(" DIST=1/.test(ino), 'INFO avisa DIST=1');
+    assert(/DIST=1 DIR=1/.test(ino) && /!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/\^DIST /.test(js) && /kv\.DIST === 1/.test(js), 'la página lee DIST y DIST=1');
 }
@@ -711,4 +712,17 @@ console.log('robot.test.js: todo bien');
     assert.strictEqual(R.mezclaJoystick(0, 1, 100, 9999).izq, R.VEL_TURBO);
     const g = R.mezclaJoystick(1, 0, 100, R.VEL_TURBO);
     assert(g.izq === R.VEL_TURBO && g.der === -R.VEL_TURBO);
+}
+
+{
+    const S = R.senalesDeMovimiento;
+    assert.deepStrictEqual(S(100, 100, false, false), { dir: 'o', luz: 'o' }, 'derecho: sin direccional');
+    assert.deepStrictEqual(S(100, 90, false, true), { dir: 'o', luz: 'o' }, 'curva suave: sin direccional');
+    assert.deepStrictEqual(S(180, 40, false, true), { dir: 'd', luz: 'o' }, 'giro fuerte a la derecha');
+    assert.deepStrictEqual(S(40, 180, false, true), { dir: 'i', luz: 'o' }, 'giro fuerte a la izquierda');
+    assert.deepStrictEqual(S(-180, 180, false, true), { dir: 'i', luz: 'o' }, 'giro en el sitio');
+    assert.deepStrictEqual(S(0, 0, true, true), { dir: 'x', luz: 'f' }, 'bloqueado por obstáculo: intermitentes y freno');
+    assert.deepStrictEqual(S(0, 0, false, true), { dir: 'o', luz: 'f' }, 'al soltar: luz de freno');
+    assert.deepStrictEqual(S(0, 0, false, false), { dir: 'o', luz: 'o' }, 'quieto sin haberse movido: nada');
+    assert.strictEqual(S(-100, -100, false, true).luz, 'r', 'reversa');
 }
