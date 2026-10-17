@@ -1115,90 +1115,119 @@
                                         <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
-                                    <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se mueva al contestar (un meneo corto en su sitio, solo si está libre)</span></label>
-                                    <h4 class="rb-fn-t">«Yokis, tírate un fact»</h4>
-                                    <div class="field">
-                                        <label class="field__label" for="rb-fact-texto">Lo que dice (un fact por línea; elige uno al azar)</label>
-                                        <textarea id="rb-fact-texto" class="textarea" rows="4" spellcheck="true"></textarea>
-                                    </div>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-fact-probar" class="btn btn--secondary btn--sm">Probar</button>
-                                        <button type="button" id="rb-fact-restaurar" class="btn btn--secondary btn--sm">Volver a los de fábrica</button>
-                                    </div>
-                                    <h4 class="rb-fn-t">La voz de Yokis</h4>
-                                    <div class="rb-calib">
-                                        <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
-                                        <label class="field"><span class="field__label">Más grave ← → más aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
-                                        <label class="field"><span class="field__label">Más calmada ← → más enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
-                                    </div>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
-                                    </div>
-                                    <label class="rb-check"><input type="checkbox" id="rb-vozia-on"><span>Voz con IA (Gemini, gratis con tu llave de abajo): más natural que la del teléfono. Tarda un par de segundos en hablar y, si falla o se acaba la cuota, usa la voz del teléfono.</span></label>
-                                    <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
-                                    <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
-                                    <h4 class="rb-fn-t">IA de respaldo (gratis)</h4>
-                                    <p class="hint">Yokis ya corrige solo lo que el micrófono oye mal. Si aun así no entiende, puede preguntarle a Gemini, que es gratis: consigue una llave en aistudio.google.com/apikey y pégala aquí. Sin llave funciona igual, solo sin este respaldo. Solo se manda lo que dijiste.</p>
-                                    <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar</button>
-                                    </div>
-                                    <p id="rb-ia-estado" class="hint" role="status"></p>
-                                    <h4 class="rb-fn-t">Voces entrenadas</h4>
-                                    <p class="hint">Entrena una voz con un amigo: lee unas frases, la guardas con un nombre y Yokis habla con ella. Con su propia voz solo dice las frases que se grabaron; en lo demás ajusta la voz del teléfono al tono de tu amigo. No es una clonación perfecta.</p>
-                                    <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
-                                    </div>
-                                    <p id="rb-ent-msg" class="msg" role="status"></p>
-                                    <dialog id="rb-ent-ventana" class="rb-ventana" aria-labelledby="rb-ent-titulo">
-                                        <header class="rb-ventana__cab">
-                                            <h3 id="rb-ent-titulo">Entrenar una voz</h3>
-                                            <button type="button" id="rb-ent-cerrar" class="icon-btn" aria-label="Cerrar el entrenamiento"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
-                                        </header>
-                                        <div class="rb-ventana__cuerpo">
-                                            <div id="rb-ent-pasos" class="rb-ent-pasos">
-                                                <div class="rb-ent-prog">
-                                                    <progress id="rb-ent-prog" max="12" value="0" aria-label="Avance del entrenamiento"></progress>
-                                                    <span id="rb-ent-paso">Frase 1 de 12</span>
+                                    <div class="rb-ops">
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Voz de Yokis</span><span class="rb-op__r">Cómo suena al hablar</span></summary>
+                                            <div class="rb-op__c">
+                                                <div class="rb-seg" role="radiogroup" aria-label="Cómo habla Yokis">
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-off" checked><span>Voz del teléfono</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-on"><span>Voz con IA</span></label>
                                                 </div>
-                                                <p class="rb-ent-pide">Que tu amigo lea en voz alta:</p>
-                                                <blockquote id="rb-ent-frase" class="rb-ent-frase"></blockquote>
-                                                <div class="rb-ent-audio">
-                                                    <button type="button" id="rb-ent-play" class="rb-ent-play" aria-label="Escuchar la grabación" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
-                                                    <canvas id="rb-ent-onda" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de la grabación"></canvas>
-                                                    <span id="rb-ent-tiempo" class="rb-ent-tiempo">0:00</span>
+                                                <div id="rb-voz-tel" class="stack">
+                                                    <label class="field"><span class="field__label">Voz</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
+                                                    <div class="rb-calib">
+                                                        <label class="field"><span class="field__label">Grave ← → aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
+                                                        <label class="field"><span class="field__label">Calmada ← → enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
+                                                    </div>
                                                 </div>
-                                                <div class="rb-ent-botones">
-                                                    <button type="button" id="rb-ent-grabar" class="btn btn--primary">Grabar</button>
-                                                    <button type="button" id="rb-ent-sig" class="btn btn--secondary" disabled>Siguiente</button>
+                                                <div id="rb-voz-ia" class="stack" hidden>
+                                                    <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
+                                                    <p class="hint">Necesita la llave de «IA gratis». Tarda un par de segundos; si falla, habla el teléfono.</p>
                                                 </div>
-                                                <p id="rb-ent-aviso" class="msg" role="status"></p>
-                                            </div>
-                                            <div id="rb-ent-final" class="rb-ent-final" hidden>
-                                                <p class="rb-ent-pide">¡Listo! Ponle un nombre a esta voz para guardarla.</p>
-                                                <label class="field"><span class="field__label">Nombre de la voz</span><input id="rb-ent-nombre" class="input" type="text" maxlength="30" placeholder="Por ejemplo: Voz de Carlos" autocomplete="off"></label>
-                                                <div class="rb-ent-botones">
-                                                    <button type="button" id="rb-ent-guardar" class="btn btn--primary" disabled>Guardar la voz</button>
-                                                    <button type="button" id="rb-ent-atras" class="btn btn--secondary">Volver</button>
+                                                <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se menee al contestar</span></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </dialog>
-                                    <h4 class="rb-fn-t">Prueba con estas frases</h4>
-                                    <ul class="rb-frases">
-                                        <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
-                                        <li><b>Girar</b><span>«Yokis, gira a la derecha», «Yokis, gira cuarenta y cinco grados», «Yokis, da la vuelta»</span></li>
-                                        <li><b>Dibujar</b><span>«Yokis, dibuja un círculo», «Yokis, hazme una estrella»</span></li>
-                                        <li><b>Funciones</b><span>«Yokis, inicia la función zigzag», «Yokis, sigue la línea», «Yokis, activa esquivar obstáculos»</span></li>
-                                        <li><b>Canciones</b><span>«Yokis, toca estrellita», «Yokis, pon la canción de la cucaracha», «Yokis, detén la música»</span></li>
-                                        <li><b>Baile</b><span>«Yokis, baila», «Yokis, baila el zigzag con estrellita», «Yokis, deja de bailar»</span></li>
-                                        <li><b>Plática</b><span>«Yokis, cómo estás», «Yokis, cuéntame un chiste», «Yokis, qué hora es», «Yokis, gracias»</span></li>
-                                        <li><b>Luces</b><span>«Yokis, enciende las luces rojas», «Yokis, luces arcoíris», «Yokis, apaga las luces»</span></li>
-                                        <li><b>Casa y sensor</b><span>«Yokis, regresa a casa», «Yokis, haz un radar», «Yokis, activa la guardia»</span></li>
-                                        <li><b>Otros</b><span>«Yokis, toca el claxon», «Yokis, cuánta batería tienes», «Yokis, para»</span></li>
-                                    </ul>
-                                    <p class="hint">Empieza siempre con «Yokis»: sin eso no obedece. Se escucha una orden por toque y el robot tiene que estar conectado. El turbo solo se usa desde el mando.</p>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">IA gratis</span><span class="rb-op__r">Entiende mejor y habla natural</span></summary>
+                                            <div class="rb-op__c">
+                                                <p class="hint">Gratis. Consigue una llave en aistudio.google.com/apikey y pégala. Yokis entiende lo que el micrófono oye mal y puede hablar con voz de IA. Solo se manda lo que dices.</p>
+                                                <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                                </div>
+                                                <p id="rb-ia-estado" class="hint" role="status"></p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Voces entrenadas</span><span class="rb-op__r">Con la voz de un amigo</span></summary>
+                                            <div class="rb-op__c">
+                                                <p class="hint">Un amigo lee 12 frases y Yokis las usa con su voz. Lo demás lo dice la voz del teléfono con su tono; no es una clonación perfecta.</p>
+                                                <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
+                                                </div>
+                                                <p id="rb-ent-msg" class="msg" role="status"></p>
+                                                <dialog id="rb-ent-ventana" class="rb-ventana" aria-labelledby="rb-ent-titulo">
+                                                    <header class="rb-ventana__cab">
+                                                        <h3 id="rb-ent-titulo">Entrenar una voz</h3>
+                                                        <button type="button" id="rb-ent-cerrar" class="icon-btn" aria-label="Cerrar el entrenamiento"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                                    </header>
+                                                    <div class="rb-ventana__cuerpo">
+                                                        <div id="rb-ent-pasos" class="rb-ent-pasos">
+                                                            <div class="rb-ent-prog">
+                                                                <progress id="rb-ent-prog" max="12" value="0" aria-label="Avance del entrenamiento"></progress>
+                                                                <span id="rb-ent-paso">Frase 1 de 12</span>
+                                                            </div>
+                                                            <p class="rb-ent-pide">Que tu amigo lea en voz alta:</p>
+                                                            <blockquote id="rb-ent-frase" class="rb-ent-frase"></blockquote>
+                                                            <div class="rb-ent-audio">
+                                                                <button type="button" id="rb-ent-play" class="rb-ent-play" aria-label="Escuchar la grabación" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
+                                                                <canvas id="rb-ent-onda" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de la grabación"></canvas>
+                                                                <span id="rb-ent-tiempo" class="rb-ent-tiempo">0:00</span>
+                                                            </div>
+                                                            <div class="rb-ent-botones">
+                                                                <button type="button" id="rb-ent-grabar" class="btn btn--primary">Grabar</button>
+                                                                <button type="button" id="rb-ent-sig" class="btn btn--secondary" disabled>Siguiente</button>
+                                                            </div>
+                                                            <p id="rb-ent-aviso" class="msg" role="status"></p>
+                                                        </div>
+                                                        <div id="rb-ent-final" class="rb-ent-final" hidden>
+                                                            <p class="rb-ent-pide">¡Listo! Ponle un nombre a esta voz para guardarla.</p>
+                                                            <label class="field"><span class="field__label">Nombre de la voz</span><input id="rb-ent-nombre" class="input" type="text" maxlength="30" placeholder="Por ejemplo: Voz de Carlos" autocomplete="off"></label>
+                                                            <div class="rb-ent-botones">
+                                                                <button type="button" id="rb-ent-guardar" class="btn btn--primary" disabled>Guardar la voz</button>
+                                                                <button type="button" id="rb-ent-atras" class="btn btn--secondary">Volver</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </dialog>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Facts</span><span class="rb-op__r">«Yokis, tírate un fact»</span></summary>
+                                            <div class="rb-op__c">
+                                                <div class="field">
+                                                    <label class="field__label" for="rb-fact-texto">Un fact por línea</label>
+                                                    <textarea id="rb-fact-texto" class="textarea" rows="4" spellcheck="true"></textarea>
+                                                </div>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-fact-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                                    <button type="button" id="rb-fact-restaurar" class="btn btn--secondary btn--sm">Volver a los de fábrica</button>
+                                                </div>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Qué decirle</span><span class="rb-op__r">Frases para probar</span></summary>
+                                            <div class="rb-op__c">
+                                                <ul class="rb-frases">
+                                                    <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
+                                                    <li><b>Girar</b><span>«Yokis, gira a la derecha», «Yokis, gira cuarenta y cinco grados», «Yokis, da la vuelta»</span></li>
+                                                    <li><b>Dibujar</b><span>«Yokis, dibuja un círculo», «Yokis, hazme una estrella»</span></li>
+                                                    <li><b>Funciones</b><span>«Yokis, inicia la función zigzag», «Yokis, sigue la línea», «Yokis, activa esquivar obstáculos»</span></li>
+                                                    <li><b>Canciones</b><span>«Yokis, toca estrellita», «Yokis, pon la canción de la cucaracha», «Yokis, detén la música»</span></li>
+                                                    <li><b>Baile</b><span>«Yokis, baila», «Yokis, baila el zigzag con estrellita», «Yokis, deja de bailar»</span></li>
+                                                    <li><b>Plática</b><span>«Yokis, cómo estás», «Yokis, cuéntame un chiste», «Yokis, qué hora es», «Yokis, gracias»</span></li>
+                                                    <li><b>Luces</b><span>«Yokis, enciende las luces rojas», «Yokis, luces arcoíris», «Yokis, apaga las luces»</span></li>
+                                                    <li><b>Casa y sensor</b><span>«Yokis, regresa a casa», «Yokis, haz un radar», «Yokis, activa la guardia»</span></li>
+                                                    <li><b>Otros</b><span>«Yokis, toca el claxon», «Yokis, cuánta batería tienes», «Yokis, para»</span></li>
+                                                </ul>
+                                                <p class="hint">Empieza siempre con «Yokis». Una orden por toque y con el robot conectado. El turbo solo desde el mando.</p>
+                                            </div>
+                                        </details>
+                                    </div>
                                 </div>
                             </div>
                         </section>

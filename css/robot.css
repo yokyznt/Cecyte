@@ -148,6 +148,35 @@
 .rb-ajustes summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .rb-ajustes[open] > .stack { padding-bottom: 12px; }
 
+.rb-ops { display: grid; gap: 10px; margin-top: 14px; }
+.rb-op { border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--surface); }
+.rb-op > summary {
+    list-style: none; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center;
+    min-height: 60px; padding: 10px 16px; border-radius: var(--r-lg); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rb-op > summary::-webkit-details-marker { display: none; }
+.rb-op > summary::after {
+    content: ''; grid-column: 2; grid-row: 1 / span 2; width: 9px; height: 9px; margin-right: 4px;
+    border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(45deg); transition: transform 200ms var(--ease-out);
+}
+.rb-op[open] > summary::after { transform: rotate(-135deg); }
+.rb-op[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.rb-op > summary:focus-visible { outline: 2px solid var(--green-700); outline-offset: -2px; }
+.rb-op__t { font-weight: 800; }
+.rb-op__r { grid-column: 1; font-size: var(--fs-cap); color: var(--ink-3); }
+.rb-op__c { display: grid; gap: 14px; padding: 14px 16px 16px; }
+.rb-op__c > .hint, .rb-op__c .field { margin: 0; }
+
+.rb-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); }
+.rb-seg__op { position: relative; display: block; }
+.rb-seg__op input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.rb-seg__op span {
+    display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; border-radius: 99px;
+    font-size: var(--fs-sm); font-weight: 700; color: var(--ink-2); text-align: center; transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.rb-seg__op input:checked + span { background: var(--green-700); color: #fff; box-shadow: var(--shadow-1); }
+.rb-seg__op input:focus-visible + span { outline: 2px solid var(--green-700); outline-offset: 2px; }
+
 /* Barra fija del apartado Robot: parar y reproducir lo de la sección que se está viendo */
 .rb-barra {
     position: sticky; bottom: 12px; z-index: 25; margin-top: 18px;

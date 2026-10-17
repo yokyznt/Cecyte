@@ -489,19 +489,26 @@
     }
 
     function iniciarVozIA() {
-        const on = $('rb-vozia-on'), sel = $('rb-vozia-voz');
-        if (!on || !sel) return;
+        const on = $('rb-vozia-on'), off = $('rb-vozia-off'), sel = $('rb-vozia-voz');
+        if (!on || !off || !sel) return;
         const a = ajustesVozIA();
         sel.innerHTML = VOCES_IA.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
         on.checked = a.on;
+        off.checked = !a.on;
         sel.value = a.voz;
+        const mostrar = () => {
+            $('rb-voz-tel').hidden = on.checked;
+            $('rb-voz-ia').hidden = !on.checked;
+        };
         const guardar = () => {
             VIA.pausaHasta = 0;
+            mostrar();
             try { localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ on: on.checked, voz: sel.value })); } catch (e) { return; }
-            if (on.checked && !llaveIA()) $('rb-ia-estado').textContent = 'Para la voz con IA pega tu llave de Gemini arriba.';
+            if (on.checked && !llaveIA()) $('rb-ia-estado').textContent = 'Para la voz con IA pega tu llave de Gemini en «IA gratis».';
         };
-        on.addEventListener('change', guardar);
+        [on, off].forEach(r => r.addEventListener('change', guardar));
         sel.addEventListener('change', () => { guardar(); hablar('¡Qué onda, we! Así suena esta voz.', true); });
+        mostrar();
     }
 
     async function voz(texto) {
