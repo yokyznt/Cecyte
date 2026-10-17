@@ -12,7 +12,7 @@ conecta por Bluetooth LE; en la web de escritorio sigue por USB.
 | Sesión de admin | cookie HttpOnly | token Bearer (`js/api.js`), solo en el APK |
 | Avisos | Web Push + service worker | notificaciones locales (`js/avisos-nativos.js`) |
 | Sin conexión | service worker | copia local del horario y de los grupos |
-| Robot | sí, por USB (Web Serial) | sí, por Bluetooth LE (`js/robot-bluetooth.js`) con mando en horizontal (`js/robot-control.js`) |
+| Robot | no (la pestaña solo sale en la app) | sí, por Bluetooth LE (`js/robot-bluetooth.js`) con mando en horizontal (`js/robot-control.js`) |
 
 ## Estructura
 

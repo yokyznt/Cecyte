@@ -317,9 +317,7 @@ for (const c of R.CANCIONES) {
     }
     assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
     // diagnóstico que la página lee al conectar
-    assert(ino.includes('F(" BAT=")'), 'INFO sin BAT=');
-    assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
-    assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
+    assert(ino.includes('F("INFO BAT=")') && ino.includes('strcmp(cmd, "BAT")'), 'INFO y BAT con el voltaje');
     // el bootloader de esta placa puede dejar el watchdog armado: se apaga antes que nada (.init3),
     // y MCUSR ya no sirve para saber por que se reinicio (solo se limpia)
     assert(/section\("\.init3"\)/.test(ino) && /wdt_disable\(\)/.test(ino) && /MCUSR = 0;/.test(ino), 'el firmware apaga el watchdog al arrancar');
@@ -587,6 +585,15 @@ for (const c of R.CANCIONES) {
     assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
 }
 
+// 23c) El robot solo se controla desde la app: sin Web Serial y con la pestaña oculta en la web
+{
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!/navigator\.serial|requestPort|abrirSerie/.test(js), 'robot.js ya no usa Web Serial');
+    assert(/id="tab-ap-robot" data-solo="android"/.test(html), 'la pestaña Robot solo sale en la app');
+    assert(!/data-solo="web"/.test(html.slice(html.indexOf('id="sec-robot"'), html.indexOf('class="rb-barra"'))), 'sin instrucciones de USB en la sección del robot');
+}
+
 // 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz
 {
     const { notas } = R.leerNotas('C4/4 E4 G4 C5');                 // 262..523 Hz
@@ -628,8 +635,8 @@ for (const c of R.CANCIONES) {
     assert(/strcmp\(cmd, "FSAVE"\)/.test(ino) && /strcmp\(cmd, "FCLR"\)/.test(ino) && /void fnCargar\(\)/.test(ino));
     const dir = Number(/const int FN_DIR = (\d+);/.exec(ino)[1]);
     const pgm = Number(/const int PGM_DIR = (\d+);/.exec(ino)[1]) + 4 + Number(/const int PGM_MAX = (\d+);/.exec(ino)[1]);
-    const diag = Number(/const int EE_BOOT = (\d+)/.exec(ino)[1]);
-    assert(dir >= pgm && dir + 4 <= diag, 'la función guardada no pisa el show ni los contadores');
+    const luces = Number(/const int EE_DIR = (\d+);/.exec(ino)[1]);
+    assert(dir >= pgm && dir + 4 <= luces, 'la función guardada no pisa el show ni las luces guardadas');
     assert(/if \(modo != 0\) fnEspera = 0;/.test(ino), 'si la página toma el control, la función no arranca sola');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');

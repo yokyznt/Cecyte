@@ -157,13 +157,13 @@ El panel de Admin tiene tres apartados, cada uno con sus secciones:
 Se puede abrir una sección directo con `#admin-<sección>` (por ejemplo `#admin-robot-luces`;
 `#admin-robot` abre Música). `node test/admin-secciones.test.js` revisa que el HTML y el script coincidan.
 
-Todo lo del robot ocurre entre el navegador y el robot por USB (Web Serial, Chrome o Edge en una
-computadora); no usa Vercel ni variables nuevas.
+El robot se controla solo desde la app del celular, por Bluetooth (la pestaña Robot no aparece en la web
+y ya no hay Web Serial); no usa Vercel ni variables nuevas.
 
 Una sola vez hay que subirle al robot `robot/mbot_ranger_web/mbot_ranger_web.ino`
 con el IDE de Arduino (placa "Arduino Mega or Mega 2560", librería Makeblock). Es el
 sketch del tanquecito con los modos del botón más el modo 4, el de la página.
-Después, al abrir la pestaña con el robot enchufado, se conecta solo.
+El USB solo sirve para subir el programa desde la computadora; después la app se conecta por Bluetooth.
 
 - **Canciones y baile:** se escriben como texto (`C4/4 D4 E4/2`, `AD/2 GI/4`). También
   acepta milisegundos (`A5:120 R:300`).

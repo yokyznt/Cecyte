@@ -39,7 +39,6 @@
     SENS             responde "SENS 01": lo que ven los dos sensores de línea (1 = nivel alto)
     DIR i|d|x|o      direccional izquierda, derecha, intermitentes o apagar (se apaga sola a los 4 s sin repetir)
     LUZ f|r|o        luz de freno (roja), de reversa (blanca con pitido) o apagar
-    DIAG0            borra los contadores de diagnóstico que el robot dice al encender (INFO ...)
     !                un solo byte, sin salto de línea: paro de emergencia. Corta la nota,
                      frena los motores y borra lo pendiente. Responde ABORTED.
   Avisos sueltos: "BTN n" (se cambió de modo con el botón) y "WDT" (los motores se pararon
@@ -201,22 +200,13 @@ unsigned long fxUltimo = 0;
 // ---------- Movimiento ----------
 // Voltaje de la batería en centésimas de volt (A4 mide un tercio, como en el firmware de fábrica)
 int bateriaCv() { return (int)((long)analogRead(A4) * 1500L / 1024L); }
-void imprimeDec(int centesimas, int decimales) {          // 742 -> "7.42" (2 decimales) o 74 -> "7.4" (1)
-  int div = decimales == 2 ? 100 : 10;
-  Serial.print(centesimas / div);
+void imprimeBat() {                                        // 742 -> "7.42"
+  const int cv = bateriaCv();
+  Serial.print(cv / 100);
   Serial.print('.');
-  int resto = centesimas % div;
-  if (decimales == 2 && resto < 10) Serial.print('0');
-  Serial.print(resto);
+  if (cv % 100 < 10) Serial.print('0');
+  Serial.print(cv % 100);
 }
-
-// Diagnóstico que sobrevive a un reinicio (EEPROM, 0xFF = vacío; la página lo muestra al conectar).
-// El bootloader de esta placa borra MCUSR antes de arrancar el sketch, así que no se puede saber por
-// qué se reinició; en su lugar se cuenta: BOOT = arranques (conectar por USB cuenta uno), BTN = veces
-// que el botón cambió de modo, RUN = pasadas del show, MIN = voltaje más bajo con las ruedas andando (x10).
-const int EE_BOOT = 2980;
-uint8_t cuentaEE(int dir) { uint8_t v = EEPROM.read(dir); return v == 0xFF ? 0 : v; }
-void sumaEE(int dir) { uint8_t v = cuentaEE(dir); if (v < 254) EEPROM.update(dir, v + 1); }
 
 // izq y der: positivo = esa rueda va hacia adelante.
 // Las ruedas suben en rampa (16 de PWM cada 12 ms): pedirle de golpe toda la corriente a la batería
@@ -501,13 +491,18 @@ int nibble(char c) {
   return -1;
 }
 
-bool ledsHex(const char *h) {
-  uint8_t v[36];
+bool hex36(const char *h, uint8_t *v) {
   for (int i = 0; i < 36; i++) {
     int hi = nibble(h[2 * i]), lo = nibble(h[2 * i + 1]);
     if (hi < 0 || lo < 0) return false;
     v[i] = hi * 16 + lo;
   }
+  return true;
+}
+
+bool ledsHex(const char *h) {
+  uint8_t v[36];
+  if (!hex36(h, v)) return false;
   for (int i = 0; i < 12; i++) ledPon(i, v[3 * i], v[3 * i + 1], v[3 * i + 2]);
   ledsMuestra();
   return true;
@@ -541,14 +536,7 @@ uint8_t fxMatizDe(int hz) {
   return (uint8_t)((clase % 12) * 255 / 12);
 }
 
-bool fxCarga(const char *h) {
-  for (int i = 0; i < 36; i++) {
-    int hi = nibble(h[2 * i]), lo = nibble(h[2 * i + 1]);
-    if (hi < 0 || lo < 0) return false;
-    fxBase[i / 3][i % 3] = hi * 16 + lo;
-  }
-  return true;
-}
+bool fxCarga(const char *h) { return hex36(h, &fxBase[0][0]); }
 
 uint8_t dirSenal = 0, luzSenal = 0, senalVista = 0, senalFase = 0;
 uint8_t anilloGuardado[36];
@@ -903,10 +891,8 @@ void fnCargar() {
 
 // ---------- Órdenes ----------
 void imprimeInfo() {
-  Serial.print(F("INFO BOOT="));
-  Serial.print(cuentaEE(EE_BOOT));
-  Serial.print(F(" BAT="));
-  imprimeDec(bateriaCv(), 2);
+  Serial.print(F("INFO BAT="));
+  imprimeBat();
   Serial.print(F(" TRIM="));
   Serial.print((int)trim);
   Serial.print(F(" DIST=1 DIR=1 LIN=1 PARK=1"));
@@ -994,7 +980,7 @@ void ejecuta(char *s) {
     ok();
   } else if (!strcmp(cmd, "BAT")) {
     Serial.print(F("BAT "));
-    imprimeDec(bateriaCv(), 2);
+    imprimeBat();
     Serial.println();
   } else if (!strcmp(cmd, "DIST")) {
     Serial.print(F("DIST "));
@@ -1022,9 +1008,6 @@ void ejecuta(char *s) {
     Serial.print(F("SENS "));
     Serial.print(digitalRead(LN_S1));
     Serial.println(digitalRead(LN_S2));
-  } else if (!strcmp(cmd, "DIAG0")) {          // borra los contadores de diagnóstico
-    EEPROM.update(EE_BOOT, 0xFF);
-    ok();
   } else if (!strcmp(cmd, "PCLR")) {
     EEPROM.update(PGM_DIR, 0);                 // el show queda inválido hasta que PEND lo cierre
     pgmFin = 0;
@@ -1133,7 +1116,6 @@ void setup() {
   }
   fnCargar();
   if (fnModo && EEPROM.read(FN_DIR + 2)) fnEspera = millis() + 2500;   // arranca sola, a los 2,5 s
-  sumaEE(EE_BOOT);
   imprimeInfo();
   Serial.println(F("mBot Ranger web v1 listo"));
 }

@@ -1,5 +1,5 @@
 // ==================== Robot mBot Ranger (panel de admin) ====================
-// La página habla por USB (Web Serial, Chrome o Edge) con el programa robot/mbot_ranger_web.
+// La app habla por Bluetooth con el programa robot/mbot_ranger_web (el robot ya no se maneja desde la web).
 // Le manda notas, movimientos y colores como líneas de texto y espera el "OK" de cada una.
 //
 // La primera mitad es lógica pura (leer canciones, compilar a órdenes, cola con confirmaciones)
@@ -1418,11 +1418,10 @@ if (typeof document === 'undefined') return;
 
 const $ = id => document.getElementById(id);
 const LLAVE = 'cecyte_robot_v1';
-const VID_CH340 = 0x1A86;
 
 const S = {
     estado: 'desconectado',   // desconectado | conectando | listo | sinprograma
-    transporte: null, juntar: null, vioArranque: false,
+    transporte: null, juntar: null,
     cola: null, actuando: false, sucio: true, sel: 0,
     inicio: 0, total: 0, audio: null,
     leds: Array.from({ length: LEDS }, () => COLOR_INICIAL),
@@ -1546,10 +1545,7 @@ function ponEstado(est) {
     $('rb-badge-text').textContent = txt;
     $('rb-conectar').textContent = est === 'desconectado' ? 'Conectar el robot' : 'Desconectar';
     for (const id of ['rb-tocar', 'rb-bailar', 'rb-fn-iniciar', 'rb-fn-guardar', 'rb-fn-borrar', 'rb-baile-guardar', 'rb-rul-girar', 'rb-serie-play', 'rb-serie-guardar', 'rb-serie-borrar']) $(id).disabled = est !== 'listo';
-    if (est === 'sinprograma') {
-        if ($('rb-instalar')) $('rb-instalar').open = true;
-        if (typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });   // las instrucciones, a la vista
-    }
+    if (est === 'sinprograma' && typeof mostrarSeccionAdmin === 'function') mostrarSeccionAdmin('robot-instalar', { recordar: false });
 }
 
 // ---------- Transporte: USB (Web Serial) o Bluetooth (BLE) ----------
@@ -1585,8 +1581,6 @@ function alLinea(l) {
             document.dispatchEvent(new CustomEvent('robot-distancia'));
         }
     } else if (/^INFO /.test(l)) {
-        // "INFO BOOT=2 BTN=0 RUN=3 MIN=5.4 BAT=7.42" al encender: lo que el robot anotó solo desde que
-        // se borró el aviso. BOOT cuenta cada arranque, y conectarlo por USB también reinicia la placa
         const kv = {};
         for (const par of l.slice(5).split(' ')) { const [k, v] = par.split('='); kv[k] = parseFloat(v); }
         S.fwNuevo = true;                  // este programa ya entiende la orden BAT
@@ -1597,17 +1591,8 @@ function alLinea(l) {
         document.dispatchEvent(new CustomEvent('robot-distancia'));
         if (Number.isFinite(kv.TRIM)) { S.trim = clamp(kv.TRIM, -30, 30); pintarFunciones(); }   // la corrección vive en el robot
         bateriaLeida(kv.BAT);
-        const cosas = [];
-        if (kv.BOOT > 1) cosas.push(`${kv.BOOT} arranques (conectarlo por USB cuenta uno; si lo probaste solo, los demás fueron reinicios)`);
-        if (kv.BTN) cosas.push(`${kv.BTN} cambio(s) de modo con el botón`);
-        if (kv.RUN) cosas.push(`${kv.RUN} pasada(s) del show`);
-        if (kv.MIN) cosas.push(`voltaje más bajo con las ruedas andando: ${kv.MIN.toFixed(1)} V`);
-        $('rb-diag-txt').textContent = cosas.length ? 'Desde la última vez que lo borraste: ' + cosas.join(', ') + '.' : '';
-        $('rb-diag').hidden = !cosas.length;
     } else if (/^PONG mbot-web/.test(l) || /mBot Ranger web .*listo/.test(l)) {
         if (S.estado === 'conectando') alListo();
-    } else if (/mBot Ranger listo/.test(l)) {
-        S.vioArranque = true;   // el programa viejo (tanquecito): no habla con la página
     } else if (l === 'ABORTED') {
         S.cola.abortado();
         if (S.salirModo) { S.salirModo = false; crudo('MODE 4\n'); }   // "!" para y ya, pero esquivar/seguir seguirían: se le quita el modo
@@ -1683,65 +1668,23 @@ function alListo() {
     S.sucio = true;
 }
 
-// Empieza a hablar con el robot: saluda con PING hasta que contesta PONG.
-// Por USB la placa se reinicia al abrir el puerto (hay que esperar); por Bluetooth no se reinicia.
 function iniciarSesion(t) {
     S.transporte = t;
     S.juntar = crearLector(alLinea);
-    S.vioArranque = false;
     S.cola.reiniciar();
     ponEstado('conectando');
-    const ble = t.tipo === 'ble';
-    mensaje(ble ? 'Conectando por Bluetooth…' : 'Conectando… (la placa se reinicia y suena una vez)');
+    mensaje('Conectando por Bluetooth…');
     let intentos = 0;
-    const espera = ble ? 0 : 2, tope = ble ? 12 : 14;
     S.saludo = setInterval(() => {
         if (S.estado !== 'conectando') return clearInterval(S.saludo);
-        if (++intentos > tope) {
+        if (++intentos > 12) {
             clearInterval(S.saludo);
             ponEstado('sinprograma');
-            mensaje(ble
-                ? 'Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.'
-                : S.vioArranque
-                    ? 'El robot tiene todavía el programa viejo. Instala el nuevo (abajo) y vuelve a conectar.'
-                    : 'El robot no contesta. Revisa el cable o instala el programa nuevo (abajo).', 'err');
-        } else if (intentos > espera) {
+            mensaje('Se conectó el Bluetooth pero el robot no contesta. Revisa que tenga el programa nuevo y que no lo tenga abierto otro aparato.', 'err');
+        } else {
             crudo('PING\n');
         }
     }, 400);
-}
-
-async function abrirSerie(puerto) {
-    try {
-        await puerto.open({ baudRate: BAUDIOS });
-    } catch (e) {
-        mensaje('No pude abrir el puerto. Si el IDE de Arduino o mBlock lo tienen abierto, ciérralos y vuelve a intentar.', 'err');
-        return;
-    }
-    const escritor = puerto.writable.getWriter();
-    const lector = puerto.readable.getReader();
-    const t = {
-        tipo: 'serial',
-        escribir: txt => escritor.write(new TextEncoder().encode(txt)),
-        async cerrar() {
-            try { await lector.cancel(); } catch (e) { /* ya estaba cerrado */ }
-            try { lector.releaseLock(); } catch (e) { /* idem */ }
-            try { escritor.releaseLock(); } catch (e) { /* idem */ }
-            try { await puerto.close(); } catch (e) { /* idem */ }
-        },
-    };
-    iniciarSesion(t);
-    (async () => {
-        const dec = new TextDecoder();
-        try {
-            for (;;) {
-                const { value, done } = await lector.read();
-                if (done) break;
-                entregar(dec.decode(value, { stream: true }));
-            }
-        } catch (e) { /* se desenchufó */ }
-        if (S.transporte === t) cerrar();
-    })();
 }
 
 async function cerrar() {
@@ -1760,9 +1703,7 @@ async function cerrar() {
     if (t) { try { await t.cerrar(); } catch (e) { /* ya estaba cerrado */ } }
     ponEstado('desconectado');
     progreso(0);
-    if (era === 'listo') mensaje(t && t.tipo === 'ble'
-        ? 'Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.'
-        : 'El robot se desconectó. Si lo vuelves a enchufar, se reconecta solo.');
+    if (era === 'listo') mensaje('Se perdió la conexión Bluetooth. Los motores se detienen solos; pulsa Conectar para volver.');
 }
 
 const hayBluetooth = () => !!(raiz.RobotBluetooth && raiz.RobotBluetooth.disponible());
@@ -1785,33 +1726,14 @@ async function conectarBluetooth(recordado) {
     }
 }
 
-async function conectar(todos) {
-    if (hayBluetooth()) return conectarBluetooth(false);
-    if (!('serial' in navigator)) {
-        mensaje('Este navegador no puede hablar con el robot. Abre la página en Chrome o Edge desde una computadora.', 'err');
-        return;
-    }
-    if (S.estado !== 'desconectado') { await cerrar(); return; }
-    try {
-        const filtros = todos ? [] : [{ usbVendorId: VID_CH340 }];
-        await abrirSerie(await navigator.serial.requestPort({ filters: filtros }));
-    } catch (e) {
-        if (e && e.name !== 'NotFoundError') mensaje('No se pudo conectar: ' + e.message, 'err');
-    }
+async function conectar() {
+    if (!hayBluetooth()) return mensaje('El robot solo se controla desde la app del celular.', 'err');
+    return conectarBluetooth(false);
 }
 
-// Si ya diste permiso antes, se conecta solo al abrir la pestaña (USB: también al enchufar el cable)
-async function conectarSolo() {
-    if (S.estado !== 'desconectado' || $('sec-robot').hidden) return;
-    if (hayBluetooth()) {
-        if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
-        return;
-    }
-    if (!('serial' in navigator)) return;
-    try {
-        const p = (await navigator.serial.getPorts()).find(x => (x.getInfo().usbVendorId || 0) === VID_CH340);
-        if (p) await abrirSerie(p);
-    } catch (e) { /* sin permiso todavía: espera al botón */ }
+function conectarSolo() {
+    if (S.estado !== 'desconectado' || $('sec-robot').hidden || !hayBluetooth()) return;
+    if (raiz.RobotBluetooth.recordado()) conectarBluetooth(true);
 }
 
 // ---------- Sonido en el navegador (escuchar sin robot) ----------
@@ -3270,10 +3192,8 @@ function iniciar() {
     pintarTodo();
     ponEstado('desconectado');
 
-    $('rb-conectar').addEventListener('click', () => conectar(false));
-    if ($('rb-todos')) $('rb-todos').addEventListener('click', () => conectar(true));
+    $('rb-conectar').addEventListener('click', conectar);
     $('rb-paro').addEventListener('click', paro);
-    $('rb-diag-borrar').addEventListener('click', () => { S.cola.enviar(['DIAG0']); $('rb-diag').hidden = true; });
     $('rb-tocar').addEventListener('click', () => actuar(true, false));
     $('rb-bailar').addEventListener('click', () => actuar(true, true));
     $('rb-escuchar').addEventListener('click', escucharAqui);
@@ -3482,16 +3402,8 @@ function iniciar() {
 
     setInterval(tickLeds, 100);
 
-    // Conectarse solo al abrir la pestaña y al enchufar el cable
     new MutationObserver(conectarSolo).observe($('sec-robot'), { attributes: true, attributeFilter: ['hidden'] });
-    if (hayBluetooth()) {
-        mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
-    } else if ('serial' in navigator) {
-        navigator.serial.addEventListener('connect', conectarSolo);
-        navigator.serial.addEventListener('disconnect', () => { if (S.estado !== 'desconectado') cerrar(); });
-    } else {
-        mensaje('Para controlar el robot abre esta página en Chrome o Edge desde una computadora.', 'err');
-    }
+    if (hayBluetooth()) mensaje('Enciende el robot y pulsa Conectar el robot (Bluetooth).');
     window.addEventListener('pagehide', () => { if (S.estado === 'listo') crudo(S.autonomo ? '!MODE 4\n' : '!'); });
 
     // Puerta para js/robot-control.js (control en vivo desde el celular): lo que necesita del robot sin abrir el estado interno

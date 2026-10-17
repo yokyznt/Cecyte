@@ -304,7 +304,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span>Timbre</span>
                         </button>
 <!-- @robot:start -->
-                        <button type="button" role="tab" id="tab-ap-robot" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                        <button type="button" role="tab" id="tab-ap-robot" data-solo="android" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
                         </button>
 <!-- @robot:end -->
@@ -709,7 +709,7 @@
                     </div>
 
 <!-- @robot:start -->
-                    <!-- Apartado Robot: mBot Ranger por USB -->
+                    <!-- Apartado Robot: mBot Ranger por Bluetooth (solo en la app) -->
                     <div class="admin-top rb-apartado" id="sec-robot" data-apartado="robot" hidden>
 
                         <!-- Conexión: siempre a la vista dentro del apartado Robot -->
@@ -1291,31 +1291,17 @@
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Conexión</h4>
                                     <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (se llama «Makeblock_LE…»). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
-                                    <p class="hint" data-solo="web">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
                                     <div class="btn-row">
                                     <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
                                     <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
-                                    <p class="hint" data-solo="web"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Enlace Bluetooth</h4>
                                     <p class="hint">Aquí aparece lo que el módulo Bluetooth del robot ofrece (servicio, escritura y avisos). Si algo no conecta, mándame este texto.</p>
                                     <pre id="rb-bt-info" class="rb-bt-info">Sin conectar todavía.</pre>
-                                </div>
-
-                                <div class="rb-card rb-card--ancho" data-solo="web">
-                                    <details id="rb-instalar" class="rb-instalar" open>
-                                    <summary>Instalar el programa en el robot (una sola vez)</summary>
-                                    <ol>
-                                        <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
-                                        <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
-                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página. Si ya tenías una versión anterior, vuelve a subirlo para que las luces corran solas y se queden guardadas.</li>
-                                        <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
-                                    </ol>
-                                </details>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho">
@@ -1340,7 +1326,6 @@
                                         <div class="btn-row"><button type="button" id="rb-bat-borrar" class="btn btn--secondary btn--sm">Borrar el historial de consumo</button></div>
                                     </div>
                                 </details>
-                                    <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
                                 </div>
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Sesión</h4>
