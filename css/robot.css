@@ -578,9 +578,9 @@
 .rb-ventana__cuerpo { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
 
 .rb-vz-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.rb-vz-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
+.rb-vz-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
 .rb-vz-item.is-activa { border-color: var(--green-600); background: var(--green-50); }
-.rb-vz-item > span { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
+.rb-vz-item > span { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
 .rb-vz-item small { color: var(--ink-2); font-size: var(--fs-cap); }
 .rb-vz-item .btn { flex: none; }
 .rb-ent-pasos, .rb-ent-final { display: flex; flex-direction: column; gap: 14px; }

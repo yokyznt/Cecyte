@@ -210,11 +210,12 @@
     function pintarVocesEntrenadas() {
         const ul = $('rb-vz-lista');
         if (!ul) return;
-        const fila = (nombre, detalle, uso, borrable) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
+        const fila = (nombre, detalle, uso, borrable, clonable) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
             + (uso ? '<small>En uso</small>' : '<button type="button" class="btn btn--secondary btn--sm" data-acc="usar">Usar</button>')
+            + (clonable ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="clonar">Clonar con IA</button>' : '')
             + (borrable ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="borrar" aria-label="Borrar esta voz">Borrar</button>' : '') + '</li>';
-        ul.innerHTML = fila('Voz del teléfono', 'La voz sintética que ajustaste arriba', !ENT.activa, false)
-            + ENT.voces.map(v => fila(v.nombre, `${v.n} frases${v.f0 ? ' · tono ' + Math.round(v.f0) + ' Hz' : ''}`, v.nombre === ENT.activa, true)).join('');
+        ul.innerHTML = fila('Voz del teléfono', 'La voz sintética que ajustaste arriba', !ENT.activa, false, false)
+            + ENT.voces.map(v => fila(v.nombre, `${v.n} frases${v.f0 ? ' · tono ' + Math.round(v.f0) + ' Hz' : ''}${v.clon ? ' · clonada con IA' : ''}`, v.nombre === ENT.activa, true, !v.clon)).join('');
     }
 
     function resumir(niveles, n) {
@@ -400,6 +401,11 @@
 
     async function iniciarEntrena() {
         if (!$('rb-vz-lista') || !raiz.indexedDB) return;
+        const llaveG = $('rb-gradium-llave');
+        if (llaveG) {
+            llaveG.value = llaveGradium();
+            llaveG.addEventListener('change', () => { try { localStorage.setItem(CLAVE_GRADIUM, llaveG.value.trim()); } catch (e) { return; } mensajeEnt(llaveG.value.trim() ? 'Llave de Gradium guardada.' : 'Llave de Gradium borrada.'); });
+        }
         $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
         $('rb-ent-cerrar').addEventListener('click', () => (raiz.RobotUI ? raiz.RobotUI.cerrarSuave($('rb-ent-ventana')) : $('rb-ent-ventana').close()));
         $('rb-ent-ventana').addEventListener('close', limpiarGrabacion);
@@ -414,6 +420,7 @@
             if (!b) return;
             const nombre = b.closest('.rb-vz-item').dataset.n;
             if (b.dataset.acc === 'usar') { await activarVoz(nombre === 'Voz del teléfono' ? '' : nombre); return; }
+            if (b.dataset.acc === 'clonar') { b.disabled = true; await clonarVoz(nombre); return; }
             if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Borrar?'; setTimeout(pintarVocesEntrenadas, 3000); return; }
             for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) await bdDel(k);
             await vzDel(nombre);
@@ -632,9 +639,127 @@
         });
     }
 
+    const CLAVE_GRADIUM = 'cecyte_yokis_gradium';
+    const llaveGradium = () => { try { return (localStorage.getItem(CLAVE_GRADIUM) || '').trim(); } catch (e) { return ''; } };
+
+    function bytesABase64(b) {
+        let s = '';
+        for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+        return btoa(s);
+    }
+
+    function base64ABytes(d) {
+        const s = atob(d), b = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+        return b;
+    }
+
+    function aWav16(muestras, sr) {
+        const n = muestras.length, bytes = new Uint8Array(44 + 2 * n), v = new DataView(bytes.buffer);
+        const txt = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+        txt(0, 'RIFF'); v.setUint32(4, 36 + 2 * n, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, 2 * n, true);
+        for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, muestras[i])) * 32767, true);
+        return bytes;
+    }
+
+    function recortarSilencio(x, sr) {
+        let a = 0, b = x.length - 1;
+        while (a < b && Math.abs(x[a]) < 0.02) a++;
+        while (b > a && Math.abs(x[b]) < 0.02) b--;
+        const margen = Math.round(sr * 0.1);
+        return x.slice(Math.max(0, a - margen), Math.min(x.length, b + margen));
+    }
+
+    async function muestraDeVoz(nombre) {
+        const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
+        const ctx = new Ctx({ sampleRate: 24000 }), sr = ctx.sampleRate, trozos = [];
+        let total = 0;
+        try {
+            for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) {
+                if (total >= 24 * sr) break;
+                const blob = await bdGet(k);
+                if (!blob) continue;
+                try {
+                    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+                    const t = recortarSilencio(buf.getChannelData(0), buf.sampleRate);
+                    trozos.push(t);
+                    total += t.length;
+                } catch (e) { continue; }
+            }
+        } finally {
+            ctx.close();
+        }
+        const todo = new Float32Array(total);
+        let o = 0;
+        trozos.forEach(t => { todo.set(t, o); o += t.length; });
+        return { segundos: total / sr, wav: aWav16(todo.subarray(0, Math.min(total, 25 * sr)), sr) };
+    }
+
+    async function clonarVoz(nombre) {
+        const P = raiz.Plataforma && raiz.Plataforma.plugin('ClonVoz');
+        if (!P) { mensajeEnt('Clonar la voz solo funciona en la app de Android.'); pintarVocesEntrenadas(); return; }
+        const llave = llaveGradium();
+        if (!llave) { mensajeEnt('Pega primero tu llave de Gradium (gratis).'); pintarVocesEntrenadas(); return; }
+        mensajeEnt('Preparando la muestra de «' + nombre + '»…');
+        try {
+            const m = await muestraDeVoz(nombre);
+            if (m.segundos < 8) { mensajeEnt('La muestra dura solo ' + Math.round(m.segundos) + ' s y hacen falta al menos 10. Graba la voz con más frases.'); pintarVocesEntrenadas(); return; }
+            mensajeEnt('Clonando la voz… tarda unos segundos.');
+            const r = await P.crear({ llave, nombre: 'Hevy ' + nombre, audio: bytesABase64(m.wav) });
+            let j = {};
+            try { j = JSON.parse(r.cuerpo); } catch (e) { j = {}; }
+            if (r.codigo === 401 || r.codigo === 403) { mensajeEnt('Gradium no aceptó la llave. Revísala.'); pintarVocesEntrenadas(); return; }
+            if (r.codigo === 402 || r.codigo === 429) { mensajeEnt('Se acabó el límite gratis de Gradium (5 clones).'); pintarVocesEntrenadas(); return; }
+            if (r.codigo >= 400 || !j.uid) { mensajeEnt('Gradium no pudo clonarla' + (j.error ? ': ' + j.error : ' (código ' + r.codigo + ').')); pintarVocesEntrenadas(); return; }
+            const meta = ENT.voces.find(v => v.nombre === nombre) || { nombre };
+            await vzPut(nombre, Object.assign({}, meta, { clon: j.uid }));
+            ENT.voces = (await vzTodas()) || [];
+            pintarVocesEntrenadas();
+            mensajeEnt('¡Listo! «' + nombre + '» ya está clonada: Hevy hablará con esa voz cuando la pongas en uso.');
+        } catch (e) {
+            pintarVocesEntrenadas();
+            mensajeEnt('No pude clonar la voz: ' + (e && e.message ? e.message : 'sin conexión') + '.');
+        }
+    }
+
+    async function hablarClon(texto) {
+        const m = ENT.activa && ENT.voces.find(v => v.nombre === ENT.activa);
+        const llave = llaveGradium();
+        if (!m || !m.clon || !llave) return false;
+        const turno = ++VIA.turno;
+        try {
+            const clave = 'clon|' + m.clon + '|' + texto;
+            let datos = VIA.cache.get(clave) || await cacheGet(clave);
+            if (!datos) {
+                const r = await fetch('https://api.gradium.ai/api/post/speech/tts', {
+                    method: 'POST', headers: { 'x-api-key': llave, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: texto, voice_id: m.clon, output_format: 'wav', only_audio: true }),
+                });
+                if (!r.ok) return false;
+                datos = bytesABase64(new Uint8Array(await r.arrayBuffer()));
+                cachePut(clave, datos);
+            }
+            VIA.cache.set(clave, datos);
+            if (turno !== VIA.turno) return true;
+            callarIA();
+            const url = URL.createObjectURL(new Blob([base64ABytes(datos)], { type: 'audio/wav' }));
+            try {
+                await sonar(url);
+                estadoVoz('Voz: clon de «' + m.nombre + '».');
+                return true;
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function voz(texto) {
         callarIA();
         if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
+        if (await hablarClon(texto)) return;
         if (await hablarIA(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
