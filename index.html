@@ -355,6 +355,9 @@
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
                         </button>
+                        <button type="button" role="tab" id="tab-robot-telefono" data-section-tab="robot-telefono" aria-controls="sec-robot-telefono" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-celular"/></svg><span>Teléfono</span>
+                        </button>
                         <button type="button" role="tab" id="tab-robot-instalar" data-section-tab="robot-instalar" aria-controls="sec-robot-instalar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Conexión</span>
                         </button>
@@ -1337,6 +1340,35 @@
                         </section>
 
                         <!-- Instalar el programa -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-telefono" data-section="robot-telefono" role="tabpanel" aria-label="Teléfonos compartidos" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Teléfono</h4>
+                                    <p id="rb-tel-aviso" class="rb-tel__aviso" role="status" hidden></p>
+                                    <div class="rb-ops">
+                                        <details class="rb-op" open>
+                                            <summary><span class="rb-op__t">Mi teléfono</span><span class="rb-op__r">Nombre, sala y compartir</span></summary>
+                                            <div class="rb-op__c">
+                                                <label class="field"><span class="field__label">Mi nombre</span><input type="text" id="rb-tel-nombre" class="input" maxlength="20" autocomplete="off"></label>
+                                                <label class="field"><span class="field__label">Código de sala</span><input type="text" id="rb-tel-sala" class="input" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-tel-crear" class="btn btn--secondary btn--sm">Crear sala nueva</button>
+                                                    <button type="button" id="rb-tel-borrar" class="btn btn--secondary btn--sm">Borrar mi punto</button>
+                                                </div>
+                                                <label class="rb-check"><input type="checkbox" id="rb-tel-compartir"><span>Compartir mi ubicación con la sala</span></label>
+                                                <p id="rb-tel-estado" class="hint" role="status"></p>
+                                                <p class="hint">Solo ven tu ubicación quienes tengan el código y también estén compartiendo. Se borra al apagar, a los 3 minutos sin señal y al cerrar la app. Para que Hevy te busque, pon el celular plano sobre el robot con la parte de arriba hacia el frente.</p>
+                                            </div>
+                                        </details>
+                                    </div>
+                                    <span class="rb-fn-t">Teléfonos en la sala</span>
+                                    <canvas id="rb-tel-radar" class="rb-lienzo" width="300" height="300" aria-label="Radar de teléfonos"></canvas>
+                                    <ul id="rb-tel-lista" class="rb-mem"></ul>
+                                    <div class="btn-row"><button type="button" id="rb-tel-parar" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar la búsqueda</button></div>
+                                </div>
+                            </div>
+                        </section>
+
                         <section class="panel admin-sec rb-panel" id="sec-robot-instalar" data-section="robot-instalar" role="tabpanel" aria-label="Instalar el programa en el robot" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
@@ -1481,7 +1513,7 @@
     <script src="calendario.js"></script>
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
-    <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
+    <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js', 'js/robot-telefono.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

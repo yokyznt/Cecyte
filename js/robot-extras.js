@@ -23,7 +23,7 @@
     const NEGACION = /\b(no|ni|nunca|tampoco|jamas|nada|aunque)\b/;
     const PROMETIDAS = ['cancion', 'baile', 'luces', 'funcion', 'figura', 'radar', 'guardia', 'casa'];
     const REBELDES = ['mover', 'giro', 'figura', 'luces', 'baile', 'cancion', 'funcion', 'casa', 'radar', 'claxon', 'ruleta'];
-    const SIN_DICE = ['sinRobot', 'fallo', 'ocupado', 'sinFuncion', 'sinCancion', 'sinMicro', 'sinVoz'];
+    const SIN_DICE = ['sinRobot', 'fallo', 'ocupado', 'sinFuncion', 'sinCancion', 'sinMicro', 'sinVoz', 'telSinCompartir', 'telSinUbicacion', 'telSinGiro', 'telSinBrujula', 'telPerdido', 'telBloqueo', 'telGps', 'telTiempo', 'telBateria', 'telLlegue'];
 
     const enlace = () => raiz.RobotEnlace || null;
     const control = () => raiz.RobotControl || null;
@@ -1592,6 +1592,7 @@
         if (o.a === 'charla') { charla(o.t); return; }
         if (o.a === 'modo') { cambiarModo(o.modo); return; }
         if (o.a === 'ppt') { jugarPPT(o.usuario); return; }
+        if (o.a === 'buscar_telefono') { if (raiz.Telefonos) raiz.Telefonos.buscar(o.nombre); else di('fallo'); return; }
         if (o.a === 'recordar') { guardarMemoria(o.dato); if (!E.callado) hablar('Anotado, lo recuerdo.', true); return; }
         if (o.a === 'aprender') { guardarRutina(o.nombre, o.pasos); if (!E.callado) hablar('Listo, aprendí la rutina «' + o.nombre + '».', true); return; }
         if (o.a === 'rutina') {
@@ -1600,7 +1601,7 @@
             return;
         }
         if (o.a === 'saludo') { di('saludo'); return; }
-        if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
+        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -2121,8 +2122,10 @@
             if (listo() && enlace().soportaDistancia && enlace().soportaDistancia()) { enlace().pedirDistancia(); await esperar(600); }
             return datosRobot();
         }
+        if (nombre === 'listar_telefonos') return raiz.Telefonos ? raiz.Telefonos.resumen() : { compartiendo: false, telefonos: [] };
         const o = raiz.Robot.accionDeHerramienta(nombre, args || {});
         if (!o) return { ok: false, error: 'parámetros inválidos' };
+        if (o.a === 'buscar_telefono') return raiz.Telefonos ? raiz.Telefonos.buscar(o.nombre) : { ok: false, error: 'la pestaña Teléfono no está disponible' };
         if (o.a === 'recordar') { guardarMemoria(o.dato); return { ok: true }; }
         if (o.a === 'aprender') { guardarRutina(o.nombre, o.pasos); return { ok: true }; }
         if (o.a === 'rutina') {
@@ -2542,6 +2545,8 @@
         });
         iniciarLienzo();
     }
+
+    raiz.Hevy = { hablar, di, modo: modoHevy };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
     else iniciar();

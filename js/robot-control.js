@@ -901,6 +901,7 @@
         turbo: si => ponerTurbo(!!si),
         marcarCasa() { C.trayecto = []; C.casa0 = 0; },
         trayecto: () => ({ pasos: C.trayecto.slice(), ms: C.trayecto.length ? Date.now() - C.casa0 : 0 }),
+        rumbo: () => (hayBrujula() ? C.fiF : null),
         vibrar,
     };
 

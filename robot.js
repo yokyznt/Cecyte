@@ -208,6 +208,36 @@ function rumboRelativo(fiActual, theta, fi0) {
     return ((r % 360) + 540) % 360 - 180;
 }
 
+// ---------- Teléfonos: distancia y rumbo entre dos puntos GPS, y qué hacer en cada paso del guiado ----------
+const RADIO_TIERRA_M = 6371000;
+
+function distanciaMetros(a, b) {
+    const rad = Math.PI / 180, f1 = a.lat * rad, f2 = b.lat * rad, df = (b.lat - a.lat) * rad, dl = (b.lon - a.lon) * rad;
+    const h = Math.sin(df / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl / 2) ** 2;
+    return 2 * RADIO_TIERRA_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// Rumbo inicial de a hacia b, de 0 a 360 con 0 = norte y creciendo hacia la derecha (como la brújula del teléfono)
+function rumboHacia(a, b) {
+    const rad = Math.PI / 180, f1 = a.lat * rad, f2 = b.lat * rad, dl = (b.lon - a.lon) * rad;
+    const y = Math.sin(dl) * Math.cos(f2), x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+    return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+// yo y destino son {lat, lon}; fi0 es el rumbo (brújula) en que apuntaba el robot al alinear el giroscopio (H0).
+// avanzar -> rumboRelativo (-180 a 180, para H) y v; esperar = parar y seguir mirando; perdido = rendirse; llegue = ya está cerca.
+function decidirGuiado({ yo, destino, fi0, radio = 8, precision = 0, edadDestinoMs = 0 }) {
+    if (!yo || !destino || !Number.isFinite(fi0)) return { accion: 'esperar', motivo: 'sin-ubicacion' };
+    if (edadDestinoMs > 45000) return { accion: 'perdido', motivo: 'destino-sin-senal' };
+    if (precision > 35) return { accion: 'esperar', motivo: 'gps-malo' };
+    const distancia = distanciaMetros(yo, destino);
+    if (distancia <= radio) return { accion: 'llegue', distancia };
+    const rumbo = rumboHacia(yo, destino);
+    const rumboRelativo = Math.round(((rumbo - fi0) % 360 + 540) % 360 - 180) + 0;
+    const v = Math.round(VEL_MAX * (distancia > 30 ? 0.6 : distancia > 15 ? 0.45 : 0.3));
+    return { accion: 'avanzar', distancia, rumbo, rumboRelativo, v };
+}
+
 const GIRO_DIRECCIONAL = 0.6;
 
 function senalesDeMovimiento(izq, der, bloqueado, veniaEnMarcha) {
@@ -1148,6 +1178,17 @@ const FRASES = {
     pptGano: ['Yo saqué {mia} y tú {tuya}. ¡Gané, we!'],
     pptPerdio: ['Yo saqué {mia} y tú {tuya}. Me ganaste, we.'],
     pptEmpate: ['Los dos sacamos {mia}. Empate, we.'],
+    telBusca: ['Va, voy por el teléfono de {nombre}. Está a unos {m} metros.', 'Órale, rumbo al teléfono de {nombre}, a unos {m} metros.'],
+    telLlegue: ['Ya llegué cerca del teléfono de {nombre}, we. Estoy a unos {m} metros.', '¡Aquí ando! Estoy a unos {m} metros del teléfono de {nombre}.'],
+    telPerdido: ['Perdí la señal del teléfono de {nombre}, me detengo.'],
+    telSinCompartir: ['No encuentro el teléfono de {nombre}: no comparte su ubicación o no se llama así.'],
+    telSinUbicacion: ['Todavía no sé dónde estoy. Enciende «Compartir mi ubicación» en la pestaña Teléfono.'],
+    telBloqueo: ['Se me atravesó algo y no puedo pasar, me detengo.'],
+    telGps: ['Mi GPS anda muy malo, así no me puedo guiar. Me detengo.'],
+    telTiempo: ['Ya llevo mucho rato buscando, me detengo.'],
+    telBateria: ['Mi batería está muy baja, me detengo.'],
+    telSinGiro: ['Mi programa no tiene giroscopio, no puedo ir solo. Instala el programa nuevo en Conexión.'],
+    telSinBrujula: ['No tengo brújula en el celular, no sé hacia dónde apunto. Pónlo plano sobre mí y prueba otra vez.'],
     chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, we.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
     hora: ['Son las {hora}, we.', 'Ya van siendo las {hora}.'],
     fecha: ['Hoy es {fecha}, we.', 'Estamos a {fecha}.'],
@@ -1487,15 +1528,21 @@ function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
     const resto = quitarNombre(t);
     if (resto === null) return { a: 'sinNombre' };
-    t = corregirVocabulario(resto
+    const limpio = resto
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
-        .replace(/\s+/g, ' ').trim());
+        .replace(/\s+/g, ' ').trim();
+    t = corregirVocabulario(limpio);
     if (!t) return { a: 'saludo' };
     const pedidoModo = t.match(RE_PEDIDO_MODO);
     if (pedidoModo) return { a: 'modo', modo: MODOS_SINONIMOS[pedidoModo[1]] };
     const jugada = t.match(/^(?:yo\s+)?(?:tiro\s+|saco\s+|elijo\s+|va\s+)?(piedra|papel|tijeras?)$/);
     if (jugada) return { a: 'ppt', usuario: jugada[1].replace(/s$/, '') };
     if (/\bpiedra\b.*\bpapel\b|\bpapel\b.*\btijeras?\b/.test(t)) return { a: 'ppt' };
+    const buscaTel = t.match(/\b(?:encuentra|encontrar|busca|buscar|localiza|localizar|ve (?:por|hacia|a buscar)|ir (?:por|hacia|a buscar))\s+(?:el|al|mi|su)?\s*(?:telefono|celular|movil)\s+(?:del|de)?\s*([a-zñ0-9][a-zñ0-9 ]{0,19})$/);
+    if (buscaTel) {
+        const crudo = limpio.match(/(?:telefono|celular|movil)\s+(?:del|de)?\s*([a-zñ0-9][a-zñ0-9 ]{0,19})$/);
+        return { a: 'buscar_telefono', nombre: (crudo ? crudo[1] : buscaTel[1]).trim() };
+    }
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
     const dice0 = r => r.test(tp);
@@ -1635,6 +1682,7 @@ function promptIA(modo) {
         '{"a":"modo","modo":"' + MODOS_IA.join('|') + '"}  cambiar tu personalidad cuando te lo pidan («ponte triste», «modo científico»)',
         '{"a":"ppt","usuario":"' + JUGADAS_PPT.join('|') + '"}  jugar piedra, papel o tijera: sin «usuario» si solo proponen jugar; con «usuario» cuando dicen su jugada (tú no eliges: la jugada la decide el sistema)',
         '{"a":"recordar","dato":"hecho corto"}  guardar en tu memoria algo que el usuario te cuente de sí mismo (nombre, gustos, tareas) · {"a":"aprender","nombre":"palabra","pasos":[acciones de un plan]}  crear una rutina cuando te digan «cuando te diga X haz Y» · {"a":"rutina","nombre":"palabra"}  ejecutar una rutina guardada (te pasan sus nombres en el contexto)',
+        '{"a":"buscar_telefono","nombre":"persona"}  ir hacia el teléfono de una persona de la sala de teléfonos (solo al aire libre y si esa persona comparte su ubicación)',
         'JUEGOS: trivia y adivinanzas los llevas tú con {"a":"decir"}: haces UNA pregunta o adivinanza real y corta; cuando el usuario responda (revisa la conversación reciente) dices si acertó, la respuesta correcta y llevas la cuenta. Jamás repitas una pregunta.',
         '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
         '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
@@ -1694,6 +1742,8 @@ function herramientasCerebro() {
         { name: 'ppt', description: 'Jugar piedra, papel o tijera: el sistema sortea tu jugada y te dice quién ganó', parameters: obj({ usuario: { type: 'STRING', enum: JUGADAS_PPT } }, ['usuario']) },
         { name: 'plan', description: 'Secuencia de pasos (mover, giro, figura, luces, claxon, cancion, baile)', parameters: obj({ pasos }, ['pasos']) },
         sinParametros('datos', 'Consultar batería, conexión, distancia del sensor frontal, hora, fecha y modo actual'),
+        { name: 'buscar_telefono', description: 'Ir hacia el teléfono de una persona de la sala de teléfonos (solo funciona al aire libre y si esa persona comparte su ubicación)', parameters: obj({ nombre: { type: 'STRING', description: 'nombre de la persona' } }, ['nombre']) },
+        sinParametros('listar_telefonos', 'Ver qué teléfonos de la sala están compartiendo su ubicación, con su distancia'),
         { name: 'recordar', description: 'Guardar un dato corto del usuario en tu memoria', parameters: obj({ dato: { type: 'STRING' } }, ['dato']) },
         { name: 'crear_rutina', description: 'Guardar una rutina que se ejecuta al decir su nombre', parameters: obj({ nombre: { type: 'STRING', description: 'una palabra' }, pasos }, ['nombre', 'pasos']) },
         { name: 'ejecutar_rutina', description: 'Ejecutar una rutina guardada', parameters: obj({ nombre: { type: 'STRING' } }, ['nombre']) },
@@ -1758,6 +1808,7 @@ function validarAccionIA(o) {
         case 'charla': return CHARLAS_IA.includes(o.t) ? { a, t: o.t } : null;
         case 'modo': return MODOS_IA.includes(o.modo) ? { a, modo: o.modo } : null;
         case 'ppt': return JUGADAS_PPT.includes(o.usuario) ? { a, usuario: o.usuario } : { a };
+        case 'buscar_telefono': { const nombre = sinAcentos(limpiarTexto(o.nombre, 20)); return nombre ? { a, nombre } : null; }
         case 'recordar': { const dato = limpiarTexto(o.dato, 120); return dato ? { a, dato } : null; }
         case 'aprender': {
             const nombre = sinAcentos(limpiarTexto(o.nombre, 30));
@@ -1832,7 +1883,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, AURA, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, REMATES_AURA, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, AURA, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, REMATES_AURA, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, distanciaMetros, rumboHacia, decidirGuiado, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
@@ -3357,6 +3408,7 @@ const QUE_REPRODUCE = {
     'robot-luces': 'las luces',
     'robot-instalar': 'nada en esta sección',
     'robot-control': 'nada en esta sección',
+    'robot-telefono': 'nada en esta sección',
 };
 
 function seccionRobotActual() {
@@ -3367,7 +3419,7 @@ function seccionRobotActual() {
 function pintarBarra() {
     const sec = seccionRobotActual();
     $('rb-barra-que').textContent = sec === 'robot-funciones' && S.modoRuleta && !S.funcion ? 'la ruleta' : sec === 'robot-funciones' && S.modoBaile && !S.funcion ? 'el baile con la canción' : (QUE_REPRODUCE[sec] || 'nada');
-    $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar'].includes(sec);
+    $('rb-barra-play').disabled = ['robot-instalar', 'robot-control', 'robot-jarvis', 'robot-dibujar', 'robot-telefono'].includes(sec);
 }
 
 // Con el robot conectado se reproduce en el robot; si no, la música suena en la página

@@ -8,7 +8,7 @@
 const APARTADOS = {
     horario: ['horarios', 'grupos', 'alertas'],
     timbre: ['timbre', 'ritmo', 'esp32'],
-    robot: ['robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar', 'robot-musica', 'robot-luces', 'robot-instalar'], // @robot:line
+    robot: ['robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar', 'robot-musica', 'robot-luces', 'robot-telefono', 'robot-instalar'], // @robot:line
 };
 const ADMIN_SECCIONES = Object.values(APARTADOS).flat();
 const ALIAS_SECCION = {
