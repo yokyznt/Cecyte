@@ -189,7 +189,8 @@
 .rb-seg--3 { grid-template-columns: repeat(3, 1fr); }
 .rb-seg--6 { grid-template-columns: repeat(3, 1fr); border-radius: 22px; }
 .rb-seg__op[hidden] { display: none; }
-.rb-seg--6 .rb-seg__op:last-child:nth-child(7) { grid-column: 1 / -1; }
+.rb-seg--6:not(:has(#rb-modo-personal:not([hidden]))) .rb-seg__op:nth-child(7) { grid-column: 1 / -1; }
+.rb-seg--6:has(#rb-modo-personal:not([hidden])) #rb-modo-personal { grid-column: 2 / 4; }
 .rb-seg__op { position: relative; display: block; }
 .rb-seg__op input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .rb-seg__op span {

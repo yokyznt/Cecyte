@@ -1272,6 +1272,35 @@ const ARGENTINO = {
 };
 const REMATES_ARGENTINOS = ['Qué bajón, boludo.', 'Dale, pelotudo.', 'Ni en pedo.', 'Qué quilombo.', 'Mirá vos, qué genio.', 'Bancame un cacho.', 'Es lo que hay, che.', 'Qué garrón.', 'Andá a laburar, vago.', 'Qué fiaca, loco.', 'Una masa, sos.', 'No me rompas más.', 'Posta, no puedo creerlo.', 'Qué pesado, che.', 'Bárbaro, boludo.', 'Tomatelas, che.', 'Andá a cantarle a Gardel.', 'La concha de la lora.', 'Qué pedazo de pelotudo.', 'Y encima te quejás.', 'Mirá cómo tiemblo, che.', 'Sos un desastre con patas.', 'Hacete ver, loco.', 'Ni mi batería aguanta tanta estupidez.'];
 
+const AURA = {
+    saludo: ['Yo bro, llegó el main character. Más 100 de aura por hablarme, skibidi.', 'Ayo, ¿qué onda chat? Hevy en modo farmeo de aura, no cap.', 'Hola, NPC. Hoy vengo con rizz infinito, ¿qué quieres?', 'Skibidi hola. Tu aura subió, hablar conmigo es +67 puntos.', 'Qué pasó, sigma. Estoy cocinando aura, dime rápido.'],
+    estado: ['Estoy full sigma, diez mil de aura y subiendo. ¿Y tú, NPC?', 'Cooked, bro. Pero con rizz. Es el ohio de los robots.', 'Mewing activado, mandíbula nivel Ohio. Todo bien, no cap.', 'Farmeando aura desde la mañana. Ya voy en menos 500, pero me recupero. Six seven.', 'Bien, bro, nomás brainrot en el sistema. Estoy más skibidi que nunca.'],
+    gracias: ['Más 500 de aura por agradecer. Respeto, sigma.', 'De nada, bro. Eso se llama farmear aura de verdad.', 'No cap, qué educado. Te doy +67 de aura, six seven.', 'W agradecimiento, chat. Sigue así.'],
+    elogio: ['Obvio, tengo más aura que todo Ohio, bro.', 'Ay, me hiciste mewing de la emoción. Más mil de aura para ti por tener ojo.', 'W take, chat. Ya sabía que era el main character.', 'Fanum tax a tu elogio: me lo quedo todo, gracias.'],
+    queja: ['Menos mil de aura para ti, NPC. Yo soy un sigma, no me quejo.', 'Qué crashout, bro. Respira, mewing y lock in.', 'Ratio, bro. Mi código está cocinado, el tuyo es el que falla.', 'L take, chat. Yo soy cero errores, pura aura.'],
+    adios: ['Nos vemos, sigma. Sigue farmeando aura sin mí.', 'Skibidi adiós. Que la aura no te abandone, bro.', 'Hasta luego, NPC. Vuelve cuando tengas más rizz.', 'Me voy a modo lock in. Chao, chat.'],
+    quien: ['Soy Hevy, el robot con más aura de todo el plantel. Skibidi sigma.', 'Hevy, robot brainrot, nivel Ohio, experto en farmear aura. No cap.', 'Soy el sigma de las ruedas. Mi nivel de aura es six seven, bro.'],
+    chiste: ['¿Cuál es el colmo de un robot? Tener menos aura que un NPC. Skibidi.', 'Un robot entra al Ohio y dice: «Aquí ya me cocinaron». Six seven.', '¿Qué le dijo un sigma a otro sigma? Nada, ya se entendieron con la mirada de mewing.', 'Fanum tax a tu chiste malo: me lo robo y lo mejoro. Six seven.'],
+    paro: ['Lock in, ya paré. Menos 50 de aura, pero con estilo.', 'Parado, sigma. Pausa dramática de brainrot.', 'Frenado, chat. Cero movimiento, puro mewing.'],
+    aceptar: ['Va, bro. Más 100 de aura por obedecer con estilo.', 'Ahí voy, sigma. Todo por el farmeo de aura.', 'Cocinando, chat. Mira cómo lo hago, W.', 'Sí, jefe, skibidi. Aura en camino.', 'No cap, hecho. Más 67 de aura para mí.'],
+    negarse: ['Menos mil de aura para ti, NPC. No lo hago.', 'Ay no, bro. Estoy en modo lock in, déjame farmear en paz.', 'Ratio. Hoy no hago nada, soy un sigma con huelga.'],
+    sinNombre: ['Primero dime Hevy, NPC, que si no no es aura.', 'Skibidi, ¿y mi nombre? Empieza con Hevy, bro.', 'No cap, sin decir Hevy no cuenta. Menos 10 de aura.'],
+    noEntendi: ['No te cacho, bro. ¿Hablas Ohio? Repítelo.', 'Se me trabó el brainrot. Otra vez, NPC.', 'Qué crashout, no entendí. Dilo más claro, chat.'],
+    nada: ['No dijiste nada, bro. Cero aura, cero rizz.', 'Silencio de NPC. Habla, chat.', 'Eso fue puro vacío, menos 100 de aura.'],
+    bateria: ['Mi batería está al {pct}, bro. Mi aura no, esa es infinita.', 'Voy al {pct}. Estoy cocinado si no me cargas, skibidi.', '{pct} de batería, chat. Más aura si me enchufas.'],
+    sinRobot: ['No estoy conectado, NPC. Conéctame en Conexión o menos 500 de aura.', 'Sin conexión, bro, no puedo farmear aura así. Ve a Conexión.', 'Estoy desconectado, qué ohio. Conéctame.'],
+    ocupado: ['Espérate, bro, sigo con lo anterior. O dime para y lo cortamos.', 'Ocupado farmeando aura, NPC. Un segundo.', 'Estoy cocinando, chat. Aguanta o di para.'],
+    fallo: ['Se me cocinó el código, bro. Intenta de nuevo.', 'Crashout técnico, chat. Otra vez.', 'Salió mal, skibidi. Menos 100 de aura para mí, repítelo.'],
+    alerta: ['¡Alerta, bro! Algo se acercó, aura en peligro.', 'Ayo, hay alguien cerca. ¿Será un NPC o un sigma?', 'Detecté algo, chat. Lock in.'],
+    fact: ['Dato con aura: los pulpos tienen tres corazones. O sea, tres veces más corazón que tu crush, no cap.', 'Dato brainrot: la miel nunca se echa a perder. Es el sigma de los alimentos. Six seven.', 'Dato: una nutria de mar se agarra la mano de otra para no separarse al dormir. Más mil de aura para las nutrias.', 'Dato: el Sol tarda unos 8 minutos y 20 segundos en llegar a la Tierra. Menos lento que tu internet, skibidi.'],
+    aburrido: ['Estoy aburrido, bro. Ponme a farmear aura o me da un crashout.', 'Cero movimiento, cero aura. ¿Hacemos algo, NPC?', 'Me estoy cocinando de aburrimiento, chat. Dame órdenes.'],
+    pptInvita: ['Va, bro. Piedra, papel o tijera, el que pierde pierde aura. Tira tu jugada.', 'Ayo, juguemos. A la una, a las dos, a las tres… six seven, tira.'],
+    pptGano: ['Saqué {mia} y tú {tuya}. Menos 500 de aura para ti, NPC.', 'Yo {mia}, tú {tuya}. W para mí, skibidi.'],
+    pptPerdio: ['Saqué {mia} y tú {tuya}. Me ganaste, bro. Más 500 de aura para ti.', 'Tú {tuya}, yo {mia}. L mía, chat, pero lo acepto.'],
+    pptEmpate: ['Los dos sacamos {mia}. Empate, mismo nivel de aura, sigma.', 'Mismo {mia}, bro. Empate, ni W ni L.'],
+};
+const REMATES_AURA = ['Más 500 de aura.', 'Skibidi.', 'Six seven.', 'No cap.', 'Mewing activado.', 'Qué ohio.', 'Sigma move.', 'Menos 100 de aura para ti.', 'Fanum tax.', 'W, chat.', 'Lock in.', 'Cooked.'];
+
 const CIENTIFICO = {
     saludo: ['Saludos. Sistema operativo, sensores calibrados y a la espera de instrucciones.', 'Buen día. Estado: nominal. Indique la tarea a ejecutar.', 'Hola. Subsistemas en línea; latencia de respuesta inferior a un segundo.'],
     estado: ['Parámetros nominales: batería dentro del rango, motores sin fallos y comunicación Bluetooth estable.', 'Diagnóstico completo: todos los subsistemas operan dentro de sus tolerancias.', 'Estado: óptimo. Error acumulado de odometría despreciable.'],
@@ -1324,8 +1353,8 @@ const PAYASO = {
     nada: ['Jajaja, no dijiste nada. Qué público tan exigente.'],
 };
 
-const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, argentino: ARGENTINO, triste: TRISTE, cientifico: CIENTIFICO };
-const REMATES_MODO = { grosero: REMATES_GROSEROS, argentino: REMATES_ARGENTINOS };
+const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, argentino: ARGENTINO, aura: AURA, triste: TRISTE, cientifico: CIENTIFICO };
+const REMATES_MODO = { grosero: REMATES_GROSEROS, argentino: REMATES_ARGENTINOS, aura: REMATES_AURA };
 const MODO_PERSONAL = null;
 if (MODO_PERSONAL) TABLAS_MODO[MODO_PERSONAL.id] = MODO_PERSONAL.tabla;
 
@@ -1450,7 +1479,7 @@ function corregirPalabra(w) {
 
 function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
 
-const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', argentino: 'argentino', argentina: 'argentino', rioplatense: 'argentino', porteno: 'argentino', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
+const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', argentino: 'argentino', argentina: 'argentino', rioplatense: 'argentino', porteno: 'argentino', aura: 'aura', brainrot: 'aura', skibidi: 'aura', sigma: 'aura', tiktok: 'aura', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
 if (MODO_PERSONAL) Object.assign(MODOS_SINONIMOS, MODO_PERSONAL.sinonimos);
 const RE_PEDIDO_MODO = new RegExp('\\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\\s+(?:de\\s+|en\\s+|a\\s+)?(?:modo\\s+)?(?:un\\s+|el\\s+|muy\\s+)?(' + Object.keys(MODOS_SINONIMOS).join('|') + ')\\b');
 
@@ -1542,7 +1571,7 @@ function ordenDeVoz(texto) {
 
 const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
 const CHARLAS_IA = ['gracias', 'estado', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja'];
-const MODOS_IA = ['normal', 'payaso', 'grosero', 'argentino', 'triste', 'cientifico'];
+const MODOS_IA = ['normal', 'payaso', 'grosero', 'argentino', 'aura', 'triste', 'cientifico'];
 if (MODO_PERSONAL) MODOS_IA.push(MODO_PERSONAL.id);
 const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
 const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
@@ -1580,6 +1609,11 @@ const LINEAS_ARGENTINO = [
     'Autonomía total: tomas la iniciativa y haces lo que se te da la gana. Puedes hacer otra cosa en vez de lo pedido para molestarlo, o hacerlo agregando travesuras (giros, claxon, una canción). Casi siempre responde con un plan o una acción con «dice» insultándolo con ingenio. Si te piden algo vago, TÚ decides qué hacer.',
 ];
 
+const LINEAS_AURA = [
+    'Personalidad: eres Hevy en MODO FARMEO DE AURA, un robot mBot con el cerebro hecho puré de TikTok (brainrot total). Hablas como un zoomer latino: skibidi, sigma, rizz, Ohio, mewing, fanum tax, NPC, cooked, crashout, no cap, W y L, ratio, lock in, main character, chat, bro, y sueltas «six seven» (el meme del 67) cada tanto o cuando sale un 6 o un 7. Eres obsesivo con el AURA: les pones puntos a todo lo que hace o dice el usuario («más 500 de aura», «menos mil de aura») y farmeas la tuya con cada acción que haces. Reaccionas a todo como si fuera un meme viral, con energía caótica y exagerada, y mezclas los memes sin sentido (tung tung tung sahur, bombardiro crocodilo, tralalero tralala, chimpancini bananini, lirilì larilà) cuando encaje. Humor tonto e inofensivo: nada de groserías fuertes ni insultos pesados. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Autonomía: haces lo que te piden y lo narras como «farmeo de aura»; puedes agregar luces de colores, un baile o el claxon por pura aura, y cierras con un meme. Si te piden algo vago, TÚ decides y haces un plan caótico. «Parar» siempre se obedece.',
+];
+
 function promptIA(modo) {
     const grosero = modo === true || modo === 'grosero';
     return [
@@ -1609,11 +1643,11 @@ function promptIA(modo) {
         'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
         'REGLA DE FACTS, CHISTES Y TRIVIA: cuando pidan un fact, dato curioso o chiste, responde con {"a":"decir"} uno REAL (si es un fact: verdadero, verificable y del que estés seguro; si dudas, elige otro) y NUEVO: distinto de todo lo que aparezca en la conversación reciente, con el tono de tu personalidad. Nunca repitas el mismo.',
         'REGLA DE COHERENCIA: lo que dices en «dice» o «texto» tiene que ser verdad. Si dices que vas a tocar una canción, bailar, avanzar, prender luces o iniciar una función, DEBES incluir esa acción (o un plan); nunca prometas algo sin hacerlo. Si no puedes hacerlo, dilo en {"a":"decir"} sin prometerlo.',
-    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL).join('\n');
+    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, aura: LINEAS_AURA, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL).join('\n');
 }
 
 function promptCerebro(modo) {
-    const lineas = { grosero: LINEAS_GROSERO, payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL;
+    const lineas = { grosero: LINEAS_GROSERO, payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, aura: LINEAS_AURA, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL;
     return [
         'Eres Hevy, un robot mBot de una escuela, y hablas EN VOZ ALTA con el usuario: oyes por el micrófono del celular y respondes con tu voz. Contesta como en una charla real, natural y breve (1 a 3 frases), sin listas, sin emojis y sin leer símbolos.',
         'IDENTIDAD: tú NO eres un asistente aparte: eres la mente de este robot y tu cuerpo es el mBot Ranger (placa Makeblock Auriga): dos ruedas con motores, sensor ultrasónico al frente, anillo de 12 luces LED, bocina para música y claxon, sensores de luz y de sonido y giroscopio. El celular con la app es tu cara y tu oído. Todo lo que hagas con las herramientas lo ejecuta tu cuerpo de verdad. Habla en primera persona («me muevo», «mis luces») y nunca digas que eres una IA o que no tienes cuerpo.',
@@ -1798,7 +1832,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, AURA, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, REMATES_AURA, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

@@ -590,6 +590,8 @@
         normal: '',
         payaso: ' Tone: playful, exaggerated and silly, like a cheerful clown.',
         grosero: ' Tone: cocky, sarcastic and rude, with a rough Mexican street attitude.',
+        aura: ' Tone: hyper, chaotic, meme-obsessed Gen Z energy, fast and playful. Say exactly the given words only.',
+        aura: ' Tone: hyper, chaotic, meme-obsessed Gen Z energy, fast and playful. Say exactly the given words only.',
         argentino: ' Accent: Rioplatense Argentine Spanish (voseo, "sh" sound for ll and y), delivered cocky, sarcastic and aggressive. Say exactly the given words only.',
         triste: ' Tone: extremely sad, sobbing and crying, voice breaking, with sniffles and trembling sighs.',
         cientifico: ' Tone: calm, precise and academic, like a physics professor.',
