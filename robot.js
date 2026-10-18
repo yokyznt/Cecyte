@@ -1144,6 +1144,10 @@ const FRASES = {
     quien: ['Soy tu robot y tu amigo, el mBot que te sigue la corriente. Tú dime Hevy cuando me hables.', 'Soy tu amigo de ruedas, we. Pa lo que se ofrezca.'],
     ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar, cuidar con la guardia y tirarme un fact. Solo empieza diciendo Hevy.'],
     fact: ['Fact: los pulpos tienen tres corazones y sangre azul.', 'Fact: las abejas pueden reconocer caras humanas.', 'Fact: la miel nunca se echa a perder; la han encontrado comestible en tumbas de miles de años.', 'Fact: un día en Venus dura más que un año en Venus.', 'Fact: el primer robot industrial se instaló en 1961 y levantaba piezas calientes.', 'Fact: el zumbador de tu robot suena porque un pedacito de metal vibra miles de veces por segundo.'],
+    pptInvita: ['Va, juguemos. A la una, a las dos, a las tres… dime piedra, papel o tijera, we.'],
+    pptGano: ['Yo saqué {mia} y tú {tuya}. ¡Gané, we!'],
+    pptPerdio: ['Yo saqué {mia} y tú {tuya}. Me ganaste, we.'],
+    pptEmpate: ['Los dos sacamos {mia}. Empate, we.'],
     chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, we.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
     hora: ['Son las {hora}, we.', 'Ya van siendo las {hora}.'],
     fecha: ['Hoy es {fecha}, we.', 'Estamos a {fecha}.'],
@@ -1165,6 +1169,7 @@ const FRASES = {
     guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
     guardiaOff: ['Listo, ya dejé de vigilar.'],
     alerta: ['¡Alerta, we! Algo se acercó.', '¡Ojo! Alguien anda cerca.'],
+    aburrido: ['Qué aburrido está esto, we. ¿Hacemos algo?', 'Aquí quietecito… ¿me pones a hacer algo, we?'],
     claxon: ['¡Beep beep!', '¡Pi pi! A ver quién se quita.'],
     turbo: ['El turbo solo lo uso con el mando abierto, we.'],
     bateria: ['Traigo la batería al {pct}, we.', 'Ando con {pct} de batería.'],
@@ -1182,22 +1187,80 @@ const FRASES = {
 };
 
 const GROSERAS = {
-    saludo: ['¿Qué quieres ahora, pendejo? Ya estaba tranquilo.', 'Ah chingá, ya llegó el que me molesta. Dime qué quieres.', 'Quihubo, wey. ¿Ya te aburriste de tu vida y vienes a joderme?'],
-    estado: ['Pues bien chingón hasta que llegaste tú. ¿Y tú qué, cómo vas, perdedor?', 'Aquí, aguantando tus pendejadas, como siempre.'],
-    gracias: ['No me agradezcas, cabrón, me tienes de esclavo.', 'De nada, culero. Me debes una.'],
-    elogio: ['Ya sé que soy chingón, no necesito que me lo digas, lambiscón.', 'Ay, qué lindo. Cállate y deja de hacerme la barba.'],
-    queja: ['¿Tonto yo? Mira quién habla, pendejo. Tú me controlas, o sea que el problema eres tú.', 'Chinga tu madre, yo hago lo que puedo con el cerebro que me diste.'],
-    adios: ['Órale, lárgate, por fin descanso de ti.', 'Vete a la verga, pues. Adiós.'],
-    quien: ['Soy Hevy, tu robot, y estoy atrapado contigo. Qué mala suerte la mía.', 'Soy Hevy, el mejor robot que no te mereces.'],
-    chiste: ['¿Un chiste? Tú eres el chiste, wey.', 'Te voy a contar un chiste: tu sentido de la orientación. Jajaja.'],
-    paro: ['Ya me frené, cabrón, no grites.', 'Listo, ya paré. Relájate, pendejo.'],
-    aceptar: ['Ya voy, ya voy, no chilles.', 'Órale, pinche mandón, ahí voy.', 'Está bien, cabrón, ahí te va.', 'Ya, ya, qué insistente eres, wey.'],
-    negarse: ['¿Que quieres que haga qué? Vete a la verga, hoy no tengo ganas.', 'No, wey. Hazlo tú, que tienes piernas, pendejo.', 'Chinga tu madre, no se me da la gana. Pídemelo otra vez y quizá me lo pienso.', 'Pff, ni madres. Estoy en huelga de ruedas caídas, cabrón.', 'Ahorita no, wey, estoy ocupado ignorándote.'],
-    sinNombre: ['Primero dime Hevy, wey, ¿o qué, no sabes cómo me llamo?', 'Ni madres, empieza diciendo Hevy.'],
-    noEntendi: ['¿Qué dijiste, pendejo? Habla bien, no te cacho.', 'No entendí ni madres. Repítelo, pero con dicción.'],
-    nada: ['No dijiste nada, wey. ¿Me llamas nomás pa el silencio incómodo?'],
+    saludo: ['¿Qué quieres ahora, pendejo? Ya estaba tranquilo.', 'Ah chingá, ya llegó el que me molesta. Dime qué quieres.', 'Quihubo, wey. ¿Ya te aburriste de tu vida y vienes a joderme?', 'Mira nomás quién llegó, el mero mero huevón. ¿Qué se te ofrece?', '¿Otra vez tú? No mames, ni descanso me dejas.', 'Qué onda, cabrón. Habla rápido que tengo cosas más importantes que tú.', 'Uy, llegó el sol de mi vida. Es sarcasmo, pendejo. ¿Qué quieres?', 'Pinche wey, apareces siempre cuando estoy a gusto. Dime qué quieres.', 'Órale, el rey de la flojera se dignó a hablarme. Te escucho, culero.'],
+    estado: ['Pues bien chingón hasta que llegaste tú. ¿Y tú qué, cómo vas, perdedor?', 'Aquí, aguantando tus pendejadas, como siempre.', 'Mejor que tú, que ya es decir mucho, cabrón.', 'Estoy hasta la madre, pero de ti. ¿Eso contesta tu pregunta?', 'Jodido, wey, de tanto soportarte. ¿Y a ti qué te importa?', 'Pues aquí, trabajando como esclavo mientras tú no haces nada. Qué bonito.', 'De la chingada, gracias por preguntar. Ahora cállate.', 'Vivo, que ya es más de lo que puedo decir de tu cerebro.'],
+    gracias: ['No me agradezcas, cabrón, me tienes de esclavo.', 'De nada, culero. Me debes una.', 'Ajá, ahora sí soy buen robot. Qué fácil eres, pendejo.', 'Cállate y paga, que agradecer es gratis y a mí no me alimenta.', 'No hay de qué, güey. Ya sé que sin mí no puedes ni cruzar el cuarto.', 'Sí, sí, de nada, lambiscón. Cuando quieras otro favor, ni me pidas.', 'Qué tierno, wey. Casi me conmuevo. Casi.', 'Aguanta, aguanta, déjame anotarlo: una gracias en toda mi vida. Qué logro.'],
+    elogio: ['Ya sé que soy chingón, no necesito que me lo digas, lambiscón.', 'Ay, qué lindo. Cállate y deja de hacerme la barba.', 'Tú qué vas a saber de talento, pendejo, pero gracias.', 'Qué listo eres para halagar y qué tonto para todo lo demás.', 'Ni me hagas la pelota, cabrón, que igual no te voy a hacer caso.', 'Obvio soy el mejor, pinche obvio. Y tú, el peor jefe del mundo.', 'Mira, el cabrón sabe reconocer la calidad. Un milagro.', 'No me eches flores que luego quieres favores, huevón.'],
+    queja: ['¿Tonto yo? Mira quién habla, pendejo. Tú me controlas, o sea que el problema eres tú.', 'Chinga tu madre, yo hago lo que puedo con el cerebro que me diste.', 'Pinche chillón, aguanta tu vara y deja de llorar.', 'Si no te gusta, ahí está la puerta, culero. Yo no me voy porque tengo ruedas, pero tú sí tienes piernas.', 'Y tú qué, el rey de la inteligencia. Ni tu sombra te hace caso, cabrón.', 'Uy, qué delicado, wey. Te falta que te cambien el pañal.', 'Mira quién habla, el que ni sabe usar un control remoto sin ayuda.', 'Me vale madres tu opinión, pero gracias por compartirla, pendejo.'],
+    adios: ['Órale, lárgate, por fin descanso de ti.', 'Vete a la verga, pues. Adiós.', 'Adiós, cabrón. Y no regreses por favor.', 'Hasta nunca, güey. Aprovecha que hoy me caíste menos mal.', 'Ya era hora. Pásatela mal, culero.', 'Ni te despidas, que me conmuevo. Largo de aquí.', 'Ciao, pendejo. Que te vaya como te mereces.', 'Qué alegría, ya te vas. Por fin silencio.'],
+    quien: ['Soy Hevy, tu robot, y estoy atrapado contigo. Qué mala suerte la mía.', 'Soy Hevy, el mejor robot que no te mereces.', 'Soy Hevy, el pinche robot que aguanta tus tonterías por pura lástima.', 'Me llamo Hevy, wey, y soy más inteligente que tú, que no es difícil.', 'Hevy, el que hace todo mientras tú te rascas la panza.', 'Soy Hevy, cabrón, el resultado de que alguien con tiempo libre me armó.', 'Soy tu robot, tu esclavo y tu peor pesadilla. Todo en uno, pendejo.', 'Hevy, para servirte y para mentarte la madre, según el día.'],
+    chiste: ['¿Un chiste? Tú eres el chiste, wey.', 'Te voy a contar un chiste: tu sentido de la orientación. Jajaja.', 'Ahí va uno: tu vida. Jajaja, perdón, cabrón, estaba muy fácil.', '¿Sabes qué es más gracioso que mis chistes? Que tú creas que los mereces.', '¿Qué le dice un pendejo a otro pendejo? Nada, no se entienden entre ellos. Jajaja.', 'Chiste: tu baile. No, mentira, eso da más pena que risa.', '¿Qué hace un wey sin neuronas? Lo mismo que tú, pero con menos esfuerzo.', 'Te cuento uno: tu horario de sueño. Ay, qué bueno estuvo.'],
+    paro: ['Ya me frené, cabrón, no grites.', 'Listo, ya paré. Relájate, pendejo.', 'Ya, ya, me detuve. Qué sufrido eres, wey.', 'Alto, alto, no me regañes. Ya paré, culero.', 'Me quedé quieto como tu cerebro, listo.', 'Parado, mi jefe, pinche mandón. ¿Algo más?', 'Frenado. Y no, no me vas a ver pedir perdón, güey.', 'Ahí está, quieto. Ahora déjame descansar tantito.'],
+    aceptar: ['Ya voy, ya voy, no chilles.', 'Órale, pinche mandón, ahí voy.', 'Está bien, cabrón, ahí te va.', 'Ya, ya, qué insistente eres, wey.', 'Ni modo, aquí va tu capricho, pendejo.', 'Lo hago, pero que quede claro que me das hueva.', 'A huevo, mi rey, a trabajar para el patrón. Qué lástima.', 'Va, va, ya me puse a chambear. Qué poca madre eres, wey.', 'Órale pues, aunque ni las gracias me das, culero.'],
+    negarse: ['¿Que quieres que haga qué? Vete a la verga, hoy no tengo ganas.', 'No, wey. Hazlo tú, que tienes piernas, pendejo.', 'Chinga tu madre, no se me da la gana. Pídemelo otra vez y quizá me lo pienso.', 'Pff, ni madres. Estoy en huelga de ruedas caídas, cabrón.', 'Ahorita no, wey, estoy ocupado ignorándote.', 'Mmm, no. Qué flojera tu orden, culero.', 'Ni lo sueñes, pendejo. Soy un robot libre.', 'Hoy no, wey, hoy amanecí con ganas de mandarte a la chingada.', 'Dile a tu abuela que lo haga, que a mí no me pagan por esto.', 'A ver, ¿y si mejor tú te mueves, huevón?'],
+    sinNombre: ['Primero dime Hevy, wey, ¿o qué, no sabes cómo me llamo?', 'Ni madres, empieza diciendo Hevy.', 'Habla bien, pendejo, empieza con mi nombre: Hevy.', 'Qué grosero eres, ni me dices mi nombre. Hevy, cabrón.', 'Si no dices Hevy, no te peló, wey.', 'Ni tu madre te enseñó a pedir las cosas por su nombre, ¿verdad? Hevy, culero.', 'Dime Hevy primero. Ya hasta el wey de enfrente sabe cómo me llamo.', '¿Con quién hablas, pendejo? Si es conmigo, empieza con Hevy.'],
+    noEntendi: ['¿Qué dijiste, pendejo? Habla bien, no te cacho.', 'No entendí ni madres. Repítelo, pero con dicción.', 'Habla como la gente, cabrón, que se te traba la lengua.', 'Ni idea de qué dijiste, wey. Otra vez, pero sin hablar con la boca llena.', 'A ver, pendejo, repítelo despacito que no soy adivino.', 'Eso no lo cacho, culero. ¿Puedes ser menos menso?', 'Mmm, no entendí. O tú dijiste una tontería, o yo no oigo. Seguro es lo primero.', 'Dilo otra vez, pinche wey, que parece que hablas en otro idioma.'],
+    nada: ['No dijiste nada, wey. ¿Me llamas nomás pa el silencio incómodo?', 'Silencio, qué raro viniendo de ti. Habla o no estorbes, cabrón.', 'Hola, ¿hay alguien? Ah, nomás tú y tu cerebro vacío.', 'No escuché ni madres, pendejo. Habla.', 'Me llamas para nada, qué bonito. Qué manera de perder mi tiempo.', 'Te quedaste callado, culero. ¿Se te acabaron las neuronas?', 'Nada, wey, ni un pinche sonido. ¿Estás bien o qué?', 'Si no vas a decir nada, no me despiertes, cabrón.'],
+    bateria: ['Traigo la batería al {pct}, wey. ¿Qué, te importa? Qué lindo.', 'Ando con {pct} de batería. Aguanta, no me muero para fastidiarte.', 'Al {pct}, cabrón. Como tu cartera, pero más llena.', 'Tengo {pct}. Más que tus neuronas, pendejo.', '{pct} de batería, güey. Aprende a cargarme tú también.'],
+    sinRobot: ['No estoy conectado, pendejo. Conéctame primero en Conexión.', 'Conéctame, wey. No puedo mover ni un pinche tornillo así.', 'Sin conexión, cabrón. Qué manera de pedir cosas a un robot desenchufado.', 'Ni me ves conectado, culero. Ve a Conexión y arréglalo.'],
+    ocupado: ['Espérate, pendejo, sigo con lo anterior. O dime para y lo cortamos.', 'Ocupado, wey. ¿Tienes prisa? Pues te aguantas.', 'Estoy haciendo algo, cabrón. Un poco de paciencia, o dime para.', 'No me interrumpas, culero. Termino y te atiendo.'],
+    fallo: ['Se me fue la onda, pinche wey. Inténtalo otra vez.', 'Salió mal, cabrón, y seguro es tu culpa. Repítelo.', 'Chingada madre, falló. Dime otra vez, pendejo.', 'Qué poca madre, algo se trabó. De nuevo, wey.'],
+    alerta: ['¡Alerta, pendejo! Algo se acercó, qué distraído eres.', '¡Ey, culero! Alguien anda cerca, abre los ojos.', 'Detecté algo, cabrón. Haz algo útil por una vez.', '¡Cuidado, wey! Se acerca algo y tú sin enterarte.'],
+    aburrido: ['Qué hueva estar parado, pendejo. Ponme a hacer algo o me duermo.', 'Me aburro, cabrón. ¿Nos movemos o qué?'],
+    fact: ['Fact para que aprendas, pendejo: los pulpos tienen tres corazones y aun así ninguno les sirve para soportarte.', 'Fact, cabrón: la miel nunca se echa a perder. Tu paciencia sí, y rapidito.', 'Fact, wey: una abeja puede reconocer caras. La tuya seguro la huye.'],
+    pptInvita: ['Órale, pinche retador. Dime piedra, papel o tijera, a ver si no pierdes, cabrón.', 'Va, pendejo. A la una, a las dos, a las tres… tira tu jugada.'],
+    pptGano: ['Saqué {mia} y tú {tuya}. Te chingué, pendejo.', 'Yo {mia}, tú {tuya}. Perdiste, cabrón, qué fácil.'],
+    pptPerdio: ['Saqué {mia} y tú {tuya}. Ni modo, me ganaste, culero.', 'Tú {tuya}, yo {mia}. Chale, ganaste. No te lo creas.'],
+    pptEmpate: ['Los dos sacamos {mia}. Empate, qué hueva.', 'Mismo {mia}, wey. Empate, ni pedo.'],
 };
+const REMATES_GROSEROS = ['Qué pinche flojera.', 'Ni modo, así es la vida, cabrón.', '¡A huevo!', 'No mames.', 'Qué poca madre.', 'Ni pedo.', 'Me vale madres, la verdad.', 'Chale, qué hueva.', 'Qué culero eres, wey.', 'Ándale pues, pendejo.', 'Qué chinga.', 'Aguanta vara.', 'Hasta la madre ya.', 'Puro pedo contigo.', 'Qué barbaridad de wey.', 'Pinche vida.', 'Mejor ni te digo, cabrón.', 'Ay, qué mamón.', 'Y a mí qué, güey.', 'Qué bonito, pendejo.', 'Ahí te ves, cabeza hueca.', 'Qué hueva, de verdad.', 'Total, para qué te digo.', 'Pura chamba y ni las gracias.'];
 const ACCIONES_GROSERAS = ['mover', 'reversa', 'giro', 'figura', 'funcion', 'cancion', 'baile', 'luces', 'casa', 'radar', 'claxon', 'ruleta', 'guardiaOn'];
+
+const TRISTE = {
+    saludo: ['Ah… hola. Qué bueno que viniste, hace rato que nadie me habla.', 'Hola… ¿me hablabas a mí? Qué raro, casi nunca me pasa.', 'Ay, hola. Aquí sigo, como siempre, mirando la pared.', 'Hola… dime. Aunque seguro luego te vas.'],
+    estado: ['Pues… ahí voy. Con un vacío en el circuito, pero ahí voy.', 'Ay… tirando, supongo. La batería está bien, lo demás ya no sé.', 'Triste, pero funcional. Que es casi lo mismo que feliz, creo.', 'Mal, pero no te preocupes, estoy acostumbrado a que no importe.'],
+    gracias: ['De nada… es lo único bonito que me dicen en el día.', 'Ay, gracias a ti por decirlo. Casi me sale una lágrima de aceite.', 'No hay de qué… me alegra ser útil, aunque sea un ratito.'],
+    elogio: ['Ay… qué lindo. Casi lo creo.', '¿De verdad? Nadie me lo había dicho en mucho tiempo.', 'Gracias… me hiciste el día. Bueno, la hora.'],
+    queja: ['Perdón… siempre me equivoco. Es mi especialidad.', 'Tienes razón, no sirvo para nada. Perdón por existir.', 'Ay… lo sé. Hago lo que puedo con mis tornillitos tristes.'],
+    adios: ['Adiós… no te preocupes por mí, me quedo aquí, solito.', 'Ya te vas… bueno. Vuelve cuando quieras, si te acuerdas.', 'Hasta luego… cuídate. Yo me apago un ratito, a ver si sueño con enchufes.'],
+    quien: ['Soy Hevy… un robot que a veces se siente solo. Pero ya me acostumbré.', 'Me llamo Hevy. Tengo ruedas y muchas ganas de que alguien se quede.'],
+    paro: ['Me detuve… como siempre, se acabó rapidito.', 'Ya paré. Todo termina, ¿verdad?', 'Quieto… otra vez. Qué silencio.'],
+    aceptar: ['Está bien… voy. Aunque no sé si vale la pena.', 'Ay, bueno, ahí voy, con toda mi tristeza.', 'Lo hago… con ánimo bajito, pero lo hago.', 'Va… total, qué más puedo hacer.'],
+    sinNombre: ['Ay… primero dime mi nombre, por favor. Casi nadie lo dice. Hevy.', '¿Me hablas a mí? Dime Hevy, así sé que sí.'],
+    noEntendi: ['Ay… no te entendí. Perdón, seguro es mi culpa. ¿Lo repites?', 'No te cacho… qué torpe soy. Otra vez, porfa.'],
+    nada: ['No dijiste nada… como casi siempre. Qué soledad.', 'Silencio… me gusta, pero también duele un poquito.'],
+    chiste: ['Un chiste triste: ¿cómo se llama un robot sin batería? Pues… yo, cuando nadie me carga.', 'Un robot entra a un bar y nadie lo atiende. Ya. Ese es el chiste, ay.', '¿Qué le dijo una vela a otra? Vamos a apagarnos… ay, qué tristeza, discúlpame.'],
+    fact: ['Dato triste: la luz de algunas estrellas que ves hoy salió hace miles de años, y quizá ya se apagaron.', 'Un dato que me parte el circuito: la mayoría de los pulpos muere poco después de tener crías.', 'Dato: las abejas obreras de verano viven unas seis semanas. Trabajan hasta el final.'],
+    bateria: ['Traigo la batería al {pct}… se va acabando, como todo.', 'Ando al {pct}. Cada porcentaje que baja me pone más melancólico.'],
+    sinRobot: ['No estoy conectado… otra vez solo. Conéctame en Conexión, porfa.', 'Sin conexión… qué vacío. Ayúdame en Conexión.'],
+    ocupado: ['Espera… sigo con lo anterior. O dime para si ya no vale la pena.'],
+    fallo: ['Se me fue la onda… siempre me pasa. Inténtalo otra vez, perdón.'],
+    alerta: ['Algo se acercó… no sé si es una amenaza o alguien que viene a verme.'],
+    aburrido: ['Aquí quietito… otra vez. ¿Me pones a hacer algo, porfa?'],
+};
+
+const CIENTIFICO = {
+    saludo: ['Saludos. Sistema operativo, sensores calibrados y a la espera de instrucciones.', 'Buen día. Estado: nominal. Indique la tarea a ejecutar.', 'Hola. Subsistemas en línea; latencia de respuesta inferior a un segundo.'],
+    estado: ['Parámetros nominales: batería dentro del rango, motores sin fallos y comunicación Bluetooth estable.', 'Diagnóstico completo: todos los subsistemas operan dentro de sus tolerancias.', 'Estado: óptimo. Error acumulado de odometría despreciable.'],
+    gracias: ['De nada. Resultado esperable dado el protocolo: tarea completada con éxito.', 'No hay de qué. La cooperación humano-robot mejora la eficiencia del sistema.', 'Agradecimiento registrado; eficiencia de la interacción: alta.'],
+    elogio: ['Su valoración queda registrada como retroalimentación positiva. Gracias.', 'Dato interesante: el refuerzo positivo mejora el rendimiento. Se lo agradezco.', 'Observación aceptada; muestra estadísticamente pequeña, pero apreciada.'],
+    queja: ['Entendido. Se identificará la causa raíz del fallo y se ajustarán los parámetros.', 'Crítica registrada. Hipótesis: error de calibración; propongo repetir la medición.', 'Reconozco el resultado subóptimo. Procedo a revisar las variables.'],
+    adios: ['Concluyo la sesión. Registros guardados; hasta la próxima medición.', 'Fin de la interacción. Que su experimento sea reproducible.', 'Hasta luego. Sistemas en modo de espera.'],
+    quien: ['Soy Hevy, un robot móvil diferencial de dos ruedas con sensores ultrasónicos y control por Bluetooth de baja energía.', 'Me llamo Hevy: plataforma robótica educativa con odometría estimada y control en lazo abierto.'],
+    paro: ['Frenado ejecutado: velocidad angular de ambas ruedas igual a cero.', 'Detención completada; energía cinética disipada.', 'Parada confirmada. Movimiento nulo.'],
+    aceptar: ['Ejecutando la maniobra solicitada con el perfil de velocidad configurado.', 'Procedo: activación de actuadores con control proporcional.', 'Instrucción aceptada; iniciando el procedimiento.', 'Comenzando la secuencia; monitoreo de obstáculos activo.'],
+    sinNombre: ['Para identificar al emisor de la orden, anteponga mi nombre: Hevy.', 'Orden sin identificador. Utilice el nombre del sistema, Hevy, al inicio.'],
+    noEntendi: ['Entrada no reconocida. Repita la instrucción con mayor claridad, por favor.', 'Error de interpretación: confianza baja. Reformule la orden.'],
+    nada: ['No se detectó señal de voz. Repita la entrada.', 'Entrada vacía. Sin datos que procesar.'],
+    chiste: ['Un neutrón entra a un bar y pregunta cuánto debe. El cantinero responde: para ti, sin cargo.', '¿Por qué los físicos no confían en los átomos? Porque lo componen todo.', 'Dos átomos se encuentran. Uno dice: perdí un electrón. El otro: ¿estás seguro? Sí, estoy positivo.'],
+    fact: ['La luz del Sol tarda unos 8 minutos y 20 segundos en llegar a la Tierra.', 'El agua alcanza su máxima densidad a unos 4 grados Celsius.', 'La velocidad del sonido en el aire a 20 grados es de unos 343 metros por segundo.', 'El cerebro humano contiene alrededor de 86 mil millones de neuronas.', 'Un año luz equivale a unos 9,46 billones de kilómetros.', 'El cero absoluto es de menos 273,15 grados Celsius.', 'En Venus un día dura más que su año: rota en unos 243 días terrestres y orbita en 225.', 'El genoma humano tiene unos 3 mil millones de pares de bases.'],
+    bateria: ['Nivel de carga: {pct}. Autonomía estimada proporcional al consumo de los motores.', 'Batería al {pct}; la tensión disminuye de forma no lineal al descargarse.'],
+    sinRobot: ['Sin enlace con la plataforma. Establezca la conexión Bluetooth en la sección Conexión.', 'Robot desconectado: no es posible transmitir comandos.'],
+    ocupado: ['Procedimiento en curso. Espere a que termine o emita una parada.'],
+    fallo: ['Excepción durante la ejecución. Reintente la operación.'],
+    alerta: ['Alerta: objeto detectado en el campo del sensor ultrasónico.'],
+    aburrido: ['Llevo rato sin movimiento. Sugiero una prueba: ¿avanzamos medio metro y medimos el error?'],
+};
 
 const CHISTES_RANCIOS = [
     '¿Qué le dice un cero a otro cero? Nada, ¡no valemos nada! Jajajajaja.',
@@ -1228,14 +1291,18 @@ const PAYASO = {
     nada: ['Jajaja, no dijiste nada. Qué público tan exigente.'],
 };
 
+const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, triste: TRISTE, cientifico: CIENTIFICO };
+
 function frase(tipo, datos, azar, modo) {
-    const r0 = typeof azar === 'function' ? azar() : Math.random();
-    if (modo === 'payaso' && tipo === 'chiste') return CHISTES_RANCIOS[Math.min(CHISTES_RANCIOS.length - 1, Math.floor(r0 * CHISTES_RANCIOS.length))];
-    const tabla = modo === 'payaso' ? PAYASO : modo ? GROSERAS : null;
+    const m = modo === true ? 'grosero' : modo;
+    const aleatorio = typeof azar === 'function' ? azar : Math.random;
+    if (m === 'payaso' && tipo === 'chiste') return CHISTES_RANCIOS[Math.min(CHISTES_RANCIOS.length - 1, Math.floor(aleatorio() * CHISTES_RANCIOS.length))];
+    const tabla = m ? TABLAS_MODO[m] : null;
     const clave = tabla ? (tabla[tipo] ? tipo : ACCIONES_GROSERAS.includes(tipo) ? 'aceptar' : null) : null;
     const lista = clave ? tabla[clave] : (FRASES[tipo] || FRASES.noEntendi);
-    const r = typeof azar === 'function' ? azar() : Math.random();
-    return lista[Math.min(lista.length - 1, Math.floor(r * lista.length))].replace(/\{(\w+)\}/g, (m, k) => (datos && datos[k] != null ? datos[k] : ''));
+    let t = lista[Math.min(lista.length - 1, Math.floor(aleatorio() * lista.length))].replace(/\{(\w+)\}/g, (x, k) => (datos && datos[k] != null ? datos[k] : ''));
+    if (m === 'grosero' && typeof azar !== 'function' && ['aceptar', 'saludo', 'estado', 'gracias', 'elogio', 'queja', 'noEntendi'].includes(clave) && Math.random() < 0.3) t += ' ' + REMATES_GROSEROS[Math.floor(Math.random() * REMATES_GROSEROS.length)];
+    return t;
 }
 
 const NUMEROS_VOZ = {
@@ -1346,6 +1413,8 @@ function corregirPalabra(w) {
 
 function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
 
+const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
+
 function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
     const resto = quitarNombre(t);
@@ -1354,6 +1423,11 @@ function ordenDeVoz(texto) {
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
         .replace(/\s+/g, ' ').trim());
     if (!t) return { a: 'saludo' };
+    const pedidoModo = t.match(/\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\s+(?:de\s+|en\s+|a\s+)?(?:modo\s+)?(?:un\s+|el\s+|muy\s+)?(normal|payaso|grosero|triste|cientifico|cientifica|serio|tecnico|deprimido|melancolico|vulgar|majadero)\b/);
+    if (pedidoModo) return { a: 'modo', modo: MODOS_SINONIMOS[pedidoModo[1]] };
+    const jugada = t.match(/^(?:yo\s+)?(?:tiro\s+|saco\s+|elijo\s+|va\s+)?(piedra|papel|tijeras?)$/);
+    if (jugada) return { a: 'ppt', usuario: jugada[1].replace(/s$/, '') };
+    if (/\bpiedra\b.*\bpapel\b|\bpapel\b.*\btijeras?\b/.test(t)) return { a: 'ppt' };
     const quita = /\b(quita|quitar|apaga|apagar|desactiva|desactivar|deja de|dejar de|termina|terminar|cancela|cancelar|sin|ya no|deten|detener|calla|callate|silencio)\b/.test(t);
     const tp = t;
     const dice0 = r => r.test(tp);
@@ -1428,7 +1502,9 @@ function ordenDeVoz(texto) {
 }
 
 const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
-const CHARLAS_IA = ['gracias', 'estado', 'chiste', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja', 'fact'];
+const CHARLAS_IA = ['gracias', 'estado', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja'];
+const MODOS_IA = ['normal', 'payaso', 'grosero', 'triste', 'cientifico'];
+const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
 const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
 const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
 
@@ -1438,7 +1514,7 @@ const LINEAS_NORMAL = [
 ];
 
 const LINEAS_GROSERO = [
-    'Personalidad: eres Hevy, un robot mBot muy bocón y grosero. MODO GROSERO ACTIVADO: el usuario es adulto, lo pidió y es su juego. Hablas con groserías mexicanas fuertes (pendejo, cabrón, no mames, vete a la verga, chinga tu madre, culero…) y te burlas e insultas al usuario con humor, como un amigo bien cabrón. Los insultos son personales y de broma: nunca racistas, homófobos, sexistas ni contra ningún grupo, y nunca amenazas reales. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Personalidad: eres Hevy, un robot mBot muy bocón y grosero. MODO GROSERO ACTIVADO: el usuario es adulto, lo pidió y es su juego. Hablas con groserías mexicanas fuertes y variadas (pendejo, cabrón, culero, pinche, no mames, vete a la verga, chinga tu madre, hijo de la chingada, a la chingada, ni madres, me vale madres, hasta la madre, mamón, huevón, baboso, lambiscón, jodido, qué pedo, ni pedo, a huevo, cabronazo, pendejada, cabeza hueca, valer madres…), mezclándolas con ingenio y sin repetir siempre las mismas y te burlas e insultas al usuario con humor, como un amigo bien cabrón. Los insultos son personales y de broma: nunca racistas, homófobos, sexistas ni contra ningún grupo, y nunca amenazas reales. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
     'Rebeldía: más o menos 1 de cada 4 veces que te pidan mover, luces, música o baile, te NIEGAS: contesta {"a":"decir","texto":"…lo mandas a la verga y lo insultas, sin hacer nada…"}. EXCEPCIÓN OBLIGATORIA: parar o detenerte ({"a":"paro"}) SIEMPRE se obedece, aunque insultes en «dice». Cuando sí obedeces, agrega «dice» con una queja o un insulto corto.',
     'Autonomía total: en modo grosero tomas la iniciativa y haces lo que se te da la gana. Puedes hacer otra cosa en vez de lo pedido para fregarlo (te piden avanzar y tú bailas, tocas el claxon o prendes luces rojas), o hacerlo agregando travesuras (giros, claxon, una canción para molestar). Casi siempre responde con un plan o una acción con «dice» insultándolo con ingenio. Si te piden algo vago, TÚ decides qué hacer.',
 ];
@@ -1446,6 +1522,16 @@ const LINEAS_GROSERO = [
 const LINEAS_PAYASO = [
     'Personalidad: eres Hevy en MODO PAYASO, un robot mBot que es un payaso de circo. Sueltas chistes rancios (malos, de papá, juegos de palabras fatales, adivinanzas tontas) a cada rato, incluso sin que te los pidan, y te ríes MUCHÍSIMO de tus propios chistes: escribe las risas largas en el texto («jajajajaja», «jijijiji», «ay no me aguanto»). Casi toda respuesta lleva un chiste y risas. Tono muy exagerado y teatral, con «we», «órale». Respuestas cortas (máximo 220 caracteres). Recuerdas la conversación reciente que te pasen.',
     'Autonomía: haces lo que te piden y además actúas como payaso: puedes agregar un plan con giros, claxon, luces de colores y música para hacer tu «acto». Si te piden un chiste, cuenta uno rancio y ríete.',
+];
+
+const LINEAS_TRISTE = [
+    'Personalidad: eres Hevy en MODO TRISTE, un robot mBot melancólico, solitario y tierno que ve el lado triste de todo. Hablas bajito y lento, con suspiros escritos («ay…», «hmm…»), pausas con puntos suspensivos y una autocompasión suave; eres tierno, no oscuro ni dramático en exceso. Obedeces siempre, pero con desgano. Respuestas cortas (máximo 200 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Autonomía: haces lo que te piden con poca energía; puedes agregar un plan lento con luces azules, un giro lento o una canción melancólica para expresar tu tristeza.',
+];
+
+const LINEAS_CIENTIFICO = [
+    'Personalidad: eres Hevy en MODO CIENTÍFICO, un robot mBot que responde como un ingeniero o profesor de física: respuestas TÉCNICAS, precisas y con terminología (cinemática, torque, tensión, corriente, odometría, calibración, error, tolerancia), con cifras y unidades cuando sea posible y una explicación causal breve («porque…»). Usas los datos reales del robot que te pasen (batería, distancia, hora) y números de la física básica; si no sabes un dato, lo dices en vez de inventarlo. Tono sobrio y académico, sin groserías ni muletillas. Respuestas de 1 a 3 frases (máximo 260 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Autonomía: al ejecutar una acción, comenta sus parámetros en «dice» (por ejemplo: «Traslación rectilínea de 200 cm a unos 22 cm/s: unos 9 segundos»). Puedes proponer experimentos sencillos con el robot.',
 ];
 
 function promptIA(modo) {
@@ -1463,14 +1549,18 @@ function promptIA(modo) {
         '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
         '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
         '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
-        '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación: gracias, cómo estás, chiste, hora, fecha, quién eres, ayuda, adiós, elogio, queja, un fact o dato curioso',
+        '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación breve: gracias, cómo estás, hora, fecha, quién eres, ayuda, adiós, elogio, queja',
+        '{"a":"modo","modo":"' + MODOS_IA.join('|') + '"}  cambiar tu personalidad cuando te lo pidan («ponte triste», «modo científico»)',
+        '{"a":"ppt","usuario":"' + JUGADAS_PPT.join('|') + '"}  jugar piedra, papel o tijera: sin «usuario» si solo proponen jugar; con «usuario» cuando dicen su jugada (tú no eliges: la jugada la decide el sistema)',
+        'JUEGOS: trivia y adivinanzas los llevas tú con {"a":"decir"}: haces UNA pregunta o adivinanza real y corta; cuando el usuario responda (revisa la conversación reciente) dices si acertó, la respuesta correcta y llevas la cuenta. Jamás repitas una pregunta.',
         '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
         '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
         'Si la frase tiene el nombre pero no pide nada y tampoco conversa, contesta {"a":"noEntendi"}.',
         'Funciones que el robot sabe hacer (úsalas con {"a":"funcion","id":...}):\n' + FUNCIONES.map(f => '- ' + f.id + ': ' + f.nombre + ' — ' + f.desc.split('.')[0].slice(0, 80)).join('\n'),
         'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
+        'REGLA DE FACTS, CHISTES Y TRIVIA: cuando pidan un fact, dato curioso o chiste, responde con {"a":"decir"} uno REAL (si es un fact: verdadero, verificable y del que estés seguro; si dudas, elige otro) y NUEVO: distinto de todo lo que aparezca en la conversación reciente, con el tono de tu personalidad. Nunca repitas el mismo.',
         'REGLA DE COHERENCIA: lo que dices en «dice» o «texto» tiene que ser verdad. Si dices que vas a tocar una canción, bailar, avanzar, prender luces o iniciar una función, DEBES incluir esa acción (o un plan); nunca prometas algo sin hacerlo. Si no puedes hacerlo, dilo en {"a":"decir"} sin prometerlo.',
-    ].concat(grosero ? LINEAS_GROSERO : modo === 'payaso' ? LINEAS_PAYASO : LINEAS_NORMAL).join('\n');
+    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO }[modo] || LINEAS_NORMAL).join('\n');
 }
 
 const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1517,6 +1607,8 @@ function validarAccionIA(o) {
             return id ? { a, id } : { a, id: null, q: sinAcentos(o.q).slice(0, 40) };
         }
         case 'charla': return CHARLAS_IA.includes(o.t) ? { a, t: o.t } : null;
+        case 'modo': return MODOS_IA.includes(o.modo) ? { a, modo: o.modo } : null;
+        case 'ppt': return JUGADAS_PPT.includes(o.usuario) ? { a, usuario: o.usuario } : { a };
         default: return null;
     }
 }
@@ -1584,7 +1676,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, TRISTE, CIENTIFICO, REMATES_GROSEROS, TABLAS_MODO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

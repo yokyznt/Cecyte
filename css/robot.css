@@ -173,6 +173,9 @@
 
 .rb-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); }
 .rb-seg--3 { grid-template-columns: repeat(3, 1fr); }
+.rb-seg--5 { grid-template-columns: repeat(6, 1fr); border-radius: 22px; }
+.rb-seg--5 .rb-seg__op { grid-column: span 2; }
+.rb-seg--5 .rb-seg__op:nth-child(n+4) { grid-column: span 3; }
 .rb-seg__op { position: relative; display: block; }
 .rb-seg__op input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .rb-seg__op span {
@@ -503,6 +506,14 @@
 .rb-flecha--izq { grid-area: 2 / 1; }
 .rb-flecha--der { grid-area: 2 / 3; }
 .rb-flecha--abajo { grid-area: 3 / 2; }
+.rb-flecha--adel-izq { grid-area: 1 / 1; }
+.rb-flecha--adel-der { grid-area: 1 / 3; }
+.rb-flecha--atras-izq { grid-area: 3 / 1; }
+.rb-flecha--atras-der { grid-area: 3 / 3; }
+.rb-flecha--adel-izq .icon { rotate: -45deg; }
+.rb-flecha--adel-der .icon { rotate: 45deg; }
+.rb-flecha--atras-izq .icon { rotate: -135deg; }
+.rb-flecha--atras-der .icon { rotate: 135deg; }
 .rb-flecha--izq .icon { rotate: -90deg; }
 .rb-flecha--der .icon { rotate: 90deg; }
 .rb-flecha--abajo .icon { rotate: 180deg; }

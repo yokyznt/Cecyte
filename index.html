@@ -776,6 +776,10 @@
                                         <button type="button" class="rb-btn rb-flecha rb-flecha--izq" data-pad="-1,0" aria-label="Izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
                                         <button type="button" class="rb-btn rb-flecha rb-flecha--der" data-pad="1,0" aria-label="Derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
                                         <button type="button" class="rb-btn rb-flecha rb-flecha--abajo" data-pad="0,-1" aria-label="Atrás"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--adel-izq" data-pad="-1,1" aria-label="Adelante a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--adel-der" data-pad="1,1" aria-label="Adelante a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--atras-izq" data-pad="-1,-1" aria-label="Atrás a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--atras-der" data-pad="1,-1" aria-label="Atrás a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
                                     </div>
 
                                     <div class="rb-pedales rb-pedales--dir" id="rb-pedales-dir" role="group" aria-label="Pedales de dirección">
@@ -1134,14 +1138,25 @@
                                             </div>
                                         </details>
                                         <details class="rb-op">
-                                            <summary><span class="rb-op__t">Personalidad</span><span class="rb-op__r">Normal, payaso o grosero</span></summary>
+                                            <summary><span class="rb-op__t">Personalidad</span><span class="rb-op__r">Cinco modos</span></summary>
                                             <div class="rb-op__c">
-                                                <div class="rb-seg rb-seg--3" role="radiogroup" aria-label="Personalidad de Hevy">
+                                                <div class="rb-seg rb-seg--5" role="radiogroup" aria-label="Personalidad de Hevy">
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="normal" checked><span>Normal</span></label>
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="payaso"><span>Payaso</span></label>
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="grosero"><span>Grosero</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="triste"><span>Triste</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="cientifico"><span>Científico</span></label>
                                                 </div>
-                                                <p class="hint">Payaso: chistes rancios y muchas risas. Grosero: groserías, insultos y a veces no te hace caso. Parar siempre obedece.</p>
+                                                <p class="hint">Payaso: chistes rancios y muchas risas. Grosero: groserías y a veces no te hace caso. Triste: melancólico. Científico: respuestas técnicas. También puedes decir «Hevy, ponte triste». Parar siempre obedece.</p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Por su cuenta</span><span class="rb-op__r">Comenta y escucha solo</span></summary>
+                                            <div class="rb-op__c">
+                                                <label class="rb-check"><input type="checkbox" id="rb-solo" checked><span>Que Hevy comente cosas solo</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-escucha"><span>Escucha continua (sin tocar el micrófono)</span></label>
+                                                <p id="rb-escucha-estado" class="hint" role="status"></p>
+                                                <p class="hint">Solo responde si empiezas con «Hevy». Se apaga a los 20 minutos sin hablarle y al salir de la app. Para jugar: «Hevy, juguemos piedra, papel o tijera».</p>
                                             </div>
                                         </details>
                                         <details class="rb-op">

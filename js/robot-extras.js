@@ -4,12 +4,13 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, nHabla: 0, finHabla: 0, procesando: false };
     const CLAVE_MODO = 'cecyte_yokis_modo';
+    const MODOS = ['normal', 'payaso', 'grosero', 'triste', 'cientifico'];
     const modoHevy = () => {
         try {
             const m = localStorage.getItem(CLAVE_MODO);
-            if (m === 'payaso' || m === 'grosero') return m;
+            if (MODOS.includes(m)) return m;
             if (m === null && localStorage.getItem('cecyte_yokis_grosero') === '1') return 'grosero';
         } catch (e) { return 'normal'; }
         return 'normal';
@@ -436,9 +437,8 @@
     }
 
     const CLAVE_VOZIA = 'cecyte_yokis_vozia';
-    const MODELOS_VOZIA = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
     const VOCES_IA = [['Charon', 'Charon (grave)'], ['Fenrir', 'Fenrir (fuerte)'], ['Orus', 'Orus (firme)'], ['Puck', 'Puck (alegre)'], ['Zephyr', 'Zephyr (brillante)'], ['Kore', 'Kore (firme, femenina)']];
-    const VIA = { fuente: null, cache: new Map(), agotados: {}, pausaHasta: 0, turno: 0, bd: null, motivo: '' };
+    const VIA = { fuente: null, cache: new Map(), turno: 0, bd: null, motivo: '' };
 
     function vozIAElegida() {
         try {
@@ -459,18 +459,6 @@
         VIA.fuente = null;
         if (!a) return;
         try { a.pause(); } catch (e) { return; }
-    }
-
-    function recortarCola(b64) {
-        const b = base64ABytes(b64), n = b.length >> 1, v = new DataView(b.buffer), ven = 480, k = Math.floor(n / ven);
-        const rms = i => {
-            let s = 0;
-            for (let j = i * ven; j < (i + 1) * ven; j++) { const x = v.getInt16(2 * j, true); s += x * x; }
-            return Math.sqrt(s / ven);
-        };
-        let fin = k;
-        while (fin > 0 && k - fin < 25 && rms(fin - 1) > 10000) fin--;
-        return fin === k ? b64 : bytesABase64(b.slice(0, 2 * fin * ven));
     }
 
     function pcmAWav(b64) {
@@ -531,50 +519,6 @@
 
     const LIMITE_ESPERA_MS = 2000;
 
-    async function pedirVozIA(texto, nombreVoz, clave) {
-        const llave = llaveIA();
-        const limite = Date.now() + LIMITE_ESPERA_MS;
-        let agotados = 0;
-        for (const modelo of MODELOS_VOZIA) {
-            if ((VIA.agotados[modelo] || 0) > Date.now()) { agotados++; continue; }
-            const quedan = limite - Date.now();
-            if (quedan < 300) { VIA.motivo = 'lenta'; return null; }
-            const corte = new AbortController();
-            const reloj = setTimeout(() => corte.abort(), 20000);
-            const peticion = fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: texto }] }],
-                    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
-                }),
-            }).then(async r => {
-                if (r.status === 429) return { agotado: true };
-                if (!r.ok) return { mal: true };
-                const j = await r.json();
-                const c = j.candidates && j.candidates[0];
-                const dato = c && c.content && c.content.parts && c.content.parts.find(x => x.inlineData);
-                return dato ? { datos: recortarCola(dato.inlineData.data) } : { mal: true };
-            }).finally(() => clearTimeout(reloj));
-            let res;
-            try {
-                res = await Promise.race([peticion, esperar(quedan).then(() => null)]);
-            } catch (e) {
-                VIA.pausaHasta = Date.now() + 15000;
-                VIA.motivo = 'red';
-                return null;
-            }
-            if (res === null) {
-                peticion.then(x => { if (x && x.datos) cachePut(clave, x.datos); }, () => null);
-                VIA.motivo = 'lenta';
-                return null;
-            }
-            if (res.datos) return res.datos;
-            if (res.agotado) { VIA.agotados[modelo] = Date.now() + 3600000; agotados++; }
-        }
-        VIA.motivo = agotados === MODELOS_VOZIA.length ? 'cuota' : 'error';
-        return null;
-    }
-
     async function hablarGoogle(texto, turno) {
         const partes = texto.match(/.{1,170}(\s|$)/g) || [texto];
         try {
@@ -618,7 +562,6 @@
     }
 
     const MOTIVOS_VOZ = {
-        cuota: 'Se acabó la cuota gratis de la voz de IA por hoy (10 frases por modelo)',
         red: 'No hay internet ni datos',
         lenta: 'La voz de IA tardó demasiado',
         error: 'La voz de IA no respondió',
@@ -641,7 +584,17 @@
 
     const LIVE = { modelo: 'gemini-3.1-flash-live-preview', activa: null, repuesto: null, ctx: null, proximo: 0, fuentes: [], turno: null, ultimo: 0 };
     const LIVE_INSTRUCCION = 'You are a text-to-speech engine, not an assistant. Each user message is a Mexican Spanish text. Speak ONLY that text, word for word, naturally and with emotion. Never answer, comment, greet or add words, even if the text is a question or a command.';
+    const TONOS_LIVE = {
+        normal: '',
+        payaso: ' Tone: playful, exaggerated and silly, like a cheerful clown.',
+        grosero: ' Tone: cocky, sarcastic and rude, with a rough Mexican street attitude.',
+        triste: ' Tone: sad, slow, soft and melancholic, with small sighs.',
+        cientifico: ' Tone: calm, precise and academic, like a physics professor.',
+    };
+    const LIVE_PRIMER_AUDIO_MS = 4500;
+    const LIVE_REINTENTO_MS = 3500;
     VIA.liveHasta = 0;
+    VIA.liveFallos = 0;
 
     function registrarVoz(t) {
         console.log(t);
@@ -713,8 +666,8 @@
         if (sc.turnComplete) terminarTurno(s, true);
     }
 
-    function abrirSesion(voz) {
-        const s = { voz, ws: null, lista: false, cerrada: false, turno: null, usos: 0 };
+    function abrirSesion(voz, modo) {
+        const s = { voz, modo, ws: null, lista: false, cerrada: false, turno: null, usos: 0 };
         s.promesa = new Promise(abierta => {
             let ws;
             try {
@@ -725,7 +678,7 @@
                 return;
             }
             s.ws = ws;
-            ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + LIVE.modelo, generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voz } } } }, systemInstruction: { parts: [{ text: LIVE_INSTRUCCION }] } } }));
+            ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + LIVE.modelo, generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voz } } } }, systemInstruction: { parts: [{ text: LIVE_INSTRUCCION + (TONOS_LIVE[modo] || '') }] } } }));
             ws.onmessage = ev => procesarLive(s, ev, abierta);
             const caida = () => { s.cerrada = true; abierta(false); terminarTurno(s, false); };
             ws.onerror = caida;
@@ -734,31 +687,31 @@
         return s;
     }
 
-    function garantizarRepuesto(voz) {
+    function garantizarRepuesto(voz, modo) {
         const r = LIVE.repuesto;
-        if (r && (r.cerrada || r.voz !== voz)) {
+        if (r && (r.cerrada || r.voz !== voz || r.modo !== modo)) {
             cerrarSesion(r);
             LIVE.repuesto = null;
         }
-        if (!LIVE.repuesto && llaveIA()) LIVE.repuesto = abrirSesion(voz);
+        if (!LIVE.repuesto && llaveIA()) LIVE.repuesto = abrirSesion(voz, modo);
     }
 
-    function sesionActiva(voz) {
+    function sesionActiva(voz, modo) {
         const a = LIVE.activa;
-        if (a && (a.cerrada || a.voz !== voz)) {
+        if (a && (a.cerrada || a.voz !== voz || a.modo !== modo)) {
             cerrarSesion(a);
             LIVE.activa = null;
         }
         if (!LIVE.activa) {
             const r = LIVE.repuesto;
-            if (r && !r.cerrada && r.voz === voz) {
+            if (r && !r.cerrada && r.voz === voz && r.modo === modo) {
                 LIVE.activa = r;
                 LIVE.repuesto = null;
             } else {
-                LIVE.activa = abrirSesion(voz);
+                LIVE.activa = abrirSesion(voz, modo);
             }
         }
-        garantizarRepuesto(voz);
+        garantizarRepuesto(voz, modo);
         LIVE.ultimo = Date.now();
         return LIVE.activa;
     }
@@ -786,6 +739,44 @@
         return bytesABase64(todo);
     }
 
+    function fallaLive(motivo) {
+        VIA.liveFallos++;
+        if (VIA.liveFallos >= 2) {
+            VIA.liveFallos = 0;
+            VIA.liveHasta = Date.now() + 10000;
+        }
+        if (motivo) VIA.motivo = motivo;
+        return false;
+    }
+
+    async function turnoLive(s, texto, turno, muda) {
+        const t = { texto, cancelado: false, terminado: false, primero: 0, pcm: [], finAudio: 0, muda: !!muda };
+        const fin = new Promise(r => { t.resolver = r; });
+        const primero = new Promise(r => { t.alPrimero = r; });
+        s.turno = t;
+        LIVE.turno = t;
+        LIVE.proximo = 0;
+        t.inicio = Date.now();
+        try {
+            s.ws.send(JSON.stringify({ realtimeInput: { text: texto } }));
+        } catch (e) {
+            s.turno = null;
+            LIVE.turno = null;
+            return { t, fin, lento: true };
+        }
+        await Promise.race([primero, fin, esperar(LIVE_PRIMER_AUDIO_MS)]);
+        if (!t.primero && !t.cancelado && turno === VIA.turno) {
+            t.cancelado = true;
+            t.terminado = true;
+            s.turno = null;
+            LIVE.turno = null;
+            cerrarSesion(s);
+            if (LIVE.activa === s) LIVE.activa = null;
+            return { t, fin, lento: true };
+        }
+        return { t, fin, lento: false };
+    }
+
     async function hablarLive(texto, voz, turno, clave, muda) {
         const c = liveCtx();
         if (!muda) {
@@ -796,62 +787,47 @@
                 return false;
             }
         }
-        const s = sesionActiva(voz);
-        const lista = await Promise.race([s.promesa, esperar(900)]);
-        if (!lista || s.cerrada) {
-            VIA.liveHasta = Date.now() + 20000;
-            if (raiz.navigator.onLine === false) VIA.motivo = 'red';
-            return false;
-        }
-        if (turno !== VIA.turno) return true;
-        const t = { texto, cancelado: false, terminado: false, primero: 0, pcm: [], finAudio: 0, muda: !!muda };
-        const fin = new Promise(r => { t.resolver = r; });
-        const primero = new Promise(r => { t.alPrimero = r; });
-        s.turno = t;
-        LIVE.turno = t;
-        LIVE.proximo = 0;
-        const t0 = Date.now();
-        try {
-            s.ws.send(JSON.stringify({ realtimeInput: { text: texto } }));
-        } catch (e) {
-            s.turno = null;
-            LIVE.turno = null;
-            VIA.liveHasta = Date.now() + 20000;
-            return false;
-        }
-        await Promise.race([primero, fin, esperar(LIMITE_ESPERA_MS)]);
-        if (turno !== VIA.turno || t.cancelado) {
-            t.cancelado = true;
+        const modo = modoHevy();
+        for (let intento = 0; intento < 2; intento++) {
+            if (turno !== VIA.turno) return true;
+            const s = sesionActiva(voz, modo);
+            const lista = await Promise.race([s.promesa, esperar(intento ? LIVE_REINTENTO_MS : 900)]);
+            if (turno !== VIA.turno) return true;
+            if (!lista || s.cerrada) {
+                cerrarSesion(s);
+                if (LIVE.activa === s) LIVE.activa = null;
+                if (raiz.navigator.onLine === false) return fallaLive('red');
+                continue;
+            }
+            const { t, fin, lento } = await turnoLive(s, texto, turno, muda);
+            if (turno !== VIA.turno || t.cancelado && !lento) {
+                t.cancelado = true;
+                return true;
+            }
+            if (lento) {
+                registrarVoz('VozLive: sin audio tras ' + (Date.now() - t.inicio) + ' ms (intento ' + (intento + 1) + ')');
+                continue;
+            }
+            VIA.liveFallos = 0;
+            registrarVoz('VozLive: primer audio en ' + (t.primero - t.inicio) + ' ms (audio ' + (c ? c.state : 'sin contexto') + ')');
+            await Promise.race([fin, esperar(30000)]);
+            if (t.cancelado) return true;
+            if (t.pcm.length && clave) cachePut(clave, unirPcm(t.pcm));
+            s.usos++;
+            if (s.usos >= 6) {
+                cerrarSesion(s);
+                if (LIVE.activa === s) LIVE.activa = null;
+            }
+            if (!t.muda) estadoVoz('Voz: Gemini en vivo.');
             return true;
         }
-        if (!t.primero) {
-            t.cancelado = true;
-            t.terminado = true;
-            s.turno = null;
-            LIVE.turno = null;
-            cerrarSesion(s);
-            LIVE.activa = null;
-            VIA.liveHasta = Date.now() + 20000;
-            VIA.motivo = 'lenta';
-            return false;
-        }
-        registrarVoz('VozLive: primer audio en ' + (t.primero - t0) + ' ms (audio ' + (c ? c.state : 'sin contexto') + ')');
-        await Promise.race([fin, esperar(30000)]);
-        if (t.cancelado) return true;
-        if (t.pcm.length && clave) cachePut(clave, unirPcm(t.pcm));
-        s.usos++;
-        if (s.usos >= 6) {
-            cerrarSesion(s);
-            if (LIVE.activa === s) LIVE.activa = null;
-        }
-        if (!t.muda) estadoVoz('Voz: Gemini en vivo.');
-        return true;
+        return fallaLive('lenta');
     }
 
     async function nivelLive(texto, turno) {
         if (!llaveIA()) { VIA.motivo = 'llave'; return false; }
         if (Date.now() < VIA.liveHasta) return false;
-        const voz = vozIAElegida(), clave = 'live|' + voz + '|' + texto;
+        const voz = vozIAElegida(), clave = 'live|' + voz + '|' + modoHevy() + '|' + texto;
         const guardado = VIA.cache.get(clave) || await cacheGet(clave);
         if (guardado) {
             VIA.cache.set(clave, guardado);
@@ -872,7 +848,7 @@
     function precalentarLive() {
         if (!llaveIA() || Date.now() < VIA.liveHasta) return;
         const t0 = Date.now();
-        sesionActiva(vozIAElegida()).promesa.then(ok => registrarVoz('VozLive: sesión ' + (ok ? 'lista en ' + (Date.now() - t0) + ' ms' : 'no abrió')));
+        sesionActiva(vozIAElegida(), modoHevy()).promesa.then(ok => registrarVoz('VozLive: sesión ' + (ok ? 'lista en ' + (Date.now() - t0) + ' ms' : 'no abrió')));
     }
 
     async function autopruebaLive() {
@@ -893,50 +869,20 @@
         LIVE.ultimo = 0;
     }, 30000);
 
-    async function nivelGemini(texto, turno) {
-        if (!llaveIA()) { VIA.motivo = 'llave'; return false; }
-        if (Date.now() < VIA.pausaHasta) { VIA.motivo = 'red'; return false; }
-        try {
-            const nombreVoz = vozIAElegida(), clave = 'v2|' + nombreVoz + '|' + texto;
-            let datos = VIA.cache.get(clave) || await cacheGet(clave);
-            if (!datos) {
-                datos = await pedirVozIA(texto, nombreVoz, clave);
-                if (datos) cachePut(clave, datos);
-            }
-            if (datos) {
-                VIA.cache.set(clave, datos);
-                if (VIA.cache.size > 40) VIA.cache.delete(VIA.cache.keys().next().value);
-                if (turno !== VIA.turno) return true;
-                callarIA();
-                const url = URL.createObjectURL(pcmAWav(datos));
-                try {
-                    await sonar(url);
-                    estadoVoz('Voz: IA de Gemini.');
-                    return true;
-                } finally {
-                    URL.revokeObjectURL(url);
-                }
-            }
-        } catch (e) {
-            VIA.motivo = 'error';
-        }
-        return false;
-    }
-
     function nivelGradium(texto, turno) {
         const v = VOCES_GRADIUM.find(x => x[0] === vozGradiumElegida()) || ['', ''];
         return hablarGradium(texto, v[0], 'IA de Gradium (' + v[1] + ')', turno);
     }
 
-    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gemini: 'la voz de IA de Gemini', gradium: 'la voz de IA de Gradium', local: 'la voz local de IA' };
+    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gradium: 'la voz de IA de Gradium', local: 'la voz local de IA' };
 
     async function hablarIA(texto) {
         const turno = ++VIA.turno;
         VIA.motivo = '';
         const tipo = valorSeleccion().split(':')[0];
         const principal = tipo === 'gradium' || tipo === 'local' ? tipo : 'gemini';
-        const niveles = { live: nivelLive, gemini: nivelGemini, gradium: nivelGradium, local: hablarLocal };
-        const orden = principal === 'local' ? ['local', 'live', 'gemini', 'gradium'] : principal === 'gradium' ? ['gradium', 'live', 'gemini'] : ['live', 'gemini', 'gradium'];
+        const niveles = { live: nivelLive, gradium: nivelGradium, local: hablarLocal };
+        const orden = principal === 'local' ? ['local', 'live'] : principal === 'gradium' ? ['gradium', 'live'] : ['live'];
         for (const nivel of orden) {
             if (turno !== VIA.turno) return true;
             if (nivel !== 'local' && (VIA.motivo === 'red' || VIA.motivo === 'lenta')) continue;
@@ -949,13 +895,13 @@
         callarIA();
         const motivo = MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió';
         const sinRed = VIA.motivo === 'red' || raiz.navigator.onLine === false;
-        if (!sinRed && await hablarGoogle(texto, turno)) {
-            estadoVoz(motivo + ': hablo con la voz de Google.');
+        if (principal !== 'local' && await hablarLocal(texto, turno)) {
+            estadoVoz((sinRed ? MOTIVOS_VOZ.red : motivo) + ': hablo con la voz local de IA.');
             return true;
         }
         if (turno !== VIA.turno) return true;
-        if (principal !== 'local' && await hablarLocal(texto, turno)) {
-            estadoVoz((sinRed ? MOTIVOS_VOZ.red : motivo) + ': hablo con la voz local de IA.');
+        if (!sinRed && await hablarGoogle(texto, turno)) {
+            estadoVoz(motivo + ': hablo con la voz de Google.');
             return true;
         }
         estadoVoz(motivo + ': hablo con la voz del teléfono.');
@@ -991,8 +937,8 @@
         pintarSelectorVoz();
         sel.addEventListener('change', async () => {
             const v = sel.value, tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
-            VIA.pausaHasta = 0;
             VIA.gradiumHasta = 0;
+            VIA.liveHasta = 0;
             if (tipo === 'entrenada') {
                 await activarVoz(id);
             } else {
@@ -1229,6 +1175,9 @@
         aviso(texto);
         historial('yokis', texto);
         const fin = voz(texto);
+        const n = ++E.nHabla;
+        E.hablando = true;
+        fin.then(() => null, () => null).then(() => { if (n === E.nHabla) { E.hablando = false; E.finHabla = Date.now(); } });
         if (!quieto) meneoHablar(texto, fin);
     }
 
@@ -1476,11 +1425,11 @@
         let t = '';
         try { t = localStorage.getItem(CLAVE_FACTS) || ''; } catch (e) { /* sin guardado */ }
         const lista = t.split('\n').map(x => x.trim()).filter(Boolean);
-        return lista.length ? lista : raiz.Robot.FRASES.fact;
+        return lista;
     }
     function tirarFact() {
         const l = leerFacts();
-        hablar(l[Math.floor(Math.random() * l.length)]);
+        hablar(l.length ? l[Math.floor(Math.random() * l.length)] : raiz.Robot.frase('fact', null, undefined, modoF()));
     }
     function iniciarFacts() {
         const caja = $('rb-fact-texto');
@@ -1547,7 +1496,7 @@
     }
 
     function ejecutar(o) {
-        E.dice = o && o.dice ? o.dice : null;
+        E.dice = o && o.dice && o.a !== 'modo' && o.a !== 'ppt' ? o.dice : null;
         if (o && o.a === 'decir') {
             E.dice = null;
             hablar(o.texto);
@@ -1577,6 +1526,8 @@
         const c = calibra();
         if (o.a === 'sinNombre') { di('sinNombre'); return; }
         if (o.a === 'charla') { charla(o.t); return; }
+        if (o.a === 'modo') { cambiarModo(o.modo); return; }
+        if (o.a === 'ppt') { jugarPPT(o.usuario); return; }
         if (o.a === 'saludo') { di('saludo'); return; }
         if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
@@ -1643,15 +1594,15 @@
         return 'Canciones guardadas del usuario: ' + (guardadas.length ? guardadas.join(', ') : 'ninguna') + '. Canción elegida ahora: ' + (actual ? actual.nombre : 'ninguna') + '.';
     }
 
-    async function consultarIA(alternativas, rebelde) {
+    async function consultarIA(alternativas, rebelde, evento) {
         const llave = llaveIA();
-        if (!llave || !alternativas.length) return null;
+        if (!llave || (!alternativas.length && !evento)) return null;
         const bat = $('rb-bat-pct');
         const contexto = [
             'Robot ' + (listo() ? 'conectado' : 'no conectado') + (bat && /\d/.test(bat.textContent) ? ', batería ' + bat.textContent.trim() : '') + '. Hora: ' + new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '.',
             capacidadesRobot(),
             E.memoria.length ? 'Conversación reciente y lo último que hiciste:\n' + E.memoria.join('\n') : '',
-            'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
+            evento ? 'EVENTO (el usuario no te habló): ' + evento + '\nResponde SOLO con {"a":"decir","texto":"..."}: un comentario espontáneo, breve y propio de tu personalidad, sin acciones.' : 'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
             rebelde ? 'Instrucción oculta: esta vez TE NIEGAS a obedecer lo que pida (usa {"a":"decir"} con un insulto ingenioso), salvo que sea parar o detenerte.' : '',
         ].filter(Boolean).join('\n\n');
         const cuerpo = JSON.stringify({
@@ -1680,12 +1631,26 @@
         return null;
     }
 
+    const BIENVENIDA = {
+        normal: 'Va, me porto bien, we.',
+        payaso: '¡Jajajajaja! ¡Llegó el payaso! ¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajajaja.',
+        grosero: 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.',
+        triste: 'Ay… bueno. Me pongo triste… tampoco es que me cueste mucho.',
+        cientifico: 'Modo científico activado. A partir de ahora respondo con precisión técnica.',
+    };
+
+    function cambiarModo(m) {
+        if (!MODOS.includes(m)) return;
+        try { localStorage.setItem(CLAVE_MODO, m); } catch (e) { return; }
+        document.querySelectorAll('input[name="rb-modo"]').forEach(r => { r.checked = r.value === m; });
+        hablar(BIENVENIDA[m], true);
+    }
+
     function iniciarIA() {
         const campo = $('rb-ia-llave');
         if (!campo) return;
         campo.value = llaveIA();
         campo.addEventListener('change', () => {
-            VIA.pausaHasta = 0;
             try { localStorage.setItem(CLAVE_IA, campo.value.trim()); } catch (e) { return; }
             $('rb-ia-estado').textContent = campo.value.trim() ? 'IA activada.' : 'IA apagada.';
         });
@@ -1695,19 +1660,33 @@
             $('rb-ia-estado').textContent = o && (o.a === 'mover' || o.a === 'plan') ? 'Funciona: la IA entendió «jevi avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
             if (o) hablar(groseroOn() ? 'Ya quedó, cabrón. Ya te escucho.' : '¡Listo, we! Ya te escucho.', true);
         });
-        const BIENVENIDA = {
-            normal: 'Va, me porto bien, we.',
-            payaso: '¡Jajajajaja! ¡Llegó el payaso! ¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajajaja.',
-            grosero: 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.',
-        };
         document.querySelectorAll('input[name="rb-modo"]').forEach(r => {
             r.checked = r.value === modoHevy();
-            r.addEventListener('change', () => {
-                if (!r.checked) return;
-                try { localStorage.setItem(CLAVE_MODO, r.value); } catch (e) { return; }
-                hablar(BIENVENIDA[r.value], true);
-            });
+            r.addEventListener('change', () => { if (r.checked) cambiarModo(r.value); });
         });
+    }
+
+    async function procesarTexto(lista, exigeNombre) {
+        const texto = elegirTexto(lista);
+        if (!texto) {
+            if (!exigeNombre) di('nada');
+            return false;
+        }
+        let orden = raiz.Robot.ordenDeVoz(texto);
+        if (exigeNombre && orden && orden.a === 'sinNombre') return false;
+        SOLO.quieto = Date.now();
+        historial('yo', texto);
+        aviso('«' + texto + '»');
+        let porIA = false;
+        if (!(orden && CRITICAS.includes(orden.a)) && llaveIA()) {
+            const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
+            if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
+        }
+        if (!porIA && groseroOn() && orden && REBELDES.includes(orden.a) && Math.random() < 0.2) {
+            orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, 'grosero') };
+        }
+        ejecutar(orden);
+        return true;
     }
 
     async function escuchar() {
@@ -1737,26 +1716,167 @@
                     rec.start();
                 });
             } else { di('sinVoz'); return; }
-            const texto = elegirTexto(lista);
-            if (!texto) { di('nada'); return; }
-            historial('yo', texto);
-            aviso('«' + texto + '»');
-            let orden = raiz.Robot.ordenDeVoz(texto);
-            let porIA = false;
-            if (!(orden && CRITICAS.includes(orden.a)) && llaveIA()) {
-                const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
-                if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
-            }
-            if (!porIA && groseroOn() && orden && REBELDES.includes(orden.a) && Math.random() < 0.2) {
-                orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, 'grosero') };
-            }
-            ejecutar(orden);
+            await procesarTexto(lista, false);
         } catch (e) {
             di('fallo');
         } finally {
             E.escuchando = false;
             boton.classList.remove('is-activo');
         }
+    }
+
+    const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
+    const COLOR_PPT = { piedra: '#ff3b30', papel: '#ffffff', tijera: '#34c759' };
+
+    function jugarPPT(usuario) {
+        if (!JUGADAS_PPT.includes(usuario)) { di('pptInvita'); return; }
+        const mia = JUGADAS_PPT[Math.floor(Math.random() * 3)];
+        const r = (JUGADAS_PPT.indexOf(usuario) - JUGADAS_PPT.indexOf(mia) + 3) % 3;
+        if (listo()) enlace().luces('fijo', COLOR_PPT[mia]);
+        di(r === 0 ? 'pptEmpate' : r === 1 ? 'pptPerdio' : 'pptGano', { mia, tuya: usuario });
+    }
+
+    const CLAVE_SOLO = 'cecyte_yokis_solo';
+    const SOLO = { ultimo: 0, bateria: 0, quieto: Date.now(), aburrirse: 240000 + Math.random() * 120000 };
+    const soloOn = () => { try { return localStorage.getItem(CLAVE_SOLO) !== '0'; } catch (e) { return true; } };
+
+    async function comentarSolo(evento, local) {
+        const ahora = Date.now();
+        if (!soloOn() || document.hidden || ahora - SOLO.ultimo < 180000 || E.escuchando || E.hablando || E.corrida || E.radar || E.dibujando || E.procesando) return;
+        SOLO.ultimo = ahora;
+        SOLO.quieto = ahora;
+        const o = await consultarIA([], false, evento);
+        hablar(o && o.a === 'decir' ? o.texto : local(), true);
+    }
+
+    function iniciarSolo() {
+        const c = $('rb-solo');
+        if (c) {
+            c.checked = soloOn();
+            c.addEventListener('change', () => { try { localStorage.setItem(CLAVE_SOLO, c.checked ? '1' : '0'); } catch (e) { /* sin guardado */ } });
+        }
+        const frase = (tipo, datos) => () => raiz.Robot.frase(tipo, datos, undefined, modoF());
+        document.addEventListener('robot-estado', e => {
+            if (e.detail && e.detail.estado === 'listo') comentarSolo('El robot acaba de conectarse y está listo.', frase('saludo'));
+        });
+        document.addEventListener('robot-bateria-baja', e => {
+            const pct = e.detail && e.detail.pct;
+            if (Date.now() - SOLO.bateria < 600000) return;
+            SOLO.bateria = Date.now();
+            comentarSolo('Tu batería está baja: ' + pct + ' por ciento.', frase('bateria', { pct: pct + ' por ciento' }));
+        });
+        document.addEventListener('robot-distancia', () => {
+            if (!listo() || !enlace().distancias) return;
+            const l = enlace().distancias().lecturas, cm = l.length ? l[l.length - 1] : 0;
+            if (cm > 0 && cm < 12) comentarSolo('Algo se puso a ' + cm + ' cm enfrente de ti.', frase('alerta'));
+        });
+        setInterval(() => {
+            if (listo() && Date.now() - SOLO.quieto > SOLO.aburrirse) {
+                SOLO.aburrirse = 240000 + Math.random() * 120000;
+                comentarSolo('Llevas varios minutos sin que nadie te hable ni te mueva; estás aburrido.', frase('aburrido'));
+            }
+        }, 30000);
+    }
+
+    const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
+    const ESC = { on: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, fallos: 0, ultimaVez: 0, reconectar: 0 };
+
+    function estadoEscucha(t) {
+        const el = $('rb-escucha-estado');
+        if (el) el.textContent = t;
+    }
+
+    function apagarEscucha(motivo) {
+        ESC.on = false;
+        clearTimeout(ESC.reconectar);
+        const ws = ESC.ws;
+        ESC.ws = null;
+        ESC.lista = false;
+        try { if (ws) ws.close(); } catch (e) { /* ya cerrado */ }
+        try { if (ESC.proc) ESC.proc.disconnect(); } catch (e) { /* ya desconectado */ }
+        try { if (ESC.ctx) ESC.ctx.close(); } catch (e) { /* ya cerrado */ }
+        if (ESC.flujo) ESC.flujo.getTracks().forEach(p => p.stop());
+        ESC.proc = null;
+        ESC.ctx = null;
+        ESC.flujo = null;
+        const c = $('rb-escucha');
+        if (c) c.checked = false;
+        estadoEscucha(motivo || '');
+    }
+
+    function conectarTranscripcion() {
+        let ws;
+        try {
+            ws = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' + encodeURIComponent(llaveIA()));
+        } catch (e) {
+            apagarEscucha('No se pudo abrir la escucha.');
+            return;
+        }
+        ESC.ws = ws;
+        ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + MODELO_TRANSCRIBE } }));
+        ws.onmessage = async ev => {
+            let m;
+            try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); } catch (e) { return; }
+            if (m.setupComplete) {
+                ESC.lista = true;
+                ESC.fallos = 0;
+                estadoEscucha('Escuchando: empieza con «Hevy».');
+                return;
+            }
+            const t = m.serverContent && m.serverContent.inputTranscription && m.serverContent.inputTranscription.text;
+            if (!t || !t.trim() || E.escuchando || E.procesando) return;
+            E.procesando = true;
+            procesarTexto([t.trim()], true).then(ok => { if (ok) ESC.ultimaVez = Date.now(); }, () => null).then(() => { E.procesando = false; });
+        };
+        const caida = () => {
+            if (ESC.ws !== ws) return;
+            ESC.ws = null;
+            ESC.lista = false;
+            if (!ESC.on) return;
+            if (++ESC.fallos > 5) { apagarEscucha('La escucha se cortó. Vuelve a prenderla.'); return; }
+            estadoEscucha('Reconectando…');
+            ESC.reconectar = setTimeout(() => { if (ESC.on && !ESC.ws) conectarTranscripcion(); }, 1500);
+        };
+        ws.onclose = caida;
+        ws.onerror = caida;
+    }
+
+    async function encenderEscucha() {
+        if (!llaveIA()) { apagarEscucha('Falta la llave de Gemini.'); return; }
+        const md = raiz.navigator.mediaDevices, Ctx = raiz.AudioContext || raiz.webkitAudioContext;
+        if (!md || !md.getUserMedia || !Ctx) { apagarEscucha('Este dispositivo no deja escuchar continuo.'); return; }
+        try {
+            ESC.flujo = await md.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+            ESC.ctx = new Ctx({ sampleRate: 16000 });
+        } catch (e) {
+            apagarEscucha('No hay permiso del micrófono.');
+            return;
+        }
+        ESC.on = true;
+        ESC.fallos = 0;
+        ESC.ultimaVez = Date.now();
+        const fuente = ESC.ctx.createMediaStreamSource(ESC.flujo);
+        ESC.proc = ESC.ctx.createScriptProcessor(4096, 1, 1);
+        const mime = 'audio/pcm;rate=' + ESC.ctx.sampleRate;
+        ESC.proc.onaudioprocess = e => {
+            const ws = ESC.ws;
+            if (!ws || ws.readyState !== 1 || !ESC.lista || E.hablando || E.escuchando || Date.now() < E.finHabla + 600) return;
+            const f = e.inputBuffer.getChannelData(0), b = new Uint8Array(f.length * 2), v = new DataView(b.buffer);
+            for (let i = 0; i < f.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, f[i])) * 32767, true);
+            ws.send(JSON.stringify({ realtimeInput: { audio: { data: bytesABase64(b), mimeType: mime } } }));
+        };
+        fuente.connect(ESC.proc);
+        ESC.proc.connect(ESC.ctx.destination);
+        estadoEscucha('Conectando…');
+        conectarTranscripcion();
+    }
+
+    function iniciarEscuchaContinua() {
+        const c = $('rb-escucha');
+        if (!c) return;
+        c.addEventListener('change', () => { if (c.checked) encenderEscucha(); else apagarEscucha('Escucha apagada.'); });
+        document.addEventListener('visibilitychange', () => { if (document.hidden && ESC.on) apagarEscucha('Se apagó al salir de la app.'); });
+        setInterval(() => { if (ESC.on && Date.now() - ESC.ultimaVez > 1200000) apagarEscucha('Se apagó tras 20 minutos sin que me hablaras.'); }, 30000);
     }
 
     const CLAVES_LOCALES = {};
@@ -1778,6 +1898,8 @@
         $('rb-jarvis').addEventListener('click', escuchar);
         iniciarFacts();
         iniciarIA();
+        iniciarSolo();
+        iniciarEscuchaContinua();
         iniciarVozIA();
         iniciarMeneo();
         $('rb-voz-probar').addEventListener('click', () => { hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
