@@ -1801,9 +1801,13 @@
         ESC.proc = null;
         ESC.ctx = null;
         ESC.flujo = null;
+        ESC.medidor = null;
+        cancelAnimationFrame(ESC.cuadro);
+        clearInterval(ESC.informe);
         const c = $('rb-escucha');
         if (c) c.checked = false;
         $('rb-jarvis').classList.remove('is-candado');
+        $('rb-jarvis').style.removeProperty('--nivel');
         estadoEscucha(motivo || '');
         if (motivo) aviso(motivo);
     }
@@ -1824,18 +1828,22 @@
             if (m.setupComplete) {
                 ESC.lista = true;
                 ESC.fallos = 0;
+                registrarVoz('Escucha: transcripción lista');
                 estadoEscucha('Escuchando: empieza con «Hevy».');
                 return;
             }
+            if (m.error || m.goAway) registrarVoz('Escucha: el servidor avisó ' + JSON.stringify(m.error || m.goAway).slice(0, 200));
             const t = m.serverContent && m.serverContent.inputTranscription && m.serverContent.inputTranscription.text;
+            if (t) registrarVoz('Escucha: oí «' + t.trim() + '»' + (E.escuchando || E.procesando ? ' (ocupado)' : ''));
             if (!t || !t.trim() || E.escuchando || E.procesando) return;
             E.procesando = true;
             procesarTexto([t.trim()], true).then(ok => { if (ok) ESC.ultimaVez = Date.now(); }, () => null).then(() => { E.procesando = false; });
         };
-        const caida = () => {
+        const caida = ev => {
             if (ESC.ws !== ws) return;
             ESC.ws = null;
             ESC.lista = false;
+            registrarVoz('Escucha: conexión cerrada (' + (ev && ev.code != null ? 'código ' + ev.code + (ev.reason ? ' ' + ev.reason : '') : ev && ev.type) + ')');
             if (!ESC.on) return;
             if (++ESC.fallos > 5) { apagarEscucha('La escucha se cortó. Vuelve a prenderla.'); return; }
             estadoEscucha('Reconectando…');
@@ -1859,22 +1867,48 @@
         ESC.on = true;
         ESC.fallos = 0;
         ESC.ultimaVez = Date.now();
+        ESC.enviados = 0;
+        ESC.bloqueados = 0;
+        if (ESC.ctx.state !== 'running') await Promise.race([ESC.ctx.resume().catch(() => null), esperar(800)]);
+        const pistas = ESC.flujo.getAudioTracks();
+        registrarVoz('Escucha: micrófono ' + (pistas.length ? pistas[0].readyState + (pistas[0].muted ? ' (mudo)' : '') : 'sin pistas') + ', audio ' + ESC.ctx.state + ' a ' + ESC.ctx.sampleRate + ' Hz');
         const fuente = ESC.ctx.createMediaStreamSource(ESC.flujo);
+        const medidor = ESC.ctx.createAnalyser();
+        medidor.fftSize = 512;
+        fuente.connect(medidor);
+        const onda = new Float32Array(medidor.fftSize), boton = $('rb-jarvis');
+        const pintar = () => {
+            if (!ESC.on || ESC.medidor !== medidor) return;
+            medidor.getFloatTimeDomainData(onda);
+            let s = 0;
+            for (let i = 0; i < onda.length; i++) s += onda[i] * onda[i];
+            ESC.nivel = Math.max(Math.min(1, Math.sqrt(s / onda.length) * 9), ESC.nivel * 0.85);
+            boton.style.setProperty('--nivel', ESC.nivel.toFixed(2));
+            ESC.cuadro = requestAnimationFrame(pintar);
+        };
+        ESC.medidor = medidor;
+        ESC.nivel = 0;
+        ESC.cuadro = requestAnimationFrame(pintar);
         ESC.proc = ESC.ctx.createScriptProcessor(4096, 1, 1);
         const mime = 'audio/pcm;rate=' + ESC.ctx.sampleRate;
         ESC.proc.onaudioprocess = e => {
             const ws = ESC.ws;
-            if (!ws || ws.readyState !== 1 || !ESC.lista || E.hablando || E.escuchando || Date.now() < E.finHabla + 600) return;
+            if (!ws || ws.readyState !== 1 || !ESC.lista || E.hablando || E.escuchando || Date.now() < E.finHabla + 600) { ESC.bloqueados++; return; }
             const f = e.inputBuffer.getChannelData(0), b = new Uint8Array(f.length * 2), v = new DataView(b.buffer);
             for (let i = 0; i < f.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, f[i])) * 32767, true);
             ws.send(JSON.stringify({ realtimeInput: { audio: { data: bytesABase64(b), mimeType: mime } } }));
+            ESC.enviados++;
         };
         fuente.connect(ESC.proc);
         ESC.proc.connect(ESC.ctx.destination);
-        $('rb-jarvis').classList.add('is-candado');
-        aviso('Candado puesto: te escucho solo. Empieza con «Hevy».');
+        boton.classList.add('is-candado');
         estadoEscucha('Conectando…');
         conectarTranscripcion();
+        clearInterval(ESC.informe);
+        ESC.informe = setInterval(() => {
+            if (!ESC.on) return;
+            registrarVoz('Escucha: enviados ' + ESC.enviados + ', sin enviar ' + ESC.bloqueados + ', nivel ' + ESC.nivel.toFixed(2) + ', listo ' + ESC.lista + ', hablando ' + E.hablando + ', audio ' + (ESC.ctx ? ESC.ctx.state : '-'));
+        }, 4000);
     }
 
     function iniciarMicrofono() {
