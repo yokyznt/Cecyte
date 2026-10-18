@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, encolar: false };
     const CLAVE_MODO = 'cecyte_yokis_modo';
     const MODOS = () => (raiz.Robot && raiz.Robot.MODOS_IA) || ['normal'];
     const personal = () => (raiz.Robot && raiz.Robot.MODO_PERSONAL) || null;
@@ -1232,12 +1232,23 @@
             control().anotar(0, 0);
             if (R.casa && R.completa) control().marcarCasa();
         }
+        if (alto && R.completa && E.cola.length) E.colaTimer = setTimeout(E.cola.shift(), 120);
+        else vaciarCola();
+    }
+
+    function vaciarCola() {
+        E.cola = [];
+        clearTimeout(E.colaTimer);
     }
 
     function correr(recorrido, habla, datos, texto) {
         if (!listo()) { di('sinRobot'); return false; }
         if (!recorrido) { di('fallo'); return false; }
-        if (E.corrida) { di('ocupado'); return false; }
+        if (E.corrida) {
+            if (E.encolar && E.cola.length < 8) { E.cola.push(() => correr(recorrido)); return true; }
+            di('ocupado');
+            return false;
+        }
         detenerMeneo();
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
         if (control() && control().pantalla) control().pantalla(true, 'ruta');
@@ -1603,7 +1614,7 @@
         }
         if (o.a === 'saludo') { di('saludo'); return; }
         if (o.a === 'marcarCasa') { marcarCasaAqui(); return; }
-        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
+        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); vaciarCola(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -2140,10 +2151,12 @@
 
     function ejecutarSilencio(o) {
         E.callado = true;
+        E.encolar = true;
         try {
             if (o.a === 'plan') ejecutarPlan(o); else ejecutarAccion(o);
         } finally {
             E.callado = false;
+            E.encolar = false;
         }
     }
 
@@ -2170,8 +2183,15 @@
         if (o.a === 'paro') { ejecutarSilencio(o); return { ok: true }; }
         if (NECESITAN_ROBOT.includes(o.a) && !listo()) return { ok: false, error: 'el robot no está conectado' };
         if (o.a === 'casa') {
-            E.callado = true;
-            try { return regresarCasa(); } finally { E.callado = false; }
+            const irACasa = () => {
+                E.callado = true;
+                try { return regresarCasa(); } finally { E.callado = false; }
+            };
+            if (E.corrida && E.cola.length < 8) {
+                E.cola.push(irACasa);
+                return { ok: true, en_cola: true };
+            }
+            return irACasa();
         }
         ejecutarSilencio(o);
         return { ok: true };
@@ -2587,6 +2607,7 @@
         $('rb-voz-probar').addEventListener('click', () => { hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {
+            vaciarCola();
             detener(false);
             E.radarCancelado = true;
             if (E.guardia) ponerGuardia(false, true);
