@@ -588,7 +588,7 @@
         normal: '',
         payaso: ' Tone: playful, exaggerated and silly, like a cheerful clown.',
         grosero: ' Tone: cocky, sarcastic and rude, with a rough Mexican street attitude.',
-        triste: ' Tone: sad, slow, soft and melancholic, with small sighs.',
+        triste: ' Tone: extremely sad, sobbing and crying, voice breaking, with sniffles and trembling sighs.',
         cientifico: ' Tone: calm, precise and academic, like a physics professor.',
     };
     const LIVE_PRIMER_AUDIO_MS = 4500;
@@ -1172,6 +1172,8 @@
     }
 
     function hablar(texto, quieto) {
+        texto = texto.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/\s{2,}/g, ' ').trim();
+        if (!texto) return;
         aviso(texto);
         historial('yokis', texto);
         const fin = voz(texto);
@@ -1635,7 +1637,7 @@
         normal: 'Va, me porto bien, we.',
         payaso: '¡Jajajajaja! ¡Llegó el payaso! ¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajajaja.',
         grosero: 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.',
-        triste: 'Ay… bueno. Me pongo triste… tampoco es que me cueste mucho.',
+        triste: 'Buaaa… ay, bueno. Me pongo triste… es que hoy me dejó mi esposa. Snif, snif.',
         cientifico: 'Modo científico activado. A partir de ahora respondo con precisión técnica.',
     };
 
@@ -1801,7 +1803,9 @@
         ESC.flujo = null;
         const c = $('rb-escucha');
         if (c) c.checked = false;
+        $('rb-jarvis').classList.remove('is-candado');
         estadoEscucha(motivo || '');
+        if (motivo) aviso(motivo);
     }
 
     function conectarTranscripcion() {
@@ -1867,8 +1871,33 @@
         };
         fuente.connect(ESC.proc);
         ESC.proc.connect(ESC.ctx.destination);
+        $('rb-jarvis').classList.add('is-candado');
+        aviso('Candado puesto: te escucho solo. Empieza con «Hevy».');
         estadoEscucha('Conectando…');
         conectarTranscripcion();
+    }
+
+    function iniciarMicrofono() {
+        const b = $('rb-jarvis');
+        let reloj = 0, largo = false;
+        b.addEventListener('pointerdown', () => {
+            largo = false;
+            callarIA();
+            detenerMeneo();
+            clearTimeout(reloj);
+            reloj = setTimeout(() => {
+                largo = true;
+                if (ESC.on) apagarEscucha('Candado abierto.');
+                else { const c = $('rb-escucha'); if (c) c.checked = true; encenderEscucha(); }
+            }, 600);
+        });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => clearTimeout(reloj)));
+        b.addEventListener('contextmenu', e => e.preventDefault());
+        b.addEventListener('click', () => {
+            if (largo) { largo = false; return; }
+            if (ESC.on) apagarEscucha('Candado abierto.');
+            else escuchar();
+        });
     }
 
     function iniciarEscuchaContinua() {
@@ -1895,7 +1924,7 @@
         $('rb-casa-ir').addEventListener('click', regresarCasa);
         $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(true); });
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
-        $('rb-jarvis').addEventListener('click', escuchar);
+        iniciarMicrofono();
         iniciarFacts();
         iniciarIA();
         iniciarSolo();

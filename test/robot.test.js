@@ -994,6 +994,8 @@ console.log('robot.test.js: todo bien');
     assert(htmlVozIA.includes('id="rb-solo"') && htmlVozIA.includes('id="rb-escucha"') && htmlVozIA.includes('id="rb-escucha-estado"'), 'interruptores de «por su cuenta»');
     assert(/gemini-3\.5-transcribe-live/.test(extras) && /audio\/pcm;rate=/.test(extras) && /inputTranscription/.test(extras) && /procesarTexto\(\[t\.trim\(\)\], true\)/.test(extras), 'escucha continua con transcripción en vivo');
     assert(/E\.hablando \|\| E\.escuchando \|\| Date\.now\(\) < E\.finHabla \+ 600/.test(extras) && /1200000/.test(extras) && /document\.hidden && ESC\.on/.test(extras), 'no se oye a sí mismo y se apaga solo');
+    assert(/function iniciarMicrofono\(\)/.test(extras) && /'pointerdown', \(\) => \{\s+largo = false;\s+callarIA\(\);/.test(extras) && /\}, 600\);/.test(extras) && /classList\.add\('is-candado'\)/.test(extras) && /rb-jarvis__candado/.test(htmlVozIA) && /is-candado/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'mantener el micrófono pone el candado y al pulsar se calla lo que dice');
+    assert(/buaaa/i.test(R.TRISTE.saludo.join('')) && R.TRISTE.saludo.concat(R.TRISTE.estado, R.TRISTE.adios).some(f => /esposa/.test(f)) && /esposa/.test(R.promptIA('triste')) && /sobbing and crying/.test(extras), 'el modo triste llora y se inventa desgracias');
     assert(/ahora - SOLO\.ultimo < 180000/.test(extras) && /SOLO\.bateria < 600000/.test(extras) && /consultarIA\(\[\], false, evento\)/.test(extras), 'reacciona solo con tope de frecuencia');
 }
 
