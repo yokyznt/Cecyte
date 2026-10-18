@@ -954,6 +954,7 @@ console.log('robot.test.js: todo bien');
     assert(recortada.length >= 2 * 24000 && recortada.length <= 2 * (24000 + 4800), 'recorta la ráfaga final sin tocar la voz');
     assert.strictEqual(recortar(sinRafaga), sinRafaga, 'si no hay ráfaga, no cambia nada');
     assert(!/Di en español mexicano|tono de amigo/.test(extras), 'ya no se le pide estilo a Gemini (lo leía en voz alta)');
+    assert(/LIMITE_ESPERA_MS = 2000/.test(extras) && /Promise\.race\(\[peticion, esperar\(quedan\)/.test(extras) && /nivel !== 'local' && \(VIA\.motivo === 'red' \|\| VIA\.motivo === 'lenta'\)/.test(extras) && /peticion\.then\(x => \{ if \(x && x\.datos\) cachePut/.test(extras), 'si la nube tarda más de 2 s, habla la local y el audio tardío se guarda');
     assert(/function cumplirPromesa/.test(extras) && /NEGACION/.test(extras) && /CRITICAS = \['paro', 'cancionParar', 'bateria'\]/.test(extras), 'lo que dice, lo hace; parar nunca pasa por la IA');
     assert(/gemini-3\.1-flash-tts-preview/.test(extras) && /gemini-2\.5-flash-preview-tts/.test(extras) && /gemini-flash-lite-latest/.test(extras), 'modelos vigentes de voz y texto');
     assert(!/thinkingBudget|gemini-2\.5-flash-lite/.test(extras), 'sin lo que Google ya rechaza');

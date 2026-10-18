@@ -528,38 +528,47 @@
         };
     }
 
-    async function pedirVozIA(texto, nombreVoz) {
+    const LIMITE_ESPERA_MS = 2000;
+
+    async function pedirVozIA(texto, nombreVoz, clave) {
         const llave = llaveIA();
-        const estilos = [texto];
+        const limite = Date.now() + LIMITE_ESPERA_MS;
         let agotados = 0;
         for (const modelo of MODELOS_VOZIA) {
             if ((VIA.agotados[modelo] || 0) > Date.now()) { agotados++; continue; }
-            for (const peticion of estilos) {
-                const corte = new AbortController();
-                const reloj = setTimeout(() => corte.abort(), 12000);
-                try {
-                    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: peticion }] }],
-                            generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
-                        }),
-                    });
-                    if (r.status === 429) { VIA.agotados[modelo] = Date.now() + 3600000; agotados++; break; }
-                    if (!r.ok) break;
-                    const j = await r.json();
-                    const c = j.candidates && j.candidates[0];
-                    const dato = c && c.content && c.content.parts && c.content.parts.find(x => x.inlineData);
-                    if (dato) return recortarCola(dato.inlineData.data);
-                } catch (e) {
-                    if (e && e.name === 'AbortError') { VIA.motivo = 'lenta'; return null; }
-                    VIA.pausaHasta = Date.now() + 15000;
-                    VIA.motivo = 'red';
-                    return null;
-                } finally {
-                    clearTimeout(reloj);
-                }
+            const quedan = limite - Date.now();
+            if (quedan < 300) { VIA.motivo = 'lenta'; return null; }
+            const corte = new AbortController();
+            const reloj = setTimeout(() => corte.abort(), 20000);
+            const peticion = fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: texto }] }],
+                    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
+                }),
+            }).then(async r => {
+                if (r.status === 429) return { agotado: true };
+                if (!r.ok) return { mal: true };
+                const j = await r.json();
+                const c = j.candidates && j.candidates[0];
+                const dato = c && c.content && c.content.parts && c.content.parts.find(x => x.inlineData);
+                return dato ? { datos: recortarCola(dato.inlineData.data) } : { mal: true };
+            }).finally(() => clearTimeout(reloj));
+            let res;
+            try {
+                res = await Promise.race([peticion, esperar(quedan).then(() => null)]);
+            } catch (e) {
+                VIA.pausaHasta = Date.now() + 15000;
+                VIA.motivo = 'red';
+                return null;
             }
+            if (res === null) {
+                peticion.then(x => { if (x && x.datos) cachePut(clave, x.datos); }, () => null);
+                VIA.motivo = 'lenta';
+                return null;
+            }
+            if (res.datos) return res.datos;
+            if (res.agotado) { VIA.agotados[modelo] = Date.now() + 3600000; agotados++; }
         }
         VIA.motivo = agotados === MODELOS_VOZIA.length ? 'cuota' : 'error';
         return null;
@@ -637,7 +646,7 @@
             const nombreVoz = vozIAElegida(), clave = 'v2|' + nombreVoz + '|' + texto;
             let datos = VIA.cache.get(clave) || await cacheGet(clave);
             if (!datos) {
-                datos = await pedirVozIA(texto, nombreVoz);
+                datos = await pedirVozIA(texto, nombreVoz, clave);
                 if (datos) cachePut(clave, datos);
             }
             if (datos) {
@@ -675,7 +684,7 @@
         const niveles = { gemini: nivelGemini, gradium: nivelGradium, local: hablarLocal };
         for (const nivel of [principal].concat(['gemini', 'gradium', 'local'].filter(x => x !== principal))) {
             if (turno !== VIA.turno) return true;
-            if (nivel === 'gradium' && VIA.motivo === 'red') continue;
+            if (nivel !== 'local' && (VIA.motivo === 'red' || VIA.motivo === 'lenta')) continue;
             if (await niveles[nivel](texto, turno)) {
                 if (nivel !== principal) estadoVoz((MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió') + ': hablo con ' + ETIQUETA_NIVEL[nivel] + '.');
                 return true;
@@ -844,15 +853,21 @@
             const clave = 'gradium|' + voiceId + '|' + texto;
             let datos = VIA.cache.get(clave) || await cacheGet(clave);
             if (!datos) {
-                const r = await fetch('https://api.gradium.ai/api/post/speech/tts', {
+                const peticion = fetch('https://api.gradium.ai/api/post/speech/tts', {
                     method: 'POST', headers: { 'x-api-key': llave, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: texto, voice_id: voiceId, output_format: 'wav', only_audio: true }),
-                });
-                if (!r.ok) {
-                    VIA.gradiumHasta = Date.now() + (r.status === 401 || r.status === 402 || r.status === 429 ? 3600000 : 15000);
+                }).then(async r => (r.ok ? { datos: bytesABase64(new Uint8Array(await r.arrayBuffer())) } : { estado: r.status }));
+                const res = await Promise.race([peticion, esperar(LIMITE_ESPERA_MS).then(() => null)]);
+                if (res === null) {
+                    peticion.then(x => { if (x && x.datos) cachePut(clave, x.datos); }, () => null);
+                    VIA.motivo = 'lenta';
                     return false;
                 }
-                datos = bytesABase64(new Uint8Array(await r.arrayBuffer()));
+                if (!res.datos) {
+                    VIA.gradiumHasta = Date.now() + (res.estado === 401 || res.estado === 402 || res.estado === 429 ? 3600000 : 15000);
+                    return false;
+                }
+                datos = res.datos;
                 cachePut(clave, datos);
             }
             VIA.cache.set(clave, datos);
