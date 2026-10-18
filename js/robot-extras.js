@@ -2235,8 +2235,14 @@
     }
 
     function oidoMejor() {
-        const transcrito = normalizarOido((ESC.vivoFinal + ' ' + ESC.vivoInterino).trim());
-        return /\p{L}{2,}/u.test(transcrito) ? transcrito : normalizarOido(ESC.oido.trim());
+        const fichas = t => t.split(/\s+/).filter(Boolean);
+        const ajenas = t => fichas(t).filter(p => FUERA_DE_LATIN.test(p)).length;
+        const lista = [(ESC.vivoFinal + ' ' + ESC.vivoInterino).trim(), ESC.oido.trim()].filter(t => /\p{L}{2,}/u.test(t));
+        const limpio = lista.find(t => !ajenas(t));
+        if (limpio) return limpio;
+        const elegido = lista.sort((a, b) => ajenas(a) / fichas(a).length - ajenas(b) / fichas(b).length)[0] || '';
+        if (fichas(elegido).length > 1 && fichas(elegido).every(p => FUERA_DE_LATIN.test(p))) return '';
+        return normalizarOido(elegido);
     }
 
     function cerrarOido() {
