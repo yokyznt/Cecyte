@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/pages.css">
     <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/admins.css">
     <link rel="stylesheet" href="css/robot.css"> <!-- @robot:line -->
     <link rel="stylesheet" href="css/themes/oscuro.css">
 </head>
@@ -285,6 +286,10 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Panel de administración</h2>
+                        <div class="quien">
+                            <span class="quien__chip"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg><span id="admin-quien">Maestro</span></span>
+                            <button type="button" id="btn-gestion-admins" class="btn btn--secondary btn--sm hidden" onclick="abrirGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestionar admins</button>
+                        </div>
 <!-- @robot:start -->
                         <div id="rb-estado-fila" class="rb-estado-fila"></div>
 <!-- @robot:end -->
@@ -296,6 +301,19 @@
                         </button>
                     </div>
                 </div>
+
+                <section id="admin-gestion" class="gestion" hidden aria-labelledby="gestion-titulo">
+                    <button type="button" class="btn btn--secondary btn--sm gestion__atras" onclick="cerrarGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg> Volver al panel</button>
+                    <div class="gestion__cab">
+                        <div>
+                            <h2 id="gestion-titulo" class="admin-head__title">Admins</h2>
+                            <p class="hint">Cada contraseña abre solo lo que le permitas.</p>
+                        </div>
+                        <button type="button" id="gestion-nuevo" class="btn btn--primary" onclick="abrirFormAdmin()"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Nuevo admin</button>
+                    </div>
+                    <div id="gestion-lista" class="gestion__lista" aria-live="polite"></div>
+                    <p id="gestion-cuenta" class="hint"></p>
+                </section>
 
                 <p id="esp-alerta" class="banner banner--err" role="alert" hidden></p>
 
@@ -1505,6 +1523,43 @@
         </form>
     </dialog>
 
+    <dialog id="admin-form-modal" class="modal" aria-labelledby="admin-form-titulo">
+        <div class="modal__head">
+            <h3 id="admin-form-titulo" class="modal__title">Nuevo admin</h3>
+            <button type="button" onclick="cerrarFormAdmin()" class="modal__close" aria-label="Cerrar">
+                <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <form id="admin-form" onsubmit="guardarAdmin(event)" class="modal__body" autocomplete="off">
+            <input type="hidden" id="admin-form-id">
+            <div class="field">
+                <label class="field__label" for="admin-form-nombre">Nombre</label>
+                <input type="text" id="admin-form-nombre" required maxlength="30" placeholder="Ej. Prefectura" class="input">
+            </div>
+            <div class="field">
+                <label class="field__label" for="admin-form-clave" id="admin-form-clave-et">Contraseña</label>
+                <div class="clave-fila">
+                    <input type="password" id="admin-form-clave" maxlength="64" autocomplete="new-password" placeholder="6 a 64 caracteres" class="input">
+                    <button type="button" id="admin-form-ver" class="btn btn--secondary btn--sm" aria-pressed="false">Ver</button>
+                    <button type="button" id="admin-form-gen" class="btn btn--secondary btn--sm">Generar</button>
+                </div>
+            </div>
+            <fieldset class="permisos">
+                <legend class="field__label">Qué puede hacer</legend>
+                <div class="permisos__acc">
+                    <button type="button" class="btn btn--secondary btn--sm" id="admin-perm-todos">Todos</button>
+                    <button type="button" class="btn btn--secondary btn--sm" id="admin-perm-ninguno">Ninguno</button>
+                </div>
+                <div id="admin-form-permisos" class="permisos__grupos"></div>
+            </fieldset>
+            <p id="admin-form-error" class="msg msg--err" role="alert" hidden></p>
+            <div class="modal__foot">
+                <button type="button" onclick="cerrarFormAdmin()" class="btn btn--secondary">Cancelar</button>
+                <button type="submit" id="admin-form-guardar" class="btn btn--primary">Guardar</button>
+            </div>
+        </form>
+    </dialog>
+
     <script src="js/api.js"></script>
     <script src="js/ayudas.js"></script>
     <script src="js/plataforma.js"></script>
@@ -1514,6 +1569,7 @@
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
     <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js', 'js/robot-telefono.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
+    <script src="js/admins.js"></script>
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

@@ -12,7 +12,7 @@
 
 import crypto from 'crypto';
 import { kv } from '@vercel/kv';
-import { verifyToken, adminToken } from '../lib/auth.js';
+import { exigir } from '../lib/admins.js';
 import { cors } from '../lib/cors.js';
 
 const FW_META_KEY = 'cecyte_fw_meta';
@@ -21,10 +21,6 @@ const MAX_CHUNK_B64 = 600_000;      // ~450 KB reales por trozo
 const MIN_BYTES = 100_000;
 const MAX_BYTES = 1_310_720;        // tamaño de la partición OTA del ESP32 (esquema por defecto, 4 MB)
 const chunkKey = (id, i) => `cecyte_fw_chunk_${id}_${i}`;
-
-function isAdmin(req) {
-    return verifyToken(adminToken(req));
-}
 
 async function readFirmware(meta) {
     const keys = Array.from({ length: meta.total }, (_, i) => chunkKey(meta.uploadId, i));
@@ -53,7 +49,7 @@ export default async function handler(req, res) {
         }
 
         if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
-        if (!isAdmin(req)) return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
+        if (!(await exigir(req, res, kv, 'esp32'))) return;
 
         const body = req.body || {};
         const idOk = typeof body.uploadId === 'string' && /^[a-z0-9]{6,24}$/.test(body.uploadId);

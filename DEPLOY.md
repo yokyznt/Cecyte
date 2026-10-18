@@ -64,6 +64,22 @@ base de datos y las contraseñas configuradas.
 - La sesión de admin dura 12 horas en el dispositivo donde entraste; después
   te vuelve a pedir la contraseña.
 
+## Varios admins con permisos
+
+`ADMIN_PASSWORD` es la contraseña **maestra**: solo la tiene el dueño, puede
+todo y es la única que gestiona admins. Nunca se guarda en el código ni en
+la base de datos.
+
+- Entra con la maestra y toca otra vez el botón de admin (arriba a la
+  derecha), o «Gestionar admins» bajo el título, para abrir la gestión.
+- Ahí creas hasta 20 admins, cada uno con nombre, contraseña propia (6 a 64
+  caracteres, no repetida) y los permisos que elijas: Horarios, Grupos,
+  Alertas, Timbre, Ritmo, ESP32 y las secciones del Robot.
+- Se guardan en Vercel KV (`cecyte_admins`) con la contraseña cifrada (scrypt).
+- Editar permisos, cambiar la contraseña o borrar a un admin surte efecto de
+  inmediato; cambiar su contraseña también le cierra sus sesiones abiertas.
+- Después de actualizar, hay que redeplegar `api/` para que funcione.
+
 ## 7. Notificaciones push reales (con la página cerrada)
 
 Esto es aparte del resto — hace que las notificaciones lleguen aunque nadie

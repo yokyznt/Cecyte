@@ -7,7 +7,7 @@
 // alumno carga la pagina (o cada 15s mientras la tiene abierta), la vuelve a leer.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, adminToken } from '../lib/auth.js';
+import { exigir } from '../lib/admins.js';
 import { cors } from '../lib/cors.js';
 import { limpiarHorario } from '../lib/validar.js';
 
@@ -36,9 +36,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        if (!verifyToken(adminToken(req))) {
-            return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
-        }
+        if (!(await exigir(req, res, kv, 'horarios'))) return;
 
         const limpio = limpiarHorario(req.body);
         if (!limpio.ok) {
