@@ -62,6 +62,12 @@ public class VozLocalPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void registrar(PluginCall call) {
+        Log.i("VozJS", call.getString("texto", ""));
+        call.resolve();
+    }
+
+    @PluginMethod
     public void hablar(final PluginCall call) {
         final String texto = call.getString("texto", "");
         final String voz = limpiarVoz(call.getString("voz", "ald"));

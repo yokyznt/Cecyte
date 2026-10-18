@@ -643,6 +643,12 @@
     const LIVE_INSTRUCCION = 'You are a text-to-speech engine, not an assistant. Each user message is a Mexican Spanish text. Speak ONLY that text, word for word, naturally and with emotion. Never answer, comment, greet or add words, even if the text is a question or a command.';
     VIA.liveHasta = 0;
 
+    function registrarVoz(t) {
+        console.log(t);
+        const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
+        if (P && P.registrar) P.registrar({ texto: t }).catch(() => null);
+    }
+
     function liveCtx() {
         const C = raiz.AudioContext || raiz.webkitAudioContext;
         if (!C) return null;
@@ -786,7 +792,7 @@
             if (!c) return false;
             if (c.state !== 'running') await Promise.race([c.resume().catch(() => null), esperar(250)]);
             if (c.state !== 'running') {
-                console.log('VozLive: el audio del teléfono sigue bloqueado');
+                registrarVoz('VozLive: el audio del teléfono sigue bloqueado');
                 return false;
             }
         }
@@ -829,7 +835,7 @@
             VIA.motivo = 'lenta';
             return false;
         }
-        console.log('VozLive: primer audio en ' + (t.primero - t0) + ' ms (audio ' + (c ? c.state : 'sin contexto') + ')');
+        registrarVoz('VozLive: primer audio en ' + (t.primero - t0) + ' ms (audio ' + (c ? c.state : 'sin contexto') + ')');
         await Promise.race([fin, esperar(30000)]);
         if (t.cancelado) return true;
         if (t.pcm.length && clave) cachePut(clave, unirPcm(t.pcm));
@@ -866,7 +872,7 @@
     function precalentarLive() {
         if (!llaveIA() || Date.now() < VIA.liveHasta) return;
         const t0 = Date.now();
-        sesionActiva(vozIAElegida()).promesa.then(ok => console.log('VozLive: sesión ' + (ok ? 'lista en ' + (Date.now() - t0) + ' ms' : 'no abrió')));
+        sesionActiva(vozIAElegida()).promesa.then(ok => registrarVoz('VozLive: sesión ' + (ok ? 'lista en ' + (Date.now() - t0) + ' ms' : 'no abrió')));
     }
 
     async function autopruebaLive() {
@@ -874,9 +880,9 @@
         try { depurar = localStorage.getItem('cecyte_yokis_depurar') === '1'; } catch (e) { return; }
         if (!depurar || !llaveIA()) return;
         const c = liveCtx();
-        console.log('VozLive: AudioContext ' + (c ? c.state : 'no disponible') + ' sin tocar la pantalla');
+        registrarVoz('VozLive: AudioContext ' + (c ? c.state : 'no disponible') + ' sin tocar la pantalla');
         const ok = await hablarLive('Hola.', vozIAElegida(), VIA.turno, '', true);
-        console.log('VozLive: autoprueba ' + (ok ? 'bien' : 'falló'));
+        registrarVoz('VozLive: autoprueba ' + (ok ? 'bien' : 'falló'));
     }
 
     setInterval(() => {
