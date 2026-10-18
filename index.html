@@ -31,7 +31,8 @@
         <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
         <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
         <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-        <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+        <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-sliders"viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
         <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
         <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
         <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
@@ -137,8 +138,8 @@
                         <span>Vista Alumnos</span>
                     </button>
                     <button type="button" onclick="switchView('admin')" id="tab-admin" class="seg__btn" aria-pressed="false" aria-label="Admin Horarios">
-                        <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>
-                        <span>Admin Horarios</span>
+                        <svg class="icon" aria-hidden="true"><use id="tab-admin-uso" href="#i-sliders"/></svg>
+                        <span id="tab-admin-texto">Admin Horarios</span>
                     </button>
                 </nav>
             </div>
@@ -285,11 +286,6 @@
 
                 <div class="admin-head">
                     <div>
-                        <h2 class="admin-head__title">Panel de administración</h2>
-                        <div class="quien">
-                            <span class="quien__chip"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg><span id="admin-quien">Maestro</span></span>
-                            <button type="button" id="btn-gestion-admins" class="btn btn--secondary btn--sm hidden" onclick="abrirGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestionar admins</button>
-                        </div>
 <!-- @robot:start -->
                         <div id="rb-estado-fila" class="rb-estado-fila"></div>
 <!-- @robot:end -->
@@ -303,7 +299,6 @@
                 </div>
 
                 <section id="admin-gestion" class="gestion" hidden aria-labelledby="gestion-titulo">
-                    <button type="button" class="btn btn--secondary btn--sm gestion__atras" onclick="cerrarGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg> Volver al panel</button>
                     <div class="gestion__cab">
                         <div>
                             <h2 id="gestion-titulo" class="admin-head__title">Admins</h2>

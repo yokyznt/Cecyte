@@ -1,20 +1,12 @@
 .sin-permiso { display: none !important; }
 
-.quien { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
-.quien__chip {
-    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
-    border-radius: 999px; background: var(--green-100); color: var(--green-800);
-    font-size: var(--fs-sm); font-weight: 700;
-}
-.quien__chip.is-master { background: var(--green-700); color: #fff; }
-.quien__chip .icon { width: 1.05em; height: 1.05em; }
+@keyframes girar-icono { to { transform: rotate(360deg); } }
+.seg__btn .icon.is-girando { animation: girar-icono 480ms var(--ease-out); }
 
 #admin-content.en-gestion > :not(#admin-gestion) { display: none; }
 
 .gestion { display: flex; flex-direction: column; gap: 16px; }
 .gestion[hidden] { display: none; }
-.gestion__atras { align-self: flex-start; }
-.gestion__atras .icon { rotate: 90deg; }
 .gestion__cab { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; }
 .gestion__lista { display: flex; flex-direction: column; gap: 10px; }
 .gestion__vacio { padding: 20px; border: 1px dashed var(--line-strong); border-radius: var(--r-lg); text-align: center; color: var(--ink-2); }
