@@ -200,12 +200,11 @@
     function pintarVocesEntrenadas() {
         const ul = $('rb-vz-lista');
         if (!ul) return;
-        const fila = (nombre, detalle, uso, clonable) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
+        const fila = (nombre, detalle, uso) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
             + (uso ? '<small>En uso</small>' : '')
-            + (clonable ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="clonar">Clonar con IA</button>' : '')
             + '<button type="button" class="btn btn--secondary btn--sm" data-acc="borrar" aria-label="Borrar esta voz">Borrar</button></li>';
         ul.innerHTML = ENT.voces.length
-            ? ENT.voces.map(v => fila(v.nombre, `${v.n} frases${v.clon ? ' · clonada con IA' : ''}`, v.nombre === ENT.activa, !v.clon)).join('')
+            ? ENT.voces.map(v => fila(v.nombre, `${v.n} frases`, v.nombre === ENT.activa)).join('')
             : '<li class="hint">Aún no hay voces. Entrena una abajo.</li>';
         pintarSelectorVoz();
     }
@@ -393,15 +392,6 @@
 
     async function iniciarEntrena() {
         if (!$('rb-vz-lista') || !raiz.indexedDB) return;
-        const llaveG = $('rb-gradium-llave');
-        if (llaveG) {
-            llaveG.value = llaveGradium();
-            llaveG.addEventListener('change', () => {
-                VIA.gradiumHasta = 0;
-                try { localStorage.setItem(CLAVE_GRADIUM, llaveG.value.trim()); } catch (e) { return; }
-                estadoVoz(llaveG.value.trim() ? 'Llave de Gradium guardada.' : 'Llave de Gradium borrada.');
-            });
-        }
         $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
         $('rb-ent-cerrar').addEventListener('click', () => (raiz.RobotUI ? raiz.RobotUI.cerrarSuave($('rb-ent-ventana')) : $('rb-ent-ventana').close()));
         $('rb-ent-ventana').addEventListener('close', limpiarGrabacion);
@@ -415,7 +405,6 @@
             const b = e.target.closest('[data-acc]');
             if (!b) return;
             const nombre = b.closest('.rb-vz-item').dataset.n;
-            if (b.dataset.acc === 'clonar') { b.disabled = true; await clonarVoz(nombre); return; }
             if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Borrar?'; setTimeout(pintarVocesEntrenadas, 3000); return; }
             for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) await bdDel(k);
             await vzDel(nombre);
@@ -520,8 +509,6 @@
         };
     }
 
-    const LIMITE_ESPERA_MS = 2000;
-
     async function hablarGoogle(texto, turno) {
         const partes = texto.match(/.{1,170}(\s|$)/g) || [texto];
         try {
@@ -550,7 +537,6 @@
             const v = localStorage.getItem(CLAVE_VOZSEL) || '';
             const tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
             if (tipo === 'gemini' && VOCES_IA.some(x => x[0] === id)) return v;
-            if (tipo === 'gradium' && VOCES_GRADIUM.some(x => x[0] === id)) return v;
         } catch (e) { return 'gemini:' + vozIAElegida(); }
         return 'gemini:' + vozIAElegida();
     }
@@ -841,27 +827,10 @@
         LIVE.ultimo = 0;
     }, 30000);
 
-    function nivelGradium(texto, turno) {
-        const v = VOCES_GRADIUM.find(x => x[0] === vozGradiumElegida()) || ['', ''];
-        return hablarGradium(texto, v[0], 'IA de Gradium (' + v[1] + ')', turno);
-    }
-
-    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gradium: 'la voz de IA de Gradium' };
-
     async function hablarIA(texto) {
         const turno = ++VIA.turno;
         VIA.motivo = '';
-        const principal = valorSeleccion().split(':')[0] === 'gradium' ? 'gradium' : 'gemini';
-        const niveles = { live: nivelLive, gradium: nivelGradium };
-        const orden = principal === 'gradium' ? ['gradium', 'live'] : ['live'];
-        for (const nivel of orden) {
-            if (turno !== VIA.turno) return true;
-            if (VIA.motivo === 'red' || VIA.motivo === 'lenta') continue;
-            if (await niveles[nivel](texto, turno)) {
-                if (nivel !== orden[0]) estadoVoz((MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió') + ': hablo con ' + ETIQUETA_NIVEL[nivel] + '.');
-                return true;
-            }
-        }
+        if (await nivelLive(texto, turno)) return true;
         if (turno !== VIA.turno) return true;
         callarIA();
         const motivo = MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió';
@@ -890,8 +859,7 @@
             sel.appendChild(g);
         };
         grupo('IA de Google (Gemini, en vivo)', VOCES_IA.map(v => ['gemini:' + v[0], v[1]]));
-        grupo('IA de Gradium', VOCES_GRADIUM.map(v => ['gradium:' + v[0], v[1]]));
-        grupo('Mis voces', ENT.voces.map(v => ['entrenada:' + v.nombre, v.nombre + (v.clon ? ' (clonada)' : ' (grabada)')]));
+        grupo('Mis voces', ENT.voces.map(v => ['entrenada:' + v.nombre, v.nombre + ' (grabada)']));
         sel.value = valorSeleccion();
     }
 
@@ -901,7 +869,6 @@
         pintarSelectorVoz();
         sel.addEventListener('change', async () => {
             const v = sel.value, tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
-            VIA.gradiumHasta = 0;
             VIA.liveHasta = 0;
             if (tipo === 'entrenada') {
                 await activarVoz(id);
@@ -909,8 +876,6 @@
                 try {
                     localStorage.setItem(CLAVE_VOZSEL, v);
                     if (tipo === 'gemini') localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ voz: id }));
-                    if (tipo === 'gradium') localStorage.setItem(CLAVE_VOZGR, id);
-                    if (tipo === 'local') localStorage.setItem(CLAVE_LOCAL, JSON.stringify({ voz: id }));
                 } catch (e) { return; }
                 if (ENT.activa) await activarVoz('');
             }
@@ -924,9 +889,6 @@
         setTimeout(autopruebaEscucha, 9000);
     }
 
-    const CLAVE_GRADIUM = 'cecyte_yokis_gradium';
-    const llaveGradium = () => { try { return (localStorage.getItem(CLAVE_GRADIUM) || '').trim(); } catch (e) { return ''; } };
-
     function bytesABase64(b) {
         let s = '';
         for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
@@ -939,139 +901,9 @@
         return b;
     }
 
-    function aWav16(muestras, sr) {
-        const n = muestras.length, bytes = new Uint8Array(44 + 2 * n), v = new DataView(bytes.buffer);
-        const txt = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
-        txt(0, 'RIFF'); v.setUint32(4, 36 + 2 * n, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-        v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, 2 * n, true);
-        for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, muestras[i])) * 32767, true);
-        return bytes;
-    }
-
-    function recortarSilencio(x, sr) {
-        let a = 0, b = x.length - 1;
-        while (a < b && Math.abs(x[a]) < 0.02) a++;
-        while (b > a && Math.abs(x[b]) < 0.02) b--;
-        const margen = Math.round(sr * 0.1);
-        return x.slice(Math.max(0, a - margen), Math.min(x.length, b + margen));
-    }
-
-    async function muestraDeVoz(nombre) {
-        const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
-        const ctx = new Ctx({ sampleRate: 24000 }), sr = ctx.sampleRate, trozos = [];
-        let total = 0;
-        try {
-            for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) {
-                if (total >= 24 * sr) break;
-                const blob = await bdGet(k);
-                if (!blob) continue;
-                try {
-                    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
-                    const t = recortarSilencio(buf.getChannelData(0), buf.sampleRate);
-                    trozos.push(t);
-                    total += t.length;
-                } catch (e) { continue; }
-            }
-        } finally {
-            ctx.close();
-        }
-        const todo = new Float32Array(total);
-        let o = 0;
-        trozos.forEach(t => { todo.set(t, o); o += t.length; });
-        return { segundos: total / sr, wav: aWav16(todo.subarray(0, Math.min(total, 25 * sr)), sr) };
-    }
-
-    async function clonarVoz(nombre) {
-        const P = raiz.Plataforma && raiz.Plataforma.plugin('ClonVoz');
-        if (!P) { mensajeEnt('Clonar la voz solo funciona en la app de Android.'); pintarVocesEntrenadas(); return; }
-        const llave = llaveGradium();
-        if (!llave) { mensajeEnt('Pega primero tu llave de Gradium (gratis).'); pintarVocesEntrenadas(); return; }
-        mensajeEnt('Preparando la muestra de «' + nombre + '»…');
-        try {
-            const m = await muestraDeVoz(nombre);
-            if (m.segundos < 8) { mensajeEnt('La muestra dura solo ' + Math.round(m.segundos) + ' s y hacen falta al menos 10. Graba la voz con más frases.'); pintarVocesEntrenadas(); return; }
-            mensajeEnt('Clonando la voz… tarda unos segundos.');
-            const r = await P.crear({ llave, nombre: 'Hevy ' + nombre, audio: bytesABase64(m.wav) });
-            let j = {};
-            try { j = JSON.parse(r.cuerpo); } catch (e) { j = {}; }
-            if (r.codigo === 401 || r.codigo === 403) { mensajeEnt('Gradium no aceptó la llave. Revísala.'); pintarVocesEntrenadas(); return; }
-            if (r.codigo === 402 || r.codigo === 429) { mensajeEnt('Se acabó el límite gratis de Gradium (5 clones).'); pintarVocesEntrenadas(); return; }
-            if (r.codigo >= 400 || !j.uid) { mensajeEnt('Gradium no pudo clonarla' + (j.error ? ': ' + j.error : ' (código ' + r.codigo + ').')); pintarVocesEntrenadas(); return; }
-            const meta = ENT.voces.find(v => v.nombre === nombre) || { nombre };
-            await vzPut(nombre, Object.assign({}, meta, { clon: j.uid }));
-            ENT.voces = (await vzTodas()) || [];
-            pintarVocesEntrenadas();
-            mensajeEnt('¡Listo! «' + nombre + '» ya está clonada: Hevy hablará con esa voz cuando la pongas en uso.');
-        } catch (e) {
-            pintarVocesEntrenadas();
-            mensajeEnt('No pude clonar la voz: ' + (e && e.message ? e.message : 'sin conexión') + '.');
-        }
-    }
-
-    const VOCES_GRADIUM = [['yPxeHKlCzaHeKd_V', 'Carlos'], ['Gijj_GPBfJVcP-FZ', 'Miguel'], ['aCWBiYUiQ4VwW8_b', 'Pablo'], ['xu7iJ_fn2ElcWp2s', 'Sergio (España)'], ['B36pbz5_UoWn4BDl', 'Valentina (México)'], ['s4CzgVHP5cEkB9LD', 'Sofía'], ['PqjKPYFyGNsg1YU-', 'Elena']];
-    const CLAVE_VOZGR = 'cecyte_yokis_vozgr';
-    VIA.gradiumHasta = 0;
-
-    function vozGradiumElegida() {
-        try {
-            const v = localStorage.getItem(CLAVE_VOZGR);
-            if (VOCES_GRADIUM.some(x => x[0] === v)) return v;
-        } catch (e) { return VOCES_GRADIUM[0][0]; }
-        return VOCES_GRADIUM[0][0];
-    }
-
-    async function hablarGradium(texto, voiceId, etiqueta, turnoDado) {
-        const llave = llaveGradium();
-        if (!llave || Date.now() < VIA.gradiumHasta) return false;
-        const turno = turnoDado || ++VIA.turno;
-        try {
-            const clave = 'gradium|' + voiceId + '|' + texto;
-            let datos = VIA.cache.get(clave) || await cacheGet(clave);
-            if (!datos) {
-                const peticion = fetch('https://api.gradium.ai/api/post/speech/tts', {
-                    method: 'POST', headers: { 'x-api-key': llave, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: texto, voice_id: voiceId, output_format: 'wav', only_audio: true }),
-                }).then(async r => (r.ok ? { datos: bytesABase64(new Uint8Array(await r.arrayBuffer())) } : { estado: r.status }));
-                const res = await Promise.race([peticion, esperar(LIMITE_ESPERA_MS).then(() => null)]);
-                if (res === null) {
-                    peticion.then(x => { if (x && x.datos) cachePut(clave, x.datos); }, () => null);
-                    VIA.motivo = 'lenta';
-                    return false;
-                }
-                if (!res.datos) {
-                    VIA.gradiumHasta = Date.now() + (res.estado === 401 || res.estado === 402 || res.estado === 429 ? 3600000 : 15000);
-                    return false;
-                }
-                datos = res.datos;
-                cachePut(clave, datos);
-            }
-            VIA.cache.set(clave, datos);
-            if (turno !== VIA.turno) return true;
-            callarIA();
-            const url = URL.createObjectURL(new Blob([base64ABytes(datos)], { type: 'audio/wav' }));
-            try {
-                await sonar(url);
-                estadoVoz('Voz: ' + etiqueta + '.');
-                return true;
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        } catch (e) {
-            VIA.gradiumHasta = Date.now() + 15000;
-            return false;
-        }
-    }
-
-    function hablarClon(texto) {
-        const m = ENT.activa && ENT.voces.find(v => v.nombre === ENT.activa);
-        if (!m || !m.clon) return Promise.resolve(false);
-        return hablarGradium(texto, m.clon, 'clon de «' + m.nombre + '»');
-    }
-
     async function voz(texto) {
         callarIA();
         if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
-        if (await hablarClon(texto)) return;
         if (await hablarIA(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
