@@ -1879,7 +1879,7 @@
     const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
     const CLAVE_EXIGE_NOMBRE = 'cecyte_yokis_exige_nombre';
     const exigeNombre = () => { try { return localStorage.getItem(CLAVE_EXIGE_NOMBRE) === '1'; } catch (e) { return false; } };
-    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0 };
+    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false };
     const CLAVE_CEREBRO = 'cecyte_yokis_cerebro';
     const cerebroOn = () => { try { return localStorage.getItem(CLAVE_CEREBRO) !== '0'; } catch (e) { return true; } };
     const UMBRAL_INTERRUPCION = 0.14;
@@ -1900,7 +1900,66 @@
         ESC.turno = null;
     }
 
+    function pintarTextoVivo() {
+        if (ESC.entradaCerrada) return;
+        pintarVivo(normalizarOido((ESC.vivoFinal + ' ' + ESC.vivoInterino).trim()));
+    }
+
+    function abrirTextoVivo() {
+        let ws;
+        try {
+            ws = new WebSocket(LIVE_URL + encodeURIComponent(llaveIA()));
+        } catch (e) {
+            return;
+        }
+        ESC.wsTexto = ws;
+        ESC.listaTexto = false;
+        ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + MODELO_TRANSCRIBE, realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH', endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH', silenceDurationMs: 500, prefixPaddingMs: 300 } } } }));
+        ws.onmessage = async ev => {
+            let m;
+            try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); } catch (e) { return; }
+            if (m.setupComplete) { ESC.listaTexto = true; return; }
+            const sc = m.serverContent;
+            if (!sc) return;
+            const interino = sc.interimInputTranscription && sc.interimInputTranscription.text;
+            const final = sc.inputTranscription && sc.inputTranscription.text;
+            if (interino && interino.trim()) { ESC.vivoInterino = interino.trim(); pintarTextoVivo(); }
+            if (final && final.trim()) { ESC.vivoFinal = (ESC.vivoFinal + ' ' + final.trim()).trim(); ESC.vivoInterino = ''; pintarTextoVivo(); }
+        };
+        ws.onclose = () => { if (ESC.wsTexto === ws) { ESC.wsTexto = null; ESC.listaTexto = false; } };
+        ws.onerror = ws.onclose;
+    }
+
+    function cerrarTextoVivo() {
+        const ws = ESC.wsTexto;
+        ESC.wsTexto = null;
+        ESC.listaTexto = false;
+        ESC.vivoFinal = '';
+        ESC.vivoInterino = '';
+        try { if (ws) ws.close(); } catch (e) { /* ya cerrado */ }
+    }
+
+    function cerrarEntrada() {
+        if (ESC.entradaCerrada || !ESC.on) return;
+        ESC.entradaCerrada = true;
+        clearTimeout(ESC.sinVoz);
+        try { if (ESC.proc) ESC.proc.disconnect(); } catch (e) { /* ya desconectado */ }
+        try { if (ESC.ctx) ESC.ctx.close(); } catch (e) { /* ya cerrado */ }
+        if (ESC.flujo) ESC.flujo.getTracks().forEach(p => p.stop());
+        ESC.proc = null;
+        ESC.ctx = null;
+        ESC.flujo = null;
+        ESC.medidor = null;
+        cancelAnimationFrame(ESC.cuadro);
+        cerrarTextoVivo();
+        const b = $('rb-jarvis');
+        b.classList.remove('is-escuchando', 'is-candado');
+        b.style.removeProperty('--nivel');
+        registrarVoz('Escucha: terminaste de hablar, micrófono apagado');
+    }
+
     function enviarAudio(dato) {
+        if (ESC.wsTexto && ESC.listaTexto && ESC.wsTexto.readyState === 1) ESC.wsTexto.send(dato);
         const ws = ESC.ws;
         if (ws && ws.readyState === 1 && ESC.lista) {
             ws.send(dato);
@@ -1967,6 +2026,8 @@
         ESC.dijo = '';
         ESC.ignorar = false;
         ESC.saludar = '';
+        ESC.entradaCerrada = false;
+        cerrarTextoVivo();
         if (ESC.cerebro) callarCerebro();
         ESC.cerebro = false;
         quitarVivo();
@@ -2109,6 +2170,8 @@
 
     function cerrarOido() {
         quitarVivo();
+        ESC.vivoFinal = '';
+        ESC.vivoInterino = '';
         const t = normalizarOido(ESC.oido.trim());
         ESC.oido = '';
         if (t) historial('yo', t);
@@ -2185,7 +2248,7 @@
                 aviso('Te escucho…');
                 return;
             }
-            if (m.toolCall) { llamadasCerebro(m.toolCall, ws); return; }
+            if (m.toolCall) { if (ESC.unico) cerrarEntrada(); llamadasCerebro(m.toolCall, ws); return; }
             if (m.goAway) { registrarVoz('Escucha: el servidor pide reconectar'); reiniciarCerebro(''); return; }
             if (m.error) { caerAlFlujoNormal('el servidor avisó ' + JSON.stringify(m.error).slice(0, 120)); return; }
             const sc = m.serverContent;
@@ -2199,12 +2262,15 @@
                 pintarVivo(normalizarOido(ESC.oido.trim()));
                 const o = ESC.oido.trim().split(/\s+/).length <= 3 ? raiz.Robot.ordenDeVoz('hevy ' + ESC.oido.trim()) : null;
                 if (o && o.a === 'paro') { callarCerebro(); ESC.ignorar = true; ejecutarSilencio({ a: 'paro' }); }
-                if (ESC.unico) ESC.sinVoz = setTimeout(() => { if (ESC.on && ESC.unico && !ESC.turno) apagarEscucha(''); }, 25000);
+                if (ESC.unico) {
+                    cerrarEntrada();
+                    ESC.sinVoz = setTimeout(() => { if (ESC.on && ESC.unico && !ESC.turno) apagarEscucha(''); }, 25000);
+                }
             }
             if (sc.modelTurn && sc.modelTurn.parts) {
                 sc.modelTurn.parts.forEach(p => {
                     if (!p.inlineData || ESC.ignorar) return;
-                    if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; cerrarOido(); }
+                    if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
                     reproducirChunk(ESC.turno, p.inlineData.data);
                 });
             }
@@ -2311,7 +2377,10 @@
         ESC.vioCerebro = false;
         ESC.ecoMax = 0;
         ESC.cerebro = cerebroDisponible();
-        if (ESC.cerebro) liveCtx();
+        ESC.entradaCerrada = false;
+        ESC.vivoFinal = '';
+        ESC.vivoInterino = '';
+        if (ESC.cerebro) { liveCtx(); abrirTextoVivo(); }
         const boton = $('rb-jarvis');
         boton.classList.add('is-escuchando');
         if (!ESC.unico) boton.classList.add('is-candado');
