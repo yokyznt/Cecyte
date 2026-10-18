@@ -29,6 +29,7 @@
     const control = () => raiz.RobotControl || null;
     const listo = () => !!(enlace() && enlace().listo());
     const esperar = ms => new Promise(r => setTimeout(r, ms));
+    const sinInternet = () => raiz.navigator.onLine === false;
 
     function aviso(t) {
         ['rb-jarvis-msg', 'rb-dib-msg', 'rb-herr-msg'].forEach(id => { const el = $(id); if (el) el.textContent = t; });
@@ -534,35 +535,6 @@
         }
     }
 
-    const CLAVE_LOCAL = 'cecyte_yokis_vozlocal';
-    const VOCES_LOCALES = [['ald', 'Ald (hombre)']];
-
-    function vozLocalUsada() {
-        return 'ald';
-    }
-
-    async function hablarLocal(texto, turno) {
-        const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
-        if (!P) return false;
-        try {
-            const a = { voz: vozLocalUsada() };
-            const r = await P.hablar({ texto, voz: a.voz, velocidad: 1.0 });
-            if (!r || !r.audio) return false;
-            if (turno !== VIA.turno) return true;
-            callarIA();
-            const url = URL.createObjectURL(new Blob([base64ABytes(r.audio)], { type: 'audio/wav' }));
-            try {
-                await sonar(url);
-                estadoVoz('Voz: IA local (' + VOCES_LOCALES.find(v => v[0] === a.voz)[1] + ').');
-                return true;
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        } catch (e) {
-            return false;
-        }
-    }
-
     const MOTIVOS_VOZ = {
         red: 'No hay internet ni datos',
         lenta: 'La voz de IA tardó demasiado',
@@ -579,7 +551,6 @@
             const tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
             if (tipo === 'gemini' && VOCES_IA.some(x => x[0] === id)) return v;
             if (tipo === 'gradium' && VOCES_GRADIUM.some(x => x[0] === id)) return v;
-            if (tipo === 'local' && VOCES_LOCALES.some(x => x[0] === id)) return v;
         } catch (e) { return 'gemini:' + vozIAElegida(); }
         return 'gemini:' + vozIAElegida();
     }
@@ -590,7 +561,6 @@
         normal: '',
         payaso: ' Tone: playful, exaggerated and silly, like a cheerful clown.',
         grosero: ' Tone: cocky, sarcastic and rude, with a rough Mexican street attitude.',
-        aura: ' Tone: hyper, chaotic, meme-obsessed Gen Z energy, fast and playful. Say exactly the given words only.',
         aura: ' Tone: hyper, chaotic, meme-obsessed Gen Z energy, fast and playful. Say exactly the given words only.',
         argentino: ' Accent: Rioplatense Argentine Spanish (voseo, "sh" sound for ll and y), delivered cocky, sarcastic and aggressive. Say exactly the given words only.',
         triste: ' Tone: extremely sad, sobbing and crying, voice breaking, with sniffles and trembling sighs.',
@@ -603,7 +573,7 @@
 
     function registrarVoz(t) {
         console.log(t);
-        const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
+        const P = raiz.Plataforma && raiz.Plataforma.plugin('Registro');
         if (P && P.registrar) P.registrar({ texto: t }).catch(() => null);
     }
 
@@ -876,18 +846,17 @@
         return hablarGradium(texto, v[0], 'IA de Gradium (' + v[1] + ')', turno);
     }
 
-    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gradium: 'la voz de IA de Gradium', local: 'la voz local de IA' };
+    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gradium: 'la voz de IA de Gradium' };
 
     async function hablarIA(texto) {
         const turno = ++VIA.turno;
         VIA.motivo = '';
-        const tipo = valorSeleccion().split(':')[0];
-        const principal = tipo === 'gradium' || tipo === 'local' ? tipo : 'gemini';
-        const niveles = { live: nivelLive, gradium: nivelGradium, local: hablarLocal };
-        const orden = principal === 'local' ? ['local', 'live'] : principal === 'gradium' ? ['gradium', 'live'] : ['live'];
+        const principal = valorSeleccion().split(':')[0] === 'gradium' ? 'gradium' : 'gemini';
+        const niveles = { live: nivelLive, gradium: nivelGradium };
+        const orden = principal === 'gradium' ? ['gradium', 'live'] : ['live'];
         for (const nivel of orden) {
             if (turno !== VIA.turno) return true;
-            if (nivel !== 'local' && (VIA.motivo === 'red' || VIA.motivo === 'lenta')) continue;
+            if (VIA.motivo === 'red' || VIA.motivo === 'lenta') continue;
             if (await niveles[nivel](texto, turno)) {
                 if (nivel !== orden[0]) estadoVoz((MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió') + ': hablo con ' + ETIQUETA_NIVEL[nivel] + '.');
                 return true;
@@ -896,13 +865,7 @@
         if (turno !== VIA.turno) return true;
         callarIA();
         const motivo = MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió';
-        const sinRed = VIA.motivo === 'red' || raiz.navigator.onLine === false;
-        if (principal !== 'local' && await hablarLocal(texto, turno)) {
-            estadoVoz((sinRed ? MOTIVOS_VOZ.red : motivo) + ': hablo con la voz local de IA.');
-            return true;
-        }
-        if (turno !== VIA.turno) return true;
-        if (!sinRed && await hablarGoogle(texto, turno)) {
+        if (VIA.motivo !== 'red' && await hablarGoogle(texto, turno)) {
             estadoVoz(motivo + ': hablo con la voz de Google.');
             return true;
         }
@@ -928,7 +891,6 @@
         };
         grupo('IA de Google (Gemini, en vivo)', VOCES_IA.map(v => ['gemini:' + v[0], v[1]]));
         grupo('IA de Gradium', VOCES_GRADIUM.map(v => ['gradium:' + v[0], v[1]]));
-        grupo('Sin internet', VOCES_LOCALES.map(v => ['local:' + v[0], v[1]]));
         grupo('Mis voces', ENT.voces.map(v => ['entrenada:' + v.nombre, v.nombre + (v.clon ? ' (clonada)' : ' (grabada)')]));
         sel.value = valorSeleccion();
     }
@@ -954,8 +916,6 @@
             }
             hablar('¡Qué onda, we! Así suena esta voz.', true);
         });
-        const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
-        if (P) setTimeout(() => P.preparar({ voz: vozLocalUsada() }).catch(() => null), 4000);
         document.addEventListener('pointerdown', () => { liveCtx(); }, true);
         setTimeout(() => {
             precalentarLive();
@@ -1179,6 +1139,7 @@
         if (!texto) return;
         aviso(texto);
         historial('yokis', texto);
+        if (sinInternet()) { E.hablando = false; return; }
         const fin = voz(texto);
         const n = ++E.nHabla;
         E.hablando = true;
@@ -1772,7 +1733,7 @@
                 return true;
             }
         }
-        if (!(orden && CRITICAS.includes(orden.a)) && llaveIA()) {
+        if (!(orden && CRITICAS.includes(orden.a)) && llaveIA() && !sinInternet()) {
             const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
             if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
         }
@@ -1841,7 +1802,7 @@
 
     async function comentarSolo(evento, local) {
         const ahora = Date.now();
-        if (!soloOn() || document.hidden || ahora - SOLO.ultimo < 180000 || E.escuchando || E.hablando || E.corrida || E.radar || E.dibujando || E.procesando || ESC.on) return;
+        if (!soloOn() || document.hidden || ahora - SOLO.ultimo < 180000 || E.escuchando || E.hablando || E.corrida || E.radar || E.dibujando || E.procesando || ESC.on || sinInternet()) return;
         SOLO.ultimo = ahora;
         SOLO.quieto = ahora;
         const o = await consultarIA([], false, evento);
@@ -2352,6 +2313,7 @@
 
     async function encenderEscucha(unico) {
         if (ESC.on || ESC.iniciando) return;
+        if (sinInternet()) { apagarEscucha('Sin internet: toca el micrófono para dar una orden guardada.'); return; }
         if (!llaveIA()) { apagarEscucha('Falta la llave de Gemini.'); return; }
         const md = raiz.navigator.mediaDevices, Ctx = raiz.AudioContext || raiz.webkitAudioContext;
         if (!md || !md.getUserMedia || !Ctx) { apagarEscucha('Este dispositivo no deja escuchar continuo.'); return; }
@@ -2486,7 +2448,7 @@
             if (largo) { largo = false; return; }
             if (ESC.on && hablaba) return;
             if (ESC.on) apagarEscucha(ESC.unico ? '' : 'Candado abierto.');
-            else if (llaveIA()) encenderEscucha(true);
+            else if (llaveIA() && !sinInternet()) encenderEscucha(true);
             else escuchar();
         });
     }
@@ -2530,6 +2492,11 @@
         $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(true); });
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
         iniciarMicrofono();
+        raiz.addEventListener('offline', () => {
+            if (ESC.on) apagarEscucha('Sin internet: se apagó la escucha continua.');
+            else aviso('Sin internet: solo entiendo órdenes y rutinas guardadas, y te contesto por el chat.');
+        });
+        raiz.addEventListener('online', () => { if (/^Sin internet/.test(($('rb-jarvis-msg') || {}).textContent || '')) aviso(''); });
         iniciarFacts();
         iniciarIA();
         iniciarSolo();

@@ -32,9 +32,6 @@ if (!debug) {
     env.CECYTE_KEYSTORE_PROPS = PROPS;
 }
 
-const voz = spawnSync(process.execPath, [path.join(__dirname, 'descargar-voz-local.js')], { stdio: 'inherit' });
-if (voz.status !== 0) process.exit(voz.status || 1);
-
 const gradle = path.join(RAIZ, 'android', process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
 const tarea = debug ? 'assembleDebug' : 'assembleRelease';
 const r = spawnSync(gradle, [tarea, '--console=plain', '-q'], { cwd: path.join(RAIZ, 'android'), env, stdio: 'inherit', shell: process.platform === 'win32' });

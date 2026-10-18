@@ -10,8 +10,5 @@ www/
 *.apk
 keystore.properties
 android/local.properties
-.cache-voz/
 config/claves-locales.json
 config/modo-personal.json
-android/app/libs/*.aar
-android/app/src/main/assets/voz/

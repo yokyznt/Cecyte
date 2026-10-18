@@ -8,7 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ClonVozPlugin.class);
-        registerPlugin(VozLocalPlugin.class);
+        registerPlugin(RegistroPlugin.class);
         registerPlugin(WidgetHorarioPlugin.class);   // antes de super.onCreate: ahí arranca el puente
         super.onCreate(savedInstanceState);
     }
