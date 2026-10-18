@@ -33,11 +33,17 @@ function quitarMarcas(texto) {
         .join('\n');
 }
 
+function clavesLocales() {
+    const f = path.join(RAIZ, 'config', 'claves-locales.json');
+    return fs.existsSync(f) ? JSON.stringify(JSON.parse(fs.readFileSync(f, 'utf8'))) : '{}';
+}
+
 function copiarArchivo(origen, destino) {
     fs.mkdirSync(path.dirname(destino), { recursive: true });
     if (/\.(html|js|css)$/.test(origen)) {
         let t = quitarMarcas(fs.readFileSync(origen, 'utf8'));
         if (!ROBOT) for (const [de, a] of REEMPLAZOS) t = t.split(de).join(a);
+        if (process.env.CECYTE_CLAVES === '1' && /robot-extras\.js$/.test(origen)) t = t.replace('const CLAVES_LOCALES = {};', 'const CLAVES_LOCALES = ' + clavesLocales() + ';');
         fs.writeFileSync(destino, t);
     } else {
         fs.copyFileSync(origen, destino);

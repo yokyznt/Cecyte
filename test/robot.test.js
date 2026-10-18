@@ -941,6 +941,8 @@ console.log('robot.test.js: todo bien');
     const cad = extras.slice(extras.indexOf('async function hablarIA'));
     assert(cad.indexOf('ajustesLocal().primero') < cad.indexOf('pedirVozIA(texto, nombreVoz)') && cad.indexOf('hablarGradium(texto, vozGradiumElegida()') < cad.lastIndexOf('hablarLocal(texto, turno)') && cad.lastIndexOf('hablarLocal(texto, turno)') < cad.indexOf('hablarGoogle(texto, turno)'), 'voz local: primero si se pide, y antes de la de Google');
     assert(htmlVozIA.includes('id="rb-local-voz"') && htmlVozIA.includes('id="rb-local-primero"') && /VOCES_LOCALES/.test(extras), 'controles de la voz local');
+    assert(/const CLAVES_LOCALES = \{\};/.test(extras) && !/gsk_[0-9a-f]{20,}|AIza[0-9A-Za-z_-]{20,}/.test(extras + htmlVozIA), 'ninguna llave en el código versionado');
+    assert(/config\/claves-locales\.json/.test(ign) && /CECYTE_CLAVES/.test(fs.readFileSync(path.join(raizRepo, 'scripts', 'build-www.js'), 'utf8')), 'las llaves personales solo entran con CECYTE_CLAVES=1');
     assert(/function cumplirPromesa/.test(extras) && /NEGACION/.test(extras) && /CRITICAS = \['paro', 'cancionParar', 'bateria'\]/.test(extras), 'lo que dice, lo hace; parar nunca pasa por la IA');
     assert(/gemini-3\.1-flash-tts-preview/.test(extras) && /gemini-2\.5-flash-preview-tts/.test(extras) && /gemini-flash-lite-latest/.test(extras), 'modelos vigentes de voz y texto');
     assert(!/thinkingBudget|gemini-2\.5-flash-lite/.test(extras), 'sin lo que Google ya rechaza');

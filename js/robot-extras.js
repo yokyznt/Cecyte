@@ -1449,8 +1449,13 @@
         }
     }
 
+    const CLAVES_LOCALES = {};
+
     function iniciar() {
         if (!$('rb-jarvis') || !raiz.Robot || !raiz.Robot.ordenDeVoz) return;
+        Object.keys(CLAVES_LOCALES).forEach(k => {
+            try { if (!localStorage.getItem(k)) localStorage.setItem(k, CLAVES_LOCALES[k]); } catch (e) { return; }
+        });
         const c = calibra();
         $('rb-cal-vel').value = c.vel;
         $('rb-cal-giro').value = c.giro;
