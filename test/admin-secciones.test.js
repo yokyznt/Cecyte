@@ -71,7 +71,7 @@ assert.deepStrictEqual(faltan, [], 'ids del robot que faltan en index.html');
 
 const adminsJs = fs.readFileSync(path.join(raiz, 'js', 'admins.js'), 'utf8');
 const usadosGestion = new Set([...adminsJs.matchAll(/gestionEl\('([a-z0-9-]+)'\)/g)].map(m => m[1]));
-for (const id of ['admin-content', 'admin-quien', 'btn-gestion-admins']) usadosGestion.add(id);
+for (const id of ['admin-content', 'tab-admin', 'tab-admin-uso', 'tab-admin-texto']) usadosGestion.add(id);
 const faltanGestion = [...usadosGestion].filter(i => !ids.includes(i));
 assert.deepStrictEqual(faltanGestion, [], 'ids de la gestión de admins que faltan en index.html');
 assert(html.includes('src="js/admins.js"') && html.includes('href="css/admins.css"'), 'index.html carga js/admins.js y css/admins.css');

@@ -71,7 +71,8 @@ todo y es la única que gestiona admins. Nunca se guarda en el código ni en
 la base de datos.
 
 - Entra con la maestra y toca otra vez el botón de admin (arriba a la
-  derecha), o «Gestionar admins» bajo el título, para abrir la gestión.
+  derecha): gira y se convierte en los ajustes de admins. Tócalo de nuevo
+  para volver al panel; es el único botón que cambia entre los dos.
 - Ahí creas hasta 20 admins, cada uno con nombre, contraseña propia (6 a 64
   caracteres, no repetida) y los permisos que elijas: Horarios, Grupos,
   Alertas, Timbre, Ritmo, ESP32 y las secciones del Robot.

@@ -464,6 +464,7 @@ function switchView(view) {
         alternarGestionAdmins();
         return;
     }
+    if (isStudent) cerrarGestionAdmins();
     studentView.classList.toggle('hidden', !isStudent);
     adminView.classList.toggle('hidden', isStudent);
     tabStudent.setAttribute('aria-pressed', String(isStudent));
@@ -499,7 +500,6 @@ function showAdminContent() {
     document.getElementById('admin-login').classList.add('hidden');
     document.getElementById('admin-content').classList.remove('hidden');
     aplicarPermisosAdmin(adminSesion && adminSesion.rol === 'admin' ? adminSesion.permisos : null);
-    mostrarQuienEntro();
     populateGroupSelectors();
     renderGroupsList();
     renderAdminTable();
@@ -544,15 +544,6 @@ async function logoutAdmin() {
     adminSesion = null;
     cerrarGestionAdmins();
     showAdminLogin();
-}
-
-function mostrarQuienEntro() {
-    const el = document.getElementById('admin-quien');
-    if (!el || !adminSesion) return;
-    const master = adminSesion.rol === 'master';
-    el.textContent = master ? 'Maestro' : adminSesion.nombre;
-    el.parentElement.classList.toggle('is-master', master);
-    document.getElementById('btn-gestion-admins').classList.toggle('hidden', !master);
 }
 
 /// Render de la tabla semanal de horario (resalta el dia y la hora actuales)

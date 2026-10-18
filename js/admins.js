@@ -9,25 +9,47 @@ function gestionAbierta() {
     return !!el && !el.hidden;
 }
 
+function ponerBotonAdmin(enGestion, animar) {
+    const boton = gestionEl('tab-admin');
+    const uso = gestionEl('tab-admin-uso');
+    const texto = gestionEl('tab-admin-texto');
+    if (!boton || !uso || !texto) return;
+    const cambiar = () => {
+        uso.setAttribute('href', enGestion ? '#i-ajustes' : '#i-sliders');
+        texto.textContent = enGestion ? 'Ajustes de admins' : 'Admin Horarios';
+        boton.setAttribute('aria-label', texto.textContent);
+    };
+    const icono = boton.querySelector('.icon');
+    if (!animar || matchMedia('(prefers-reduced-motion: reduce)').matches) return cambiar();
+    icono.classList.remove('is-girando');
+    void icono.getBoundingClientRect();
+    icono.classList.add('is-girando');
+    icono.addEventListener('animationend', () => icono.classList.remove('is-girando'), { once: true });
+    setTimeout(cambiar, 180);
+}
+
 function abrirGestionAdmins() {
     const sesion = typeof sesionAdmin === 'function' ? sesionAdmin() : null;
     if (!sesion || sesion.rol !== 'master') return;
     gestionEl('admin-content').classList.add('en-gestion');
     gestionEl('admin-gestion').hidden = false;
+    ponerBotonAdmin(true, true);
     window.scrollTo({ top: 0 });
     cargarAdmins();
 }
 
-function cerrarGestionAdmins() {
+function cerrarGestionAdmins(animar = false) {
     const cont = gestionEl('admin-content');
     const sec = gestionEl('admin-gestion');
     if (!cont || !sec) return;
+    const estabaAbierta = !sec.hidden;
     cont.classList.remove('en-gestion');
     sec.hidden = true;
+    if (estabaAbierta) ponerBotonAdmin(false, animar);
 }
 
 function alternarGestionAdmins() {
-    if (gestionAbierta()) cerrarGestionAdmins();
+    if (gestionAbierta()) cerrarGestionAdmins(true);
     else abrirGestionAdmins();
 }
 
