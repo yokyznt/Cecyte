@@ -581,6 +581,39 @@
         }
     }
 
+    const CLAVE_LOCAL = 'cecyte_yokis_vozlocal';
+    const VOCES_LOCALES = [['ald', 'Ald (hombre)'], ['claude', 'Claude (mujer)']];
+
+    function ajustesLocal() {
+        const a = { voz: 'ald', primero: false };
+        try { Object.assign(a, JSON.parse(localStorage.getItem(CLAVE_LOCAL)) || {}); } catch (e) { return a; }
+        if (!VOCES_LOCALES.some(v => v[0] === a.voz)) a.voz = 'ald';
+        a.primero = a.primero === true;
+        return a;
+    }
+
+    async function hablarLocal(texto, turno) {
+        const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
+        if (!P) return false;
+        try {
+            const a = ajustesLocal();
+            const r = await P.hablar({ texto, voz: a.voz, velocidad: 1.0 });
+            if (!r || !r.audio) return false;
+            if (turno !== VIA.turno) return true;
+            callarIA();
+            const url = URL.createObjectURL(new Blob([base64ABytes(r.audio)], { type: 'audio/wav' }));
+            try {
+                await sonar(url);
+                estadoVoz('Voz: IA local (' + VOCES_LOCALES.find(v => v[0] === a.voz)[1] + ').');
+                return true;
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        } catch (e) {
+            return false;
+        }
+    }
+
     const MOTIVOS_VOZ = {
         cuota: 'Se acabó la cuota gratis de la voz de IA por hoy (10 frases por modelo)',
         red: 'No hay internet ni datos',
@@ -592,6 +625,7 @@
     async function hablarIA(texto) {
         const turno = ++VIA.turno;
         VIA.motivo = llaveIA() ? '' : 'llave';
+        if (ajustesLocal().primero && await hablarLocal(texto, turno)) return true;
         if (llaveIA() && Date.now() >= VIA.pausaHasta) {
             try {
                 const nombreVoz = vozIAElegida(), clave = nombreVoz + '|' + modoHevy() + '|' + texto;
@@ -625,6 +659,11 @@
         const motivo = MOTIVOS_VOZ[VIA.motivo] || MOTIVOS_VOZ.error;
         if (VIA.motivo !== 'red' && await hablarGradium(texto, vozGradiumElegida(), 'IA de Gradium (' + (VOCES_GRADIUM.find(x => x[0] === vozGradiumElegida()) || ['', ''])[1] + ')', turno)) return true;
         if (turno !== VIA.turno) return true;
+        if (await hablarLocal(texto, turno)) {
+            estadoVoz(motivo + ': hablo con la voz local de IA.');
+            return true;
+        }
+        if (turno !== VIA.turno) return true;
         if (VIA.motivo !== 'red' && await hablarGoogle(texto, turno)) {
             estadoVoz(motivo + ': hablo con la voz de Google.');
             return true;
@@ -638,6 +677,19 @@
         if (!sel) return;
         sel.innerHTML = VOCES_IA.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
         sel.value = vozIAElegida();
+        const selL = $('rb-local-voz'), primero = $('rb-local-primero');
+        if (selL && primero) {
+            selL.innerHTML = VOCES_LOCALES.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
+            selL.value = ajustesLocal().voz;
+            primero.checked = ajustesLocal().primero;
+            const guardarLocal = () => { try { localStorage.setItem(CLAVE_LOCAL, JSON.stringify({ voz: selL.value, primero: primero.checked })); } catch (e) { return false; } return true; };
+            primero.addEventListener('change', guardarLocal);
+            selL.addEventListener('change', () => {
+                if (guardarLocal()) hablarLocal('¡Qué onda, we! Así suena esta voz.', ++VIA.turno);
+            });
+            const P = raiz.Plataforma && raiz.Plataforma.plugin('VozLocal');
+            if (P) setTimeout(() => P.preparar({ voz: ajustesLocal().voz }).catch(() => null), 4000);
+        }
         const selG = $('rb-gradium-voz');
         if (selG) {
             selG.innerHTML = VOCES_GRADIUM.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
