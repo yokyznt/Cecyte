@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 @CapacitorPlugin(name = "VozLocal")
 public class VozLocalPlugin extends Plugin {
     private static final String TAG = "VozLocal";
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
     private final ExecutorService hilo = Executors.newSingleThreadExecutor();
     private OfflineTts motor;
     private String vozActual = "";
@@ -111,6 +111,8 @@ public class VozLocalPlugin extends Plugin {
         vits.setModel(new File(base, voz + "/model.onnx").getAbsolutePath());
         vits.setTokens(new File(base, voz + "/tokens.txt").getAbsolutePath());
         vits.setDataDir(new File(base, "espeak-ng-data").getAbsolutePath());
+        vits.setNoiseScale(0.5f);
+        vits.setNoiseScaleW(0.6f);
         OfflineTtsModelConfig modelo = new OfflineTtsModelConfig();
         modelo.setVits(vits);
         modelo.setNumThreads(2);
@@ -125,10 +127,17 @@ public class VozLocalPlugin extends Plugin {
     private void copiarAssets(File base) throws IOException {
         File marca = new File(base, "version.txt");
         if (marca.exists() && VERSION.equals(leer(marca))) return;
+        borrar(base);
         copiar(getContext().getAssets(), "voz", base);
         FileOutputStream o = new FileOutputStream(marca);
         o.write(VERSION.getBytes("UTF-8"));
         o.close();
+    }
+
+    private static void borrar(File f) {
+        File[] hijos = f.listFiles();
+        if (hijos != null) for (File h : hijos) borrar(h);
+        f.delete();
     }
 
     private static String leer(File f) throws IOException {

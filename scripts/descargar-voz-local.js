@@ -11,8 +11,7 @@ const CACHE = path.join(RAIZ, '.cache-voz');
 const BASE = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/';
 const AAR = { archivo: 'sherpa-onnx-1.13.8.aar', url: BASE + 'v1.13.8/sherpa-onnx-1.13.8.aar', minimo: 45e6 };
 const VOCES = [
-    { id: 'ald', paquete: 'vits-piper-es_MX-ald-medium-int8', modelo: 'es_MX-ald-medium.onnx' },
-    { id: 'claude', paquete: 'vits-piper-es_MX-claude-high-int8', modelo: 'es_MX-claude-high.onnx' },
+    { id: 'ald', paquete: 'vits-piper-es_MX-ald-medium', modelo: 'es_MX-ald-medium.onnx', minimo: 50e6 },
 ];
 
 function descargar(url, destino) {
@@ -44,7 +43,8 @@ async function main() {
     }
     for (const v of VOCES) {
         const destino = path.join(VOZ, v.id);
-        if (tamano(path.join(destino, 'model.onnx')) > 1e6 && fs.existsSync(path.join(VOZ, 'espeak-ng-data'))) continue;
+        fs.rmSync(path.join(VOZ, 'claude'), { recursive: true, force: true });
+        if (tamano(path.join(destino, 'model.onnx')) > v.minimo && fs.existsSync(path.join(VOZ, 'espeak-ng-data'))) continue;
         const tar = path.join(CACHE, v.paquete + '.tar.bz2');
         if (tamano(tar) < 1e6) {
             console.log('Bajando la voz ' + v.id + '…');
