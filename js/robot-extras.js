@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, nHabla: 0, finHabla: 0, procesando: false };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, encolar: false };
     const CLAVE_MODO = 'cecyte_yokis_modo';
     const MODOS = () => (raiz.Robot && raiz.Robot.MODOS_IA) || ['normal'];
     const personal = () => (raiz.Robot && raiz.Robot.MODO_PERSONAL) || null;
@@ -1106,20 +1106,43 @@
         if (listo()) enlace().mover(0, 0);
     }
 
+    function pasoMeneo(G, t0, t) {
+        const f = (t - t0) % 520;
+        const v = f < 110 ? [130, -130] : f >= 260 && f < 370 ? [-130, 130] : [0, 0];
+        const clave = v.join(',');
+        if (clave !== G.ult) { enlace().mover(v[0], v[1]); G.ult = clave; }
+    }
+
+    function puedeMenear() {
+        return meneoActivo() && !E.corrida && !E.radar && !E.guardia && listo() && enlace().libre();
+    }
+
     // Mientras contesta, el robot hace un meneo corto en su sitio (un giro a cada lado, sin avanzar): como si hablara.
     // La duración se calcula por el largo del texto; con la voz nativa, que avisa cuándo termina, se corta ahí.
     function meneoHablar(texto, fin) {
-        if (!meneoActivo() || E.corrida || E.radar || E.guardia || !listo() || !enlace().libre()) return;
+        if (!puedeMenear()) return;
         detenerMeneo();
         const t0 = Date.now(), G = { hasta: t0 + Math.min(9000, Math.max(700, texto.length * 62)), ult: '' };
         fin.then(() => { if (E.meneo === G && Date.now() - t0 > 700) G.hasta = Date.now(); });
         G.timer = setInterval(() => {
             const t = Date.now();
             if (t >= G.hasta || !listo() || E.corrida) { detenerMeneo(); return; }
-            const f = (t - t0) % 520;
-            const v = f < 110 ? [130, -130] : f >= 260 && f < 370 ? [-130, 130] : [0, 0];
-            const clave = v.join(',');
-            if (clave !== G.ult) { enlace().mover(v[0], v[1]); G.ult = clave; }
+            pasoMeneo(G, t0, t);
+        }, 40);
+        E.meneo = G;
+    }
+
+    // Con la conversación en vivo la voz llega por el audio del cerebro: se menea mientras suene y se corta al callar.
+    function meneoCerebro() {
+        if (E.meneo && E.meneo.cerebro) return;
+        if (!puedeMenear()) return;
+        detenerMeneo();
+        const t0 = Date.now(), G = { cerebro: true, ult: '', visto: t0 };
+        G.timer = setInterval(() => {
+            const t = Date.now();
+            if (hevyHablando()) G.visto = t;
+            if (t - G.visto > 400 || !listo() || E.corrida) { detenerMeneo(); return; }
+            pasoMeneo(G, t0, t);
         }, 40);
         E.meneo = G;
     }
@@ -1143,6 +1166,7 @@
         const fin = voz(texto);
         const n = ++E.nHabla;
         E.hablando = true;
+        E.hablaTope = Date.now() + Math.min(60000, 6000 + texto.length * 120);
         fin.then(() => null, () => null).then(() => { if (n === E.nHabla) { E.hablando = false; E.finHabla = Date.now(); } });
         if (!quieto) meneoHablar(texto, fin);
     }
@@ -1185,12 +1209,13 @@
         if (!R) return;
         if (!listo()) { detener(false); return; }
         const ahora = Date.now(), t = ahora - R.t0;
-        if (t >= R.r.ms) { detener(true); return; }
+        if (t >= R.r.ms) { R.completa = true; detener(true); return; }
         const p = raiz.Robot.pasoEn(R.r, t);
         if (!p) return;
         const clave = p.izq + ',' + p.der;
         if (clave !== R.ult || ahora - R.envio >= MS_LATIDO) {
             enlace().mover(p.izq, p.der);
+            if (control() && control().anotar) control().anotar(p.izq, p.der);
             R.ult = clave;
             R.envio = ahora;
         }
@@ -1203,12 +1228,27 @@
         E.corrida = null;
         if (control() && control().pantalla) control().pantalla(false, 'ruta');
         if (alto && listo()) enlace().mover(0, 0);
+        if (control() && control().anotar) {
+            control().anotar(0, 0);
+            if (R.casa && R.completa) control().marcarCasa();
+        }
+        if (alto && R.completa && E.cola.length) E.colaTimer = setTimeout(E.cola.shift(), 120);
+        else vaciarCola();
+    }
+
+    function vaciarCola() {
+        E.cola = [];
+        clearTimeout(E.colaTimer);
     }
 
     function correr(recorrido, habla, datos, texto) {
         if (!listo()) { di('sinRobot'); return false; }
         if (!recorrido) { di('fallo'); return false; }
-        if (E.corrida) { di('ocupado'); return false; }
+        if (E.corrida) {
+            if (E.encolar && E.cola.length < 8) { E.cola.push(() => correr(recorrido)); return true; }
+            di('ocupado');
+            return false;
+        }
         detenerMeneo();
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
         if (control() && control().pantalla) control().pantalla(true, 'ruta');
@@ -1281,11 +1321,22 @@
     }
 
     function regresarCasa() {
-        if (!listo()) { di('sinRobot'); return; }
+        if (!listo()) { di('sinRobot'); return { ok: false, error: 'el robot no está conectado' }; }
         const t = control() ? control().trayecto() : { pasos: [], ms: 0 };
-        const r = raiz.Robot.inversoDeRecorrido(t.pasos, t.ms, 'Casa');
-        if (!r) { hablar('No tengo nada que deshacer, we. Maneja un poco con el mando primero.'); return; }
-        if (correr(r, 'casa')) control().marcarCasa();
+        const c = calibra();
+        const r = raiz.Robot.rutaDeRegreso(t.pasos, t.ms, c.vel, c.giro);
+        if (!r) {
+            if (!E.callado) hablar('Ya estoy en mi casa, we.', true);
+            return { ok: false, error: 'ya estoy en casa' };
+        }
+        if (!correr(r, 'casa')) return { ok: false, error: 'estoy ocupado con otra cosa' };
+        E.corrida.casa = true;
+        return { ok: true };
+    }
+
+    function marcarCasaAqui() {
+        if (control()) control().marcarCasa();
+        if (!E.callado) hablar('Listo, aquí queda mi casa.', true);
     }
 
     function pintarRadar(lecturas) {
@@ -1562,7 +1613,8 @@
             return;
         }
         if (o.a === 'saludo') { di('saludo'); return; }
-        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
+        if (o.a === 'marcarCasa') { marcarCasaAqui(); return; }
+        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); vaciarCola(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -1841,13 +1893,13 @@
     const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
     const CLAVE_EXIGE_NOMBRE = 'cecyte_yokis_exige_nombre';
     const exigeNombre = () => { try { return localStorage.getItem(CLAVE_EXIGE_NOMBRE) === '1'; } catch (e) { return false; } };
-    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false };
+    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false, vivoHevy: null, sesion: 0 };
     const CLAVE_CEREBRO = 'cecyte_yokis_cerebro';
     const cerebroOn = () => { try { return localStorage.getItem(CLAVE_CEREBRO) !== '0'; } catch (e) { return true; } };
     const UMBRAL_INTERRUPCION = 0.14;
 
     function hevyHablando() {
-        return E.hablando || LIVE.fuentes.length > 0 || !!(LIVE.ctx && LIVE.proximo > LIVE.ctx.currentTime + 0.05);
+        return (E.hablando && Date.now() < E.hablaTope) || LIVE.fuentes.length > 0 || !!(LIVE.ctx && LIVE.proximo > LIVE.ctx.currentTime + 0.05);
     }
 
     function cerebroDisponible() {
@@ -1975,6 +2027,34 @@
         ol.scrollTop = ol.scrollHeight;
     }
 
+    function pintarHevy() {
+        const ol = $('rb-jarvis-hist');
+        const texto = ESC.dijo.trim().replace(/\s+/g, ' ');
+        if (!ol || !texto) return;
+        if (!ESC.vivoHevy) {
+            ESC.vivoHevy = document.createElement('li');
+            ESC.vivoHevy.className = 'is-jarvis';
+            ol.appendChild(ESC.vivoHevy);
+            while (ol.children.length > HIST_MAX && ol.firstChild !== ESC.vivoHevy) ol.removeChild(ol.firstChild);
+        }
+        ESC.vivoHevy.textContent = texto;
+        ol.scrollTop = ol.scrollHeight;
+        aviso(texto);
+    }
+
+    function fijarHevy() {
+        const dijo = ESC.dijo.trim().replace(/\s+/g, ' ');
+        const li = ESC.vivoHevy;
+        ESC.dijo = '';
+        ESC.vivoHevy = null;
+        if (!dijo) { if (li) li.remove(); return; }
+        aviso(dijo);
+        if (!li) { historial('yokis', dijo); return; }
+        li.textContent = dijo;
+        E.memoria.push('Hevy: ' + dijo);
+        if (E.memoria.length > 12) E.memoria.shift();
+    }
+
     function apagarEscucha(motivo) {
         ESC.on = false;
         ESC.unico = false;
@@ -1985,7 +2065,7 @@
         ESC.cola = [];
         ESC.anillo = [];
         ESC.oido = '';
-        ESC.dijo = '';
+        fijarHevy();
         ESC.ignorar = false;
         ESC.saludar = '';
         ESC.entradaCerrada = false;
@@ -2071,10 +2151,12 @@
 
     function ejecutarSilencio(o) {
         E.callado = true;
+        E.encolar = true;
         try {
             if (o.a === 'plan') ejecutarPlan(o); else ejecutarAccion(o);
         } finally {
             E.callado = false;
+            E.encolar = false;
         }
     }
 
@@ -2100,6 +2182,17 @@
         if (o.a === 'ppt') return o.usuario ? Object.assign({ ok: true }, sortearPPT(o.usuario)) : { ok: false, error: 'falta la jugada del usuario' };
         if (o.a === 'paro') { ejecutarSilencio(o); return { ok: true }; }
         if (NECESITAN_ROBOT.includes(o.a) && !listo()) return { ok: false, error: 'el robot no está conectado' };
+        if (o.a === 'casa') {
+            const irACasa = () => {
+                E.callado = true;
+                try { return regresarCasa(); } finally { E.callado = false; }
+            };
+            if (E.corrida && E.cola.length < 8) {
+                E.cola.push(irACasa);
+                return { ok: true, en_cola: true };
+            }
+            return irACasa();
+        }
         ejecutarSilencio(o);
         return { ok: true };
     }
@@ -2144,15 +2237,14 @@
 
     function terminarTurnoCerebro() {
         cerrarOido();
-        const dijo = ESC.dijo.trim().replace(/\s+/g, ' ');
-        ESC.dijo = '';
-        if (dijo) { aviso(dijo); historial('yokis', dijo); }
+        fijarHevy();
         ESC.turno = null;
         ESC.ignorar = false;
         ESC.ultimaVez = Date.now();
         if (ESC.unico) {
+            const sesion = ESC.sesion;
             const espera = LIVE.ctx ? Math.max(0, (LIVE.proximo - LIVE.ctx.currentTime) * 1000) : 0;
-            setTimeout(() => { if (ESC.on && ESC.unico) apagarEscucha(''); }, espera + 400);
+            setTimeout(() => { if (ESC.on && ESC.unico && ESC.sesion === sesion) apagarEscucha(''); }, espera + 400);
         }
     }
 
@@ -2217,7 +2309,7 @@
             if (m.error) { caerAlFlujoNormal('el servidor avisó ' + JSON.stringify(m.error).slice(0, 120)); return; }
             const sc = m.serverContent;
             if (!sc) return;
-            if (sc.interrupted) { callarCerebro(); ESC.ignorar = false; }
+            if (sc.interrupted) { callarCerebro(); fijarHevy(); ESC.ignorar = false; }
             const oido = sc.inputTranscription && sc.inputTranscription.text;
             if (oido) {
                 clearTimeout(ESC.sinVoz);
@@ -2236,10 +2328,11 @@
                     if (!p.inlineData || ESC.ignorar) return;
                     if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
                     reproducirChunk(ESC.turno, p.inlineData.data);
+                    meneoCerebro();
                 });
             }
             const dijo = sc.outputTranscription && sc.outputTranscription.text;
-            if (dijo) { if (!ESC.dijo) cerrarOido(); ESC.dijo += dijo; }
+            if (dijo) { if (!ESC.dijo) cerrarOido(); ESC.dijo += dijo; pintarHevy(); }
             if (sc.turnComplete) terminarTurnoCerebro();
         };
         const caida = ev => {
@@ -2328,6 +2421,7 @@
         }
         ESC.iniciando = false;
         ESC.on = true;
+        ESC.sesion++;
         ESC.unico = !!unico;
         ESC.fallos = 0;
         ESC.ultimaVez = Date.now();
@@ -2370,7 +2464,7 @@
             boton.style.setProperty('--nivel', ESC.nivel.toFixed(2));
             if (hevyHablando()) {
                 ESC.ecoMax = Math.max(ESC.ecoMax, ESC.nivelCrudo);
-                if (ESC.nivelCrudo > UMBRAL_INTERRUPCION) {
+                if (ESC.nivelCrudo > (E.meneo ? UMBRAL_INTERRUPCION * 2 : UMBRAL_INTERRUPCION)) {
                     if (!ESC.picoDesde) ESC.picoDesde = Date.now();
                     else if (Date.now() - ESC.picoDesde > 250) interrumpirPorVoz();
                 } else ESC.picoDesde = 0;
@@ -2446,8 +2540,15 @@
         b.addEventListener('contextmenu', e => e.preventDefault());
         b.addEventListener('click', () => {
             if (largo) { largo = false; return; }
-            if (ESC.on && hablaba) return;
-            if (ESC.on) apagarEscucha(ESC.unico ? '' : 'Candado abierto.');
+            if (ESC.on && !ESC.unico) {
+                if (!hablaba) apagarEscucha('Candado abierto.');
+                return;
+            }
+            if (ESC.on) {
+                const soloEscuchaba = !hablaba && !ESC.entradaCerrada && !ESC.turno && !ESC.oido && !ESC.texto;
+                apagarEscucha('');
+                if (!soloEscuchaba) encenderEscucha(true);
+            }
             else if (llaveIA() && !sinInternet()) encenderEscucha(true);
             else escuchar();
         });
@@ -2487,7 +2588,7 @@
         $('rb-cal-giro').value = c.giro;
         ['rb-cal-vel', 'rb-cal-giro'].forEach(id => $(id).addEventListener('change', guardaCalibra));
         document.querySelectorAll('[data-figura]').forEach(b => b.addEventListener('click', () => { guardaCalibra(); correr(figura(b.dataset.figura), null, null, 'Dibujando ' + b.dataset.figura + '.'); }));
-        $('rb-casa-marca').addEventListener('click', () => { if (control()) control().marcarCasa(); aviso('Casa marcada: aquí empieza el regreso.'); });
+        $('rb-casa-marca').addEventListener('click', () => { if (control()) control().marcarCasa(); aviso('Casa marcada: aquí queda tu punto de regreso.'); });
         $('rb-casa-ir').addEventListener('click', regresarCasa);
         $('rb-radar').addEventListener('click', () => { guardaCalibra(); radar(true); });
         $('rb-guardia').addEventListener('click', () => ponerGuardia($('rb-guardia').getAttribute('aria-pressed') !== 'true', true));
@@ -2506,6 +2607,7 @@
         $('rb-voz-probar').addEventListener('click', () => { hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {
+            vaciarCola();
             detener(false);
             E.radarCancelado = true;
             if (E.guardia) ponerGuardia(false, true);
