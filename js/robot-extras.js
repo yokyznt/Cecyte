@@ -1323,8 +1323,7 @@
     function regresarCasa() {
         if (!listo()) { di('sinRobot'); return { ok: false, error: 'el robot no está conectado' }; }
         const t = control() ? control().trayecto() : { pasos: [], ms: 0 };
-        const c = calibra();
-        const r = raiz.Robot.rutaDeRegreso(t.pasos, t.ms, c.vel, c.giro);
+        const r = raiz.Robot.regresoDeRecorrido(t.pasos, t.ms, 'Casa');
         if (!r) {
             if (!E.callado) hablar('Ya estoy en mi casa, we.', true);
             return { ok: false, error: 'ya estoy en casa' };
@@ -1932,6 +1931,7 @@
         ws.onmessage = async ev => {
             let m;
             try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); } catch (e) { return; }
+            if (ESC.wsTexto !== ws) return;
             if (m.setupComplete) { ESC.listaTexto = true; return; }
             const sc = m.serverContent;
             if (!sc) return;
@@ -1942,6 +1942,15 @@
         };
         ws.onclose = () => { if (ESC.wsTexto === ws) { ESC.wsTexto = null; ESC.listaTexto = false; } };
         ws.onerror = ws.onclose;
+    }
+
+    function soltarTextoVivo() {
+        const ws = ESC.wsTexto;
+        if (!ws) return;
+        setTimeout(() => {
+            try { ws.close(); } catch (e) { /* ya cerrado */ }
+            if (ESC.wsTexto === ws) { ESC.wsTexto = null; ESC.listaTexto = false; }
+        }, 900);
     }
 
     function cerrarTextoVivo() {
@@ -1965,7 +1974,7 @@
         ESC.flujo = null;
         ESC.medidor = null;
         cancelAnimationFrame(ESC.cuadro);
-        cerrarTextoVivo();
+        soltarTextoVivo();
         const b = $('rb-jarvis');
         b.classList.remove('is-escuchando', 'is-candado');
         b.style.removeProperty('--nivel');
@@ -2225,11 +2234,16 @@
         ].filter(Boolean).join('\n');
     }
 
+    function oidoMejor() {
+        const transcrito = normalizarOido((ESC.vivoFinal + ' ' + ESC.vivoInterino).trim());
+        return /\p{L}{2,}/u.test(transcrito) ? transcrito : normalizarOido(ESC.oido.trim());
+    }
+
     function cerrarOido() {
         quitarVivo();
+        const t = oidoMejor();
         ESC.vivoFinal = '';
         ESC.vivoInterino = '';
-        const t = normalizarOido(ESC.oido.trim());
         ESC.oido = '';
         if (t) historial('yo', t);
         SOLO.quieto = Date.now();
@@ -2315,7 +2329,7 @@
                 clearTimeout(ESC.sinVoz);
                 ESC.oido += oido;
                 ESC.ignorar = false;
-                pintarVivo(normalizarOido(ESC.oido.trim()));
+                pintarVivo(oidoMejor());
                 const o = ESC.oido.trim().split(/\s+/).length <= 3 ? raiz.Robot.ordenDeVoz('hevy ' + ESC.oido.trim()) : null;
                 if (o && o.a === 'paro') { callarCerebro(); ESC.ignorar = true; ejecutarSilencio({ a: 'paro' }); }
                 if (ESC.unico) {
