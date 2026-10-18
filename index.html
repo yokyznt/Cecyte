@@ -1116,34 +1116,21 @@
                                     </div>
                                     <div class="rb-ops">
                                         <details class="rb-op">
-                                            <summary><span class="rb-op__t">Voz de Hevy</span><span class="rb-op__r">IA gratis, y la del teléfono si no hay red</span></summary>
+                                            <summary><span class="rb-op__t">Voz de Hevy</span><span class="rb-op__r">Un menú con todas las voces</span></summary>
                                             <div class="rb-op__c">
-                                                <p class="hint">Hevy habla con voz de IA (gratis) siempre que puede. Consigue una llave en aistudio.google.com/apikey y pégala: con ella también entiende mejor lo que dices. Solo se manda lo que dices.</p>
+                                                <label class="field"><span class="field__label">Voz</span><select id="rb-voz-unica" class="select"></select></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
+                                                </div>
+                                                <p id="rb-ia-estado" class="hint" role="status"></p>
+                                                <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se menee al contestar</span></label>
+                                                <span class="rb-fn-t">Llaves gratis</span>
+                                                <p class="hint">Gemini: aistudio.google.com/apikey. Gradium: studio.gradium.ai (también clona voces). Sin llaves habla la voz local.</p>
                                                 <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
                                                 <div class="btn-row">
                                                     <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar la IA</button>
                                                 </div>
-                                                <p id="rb-ia-estado" class="hint" role="status"></p>
-                                                <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
-                                                <label class="field"><span class="field__label">Llave de Gradium (opcional, gratis)</span><input type="password" id="rb-gradium-llave" class="input" autocomplete="off" spellcheck="false"></label>
-                                                <label class="field"><span class="field__label">Voz de Gradium</span><select id="rb-gradium-voz" class="select"></select></label>
-                                                <p class="hint">Gradium (gradium.ai, sin tarjeta, solo uso personal) da más voces de IA cuando se acaba la cuota de Gemini y sirve para clonar voces.</p>
-                                                <span class="rb-fn-t">Voz local, sin límite</span>
-                                                <label class="field"><span class="field__label">Voz local</span><select id="rb-local-voz" class="select"></select></label>
-                                                <label class="rb-check"><input type="checkbox" id="rb-local-primero"><span>Usarla siempre primero (misma voz, sin esperar)</span></label>
-                                                <p class="hint">Corre dentro del teléfono: gratis, sin internet y sin cuota. Es la que entra cuando se acaban las demás.</p>
-                                                <div id="rb-voz-tel" class="stack">
-                                                    <span class="rb-fn-t">Sin internet ni datos</span>
-                                                    <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
-                                                    <div class="rb-calib">
-                                                        <label class="field"><span class="field__label">Grave ← → aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
-                                                        <label class="field"><span class="field__label">Calmada ← → enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
-                                                    </div>
-                                                </div>
-                                                <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se menee al contestar</span></label>
-                                                <div class="btn-row">
-                                                    <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
-                                                </div>
+                                                <label class="field"><span class="field__label">Llave de Gradium</span><input type="password" id="rb-gradium-llave" class="input" autocomplete="off" spellcheck="false"></label>
                                             </div>
                                         </details>
                                         <details class="rb-op">
