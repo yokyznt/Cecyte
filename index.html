@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/pages.css">
     <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/admins.css">
     <link rel="stylesheet" href="css/robot.css"> <!-- @robot:line -->
     <link rel="stylesheet" href="css/themes/oscuro.css">
 </head>
@@ -54,6 +55,10 @@
         <symbol id="i-fn-avanzar" viewBox="0 0 24 24"><!-- @robot:line --><path d="M12 20V5"/><path d="m6 11 6-6 6 6"/></symbol>
         <symbol id="i-fn-esquivar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="7" height="6" x="8.5" y="3" rx="1"/><path d="M5 21c0-5 3-6 7-6"/><path d="m10 12 3 3-3 3"/></symbol>
         <symbol id="i-fn-mano" viewBox="0 0 24 24"><!-- @robot:line --><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6"/><path d="M11 10V4a1.5 1.5 0 0 1 3 0v7"/><path d="M14 10V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2-3a1.5 1.5 0 0 1 2.5-1.5L8 15"/></symbol>
+        <symbol id="i-estilo-palanca" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></symbol>
+        <symbol id="i-estilo-flechas" viewBox="0 0 24 24"><path d="m9 6 3-3 3 3"/><path d="m9 18 3 3 3-3"/><path d="m6 9-3 3 3 3"/><path d="m18 9 3 3-3 3"/></symbol>
+        <symbol id="i-estilo-pedales" viewBox="0 0 24 24"><rect x="4" y="5" width="6" height="14" rx="2"/><rect x="14" y="9" width="6" height="10" rx="2"/></symbol>
+        <symbol id="i-direccion" viewBox="0 0 24 24"><path d="M12 3v3"/><circle cx="12" cy="12" r="8"/><path d="m12 7.5 3 8-3-1.8-3 1.8z"/></symbol>
         <symbol id="i-fn-estacionar" viewBox="0 0 24 24"><!-- @robot:line --><rect width="12" height="5" x="6" y="3" rx="1"/><path d="M12 10v7"/><path d="m8 14 4 4 4-4"/><path d="M4 21h16"/></symbol>
         <symbol id="i-fn-sirena" viewBox="0 0 24 24"><!-- @robot:line --><path d="M7 17v-5a5 5 0 0 1 10 0v5"/><path d="M5 17h14v4H5z"/><path d="M12 3v2"/><path d="m4.5 6.5 1.5 1.5"/><path d="m19.5 6.5-1.5 1.5"/></symbol>
         <symbol id="i-fn-cuadrado" viewBox="0 0 24 24"><!-- @robot:line --><rect width="14" height="14" x="5" y="5" rx="2"/><path d="m12 2 3 3-3 3"/></symbol>
@@ -281,6 +286,10 @@
                 <div class="admin-head">
                     <div>
                         <h2 class="admin-head__title">Panel de administración</h2>
+                        <div class="quien">
+                            <span class="quien__chip"><svg class="icon" aria-hidden="true"><use href="#i-escudo"/></svg><span id="admin-quien">Maestro</span></span>
+                            <button type="button" id="btn-gestion-admins" class="btn btn--secondary btn--sm hidden" onclick="abrirGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg> Gestionar admins</button>
+                        </div>
 <!-- @robot:start -->
                         <div id="rb-estado-fila" class="rb-estado-fila"></div>
 <!-- @robot:end -->
@@ -293,6 +302,19 @@
                     </div>
                 </div>
 
+                <section id="admin-gestion" class="gestion" hidden aria-labelledby="gestion-titulo">
+                    <button type="button" class="btn btn--secondary btn--sm gestion__atras" onclick="cerrarGestionAdmins()"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg> Volver al panel</button>
+                    <div class="gestion__cab">
+                        <div>
+                            <h2 id="gestion-titulo" class="admin-head__title">Admins</h2>
+                            <p class="hint">Cada contraseña abre solo lo que le permitas.</p>
+                        </div>
+                        <button type="button" id="gestion-nuevo" class="btn btn--primary" onclick="abrirFormAdmin()"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Nuevo admin</button>
+                    </div>
+                    <div id="gestion-lista" class="gestion__lista" aria-live="polite"></div>
+                    <p id="gestion-cuenta" class="hint"></p>
+                </section>
+
                 <p id="esp-alerta" class="banner banner--err" role="alert" hidden></p>
 
                 <nav class="sections" aria-label="Apartados del panel de administración">
@@ -304,7 +326,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span>Timbre</span>
                         </button>
 <!-- @robot:start -->
-                        <button type="button" role="tab" id="tab-ap-robot" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
+                        <button type="button" role="tab" id="tab-ap-robot" data-solo="android" data-apartado-tab="robot" aria-controls="sec-robot" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Robot</span>
                         </button>
 <!-- @robot:end -->
@@ -340,7 +362,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Funciones</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-jarvis" data-section-tab="robot-jarvis" aria-controls="sec-robot-jarvis" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Yokis</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hevy</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-dibujar" data-section-tab="robot-dibujar" aria-controls="sec-robot-dibujar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg><span>Dibujar</span>
@@ -350,6 +372,9 @@
                         </button>
                         <button type="button" role="tab" id="tab-robot-luces" data-section-tab="robot-luces" aria-controls="sec-robot-luces" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg><span>Luces</span>
+                        </button>
+                        <button type="button" role="tab" id="tab-robot-telefono" data-section-tab="robot-telefono" aria-controls="sec-robot-telefono" aria-selected="false" tabindex="-1">
+                            <svg class="icon" aria-hidden="true"><use href="#i-celular"/></svg><span>Teléfono</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-instalar" data-section-tab="robot-instalar" aria-controls="sec-robot-instalar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg><span>Conexión</span>
@@ -467,8 +492,7 @@
                                 <span id="bell-status" class="badge badge--idle"><span class="dot"></span> <span id="bell-status-text">Revisando...</span></span>
                             </div>
                             <div class="panel__body">
-                                <p class="hint">El ESP32 descarga las horas, los días y el ritmo cada 5 segundos. "Tocar timbre ahora" suena sin esperar la hora programada.</p>
-
+                                <p class="hint">El ESP32 recibe los cambios cada 5 segundos.</p>
                                 <div>
                                     <button type="button" onclick="ringBellNow()" id="bell-ring-btn" class="btn btn--bell btn--block">
                                         <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
@@ -476,73 +500,70 @@
                                     </button>
                                     <p id="bell-ring-msg" class="msg" role="status" style="margin-top:8px"></p>
                                 </div>
-
-                                <hr class="divider">
-
-                                <div style="display:flex;flex-direction:column;gap:10px">
-                                    <h4 class="panel__sub">Horas programadas</h4>
-                                    <div id="bell-times-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
-                                        <input type="time" id="bell-new-time" class="input">
-                                        <button type="button" onclick="addBellTime()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar hora
-                                        </button>
-                                    </div>
+                                <div class="rb-ops">
+                                    <details class="rb-op" open>
+                                        <summary><span class="rb-op__t">Horas y días</span><span class="rb-op__r">Cuándo suena el timbre</span></summary>
+                                        <div class="rb-op__c">
+                                            <div id="bell-times-list" class="chips"></div>
+                                            <div class="inline-form">
+                                                <label class="sr-only" for="bell-new-time">Nueva hora del timbre</label>
+                                                <input type="time" id="bell-new-time" class="input">
+                                                <button type="button" onclick="addBellTime()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar hora
+                                                </button>
+                                            </div>
+                                            <fieldset style="border:0;padding:0;margin:0;min-width:0">
+                                                <legend class="rb-fn-t" style="margin-bottom:8px;padding:0">Días</legend>
+                                                <div class="days">
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
+                                                    <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
+                                                </div>
+                                            </fieldset>
+                                        </div>
+                                    </details>
+                                    <details class="rb-op">
+                                        <summary><span class="rb-op__t">Días sin timbre</span><span class="rb-op__r">Vacaciones y festivos</span></summary>
+                                        <div class="rb-op__c">
+                                            <p class="hint">Ese día no suena nada.</p>
+                                            <div id="bell-off-list" class="chips"></div>
+                                            <div class="inline-form">
+                                                <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
+                                                <input type="date" id="bell-off-date" class="input">
+                                                <button type="button" onclick="addOffDate()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar día
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <details class="rb-op">
+                                        <summary><span class="rb-op__t">Horario especial</span><span class="rb-op__r">Un día con otras horas</span></summary>
+                                        <div class="rb-op__c">
+                                            <p class="hint">Ese día manda sobre las horas normales y los días de la semana.</p>
+                                            <div id="bell-special-list" class="chips"></div>
+                                            <div class="stack">
+                                                <label class="field"><span class="field__label">Fecha</span><input type="date" id="bell-special-date" class="input"></label>
+                                                <label class="field"><span class="field__label">Horas de ese día</span><input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00"></label>
+                                                <button type="button" onclick="addSpecial()" class="btn btn--secondary">
+                                                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                                                    Agregar horario especial
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
                                 </div>
-
-                                <fieldset style="border:0;padding:0;margin:0;min-width:0">
-                                    <legend class="field__label" style="margin-bottom:8px;padding:0">Días</legend>
-                                    <div class="days">
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="1"><span>Lun</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="2"><span>Mar</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="3"><span>Mié</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="4"><span>Jue</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="5"><span>Vie</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="6"><span>Sáb</span></label>
-                                        <label class="day-chip"><input type="checkbox" class="bell-day" value="0"><span>Dom</span></label>
-                                    </div>
-                                </fieldset>
-
-                                <hr class="divider">
-
                                 <div class="stack">
-                                    <h4 class="panel__sub">Días sin timbre</h4>
-                                    <p class="hint">Vacaciones, suspensiones y días festivos: ese día no suena nada.</p>
-                                    <div id="bell-off-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-off-date">Fecha sin timbre</label>
-                                        <input type="date" id="bell-off-date" class="input">
-                                        <button type="button" onclick="addOffDate()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar día
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="stack">
-                                    <h4 class="panel__sub">Horario especial</h4>
-                                    <p class="hint">Un día con otras horas, por ejemplo un día corto. Ese día manda sobre las horas normales y sobre los días de la semana.</p>
-                                    <div id="bell-special-list" class="chips"></div>
-                                    <div class="inline-form">
-                                        <label class="sr-only" for="bell-special-date">Fecha del horario especial</label>
-                                        <input type="date" id="bell-special-date" class="input" style="max-width:170px">
-                                        <label class="sr-only" for="bell-special-times">Horas de ese día</label>
-                                        <input type="text" id="bell-special-times" class="input" placeholder="07:00, 10:30, 12:00">
-                                        <button type="button" onclick="addSpecial()" class="btn btn--secondary">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                                            Agregar
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="row-between">
-                                    <p id="bell-save-msg" class="msg" role="status"></p>
-                                    <button type="button" onclick="saveBell()" class="btn btn--primary">
+                                    <button type="button" onclick="saveBell()" class="btn btn--primary btn--block">
                                         <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg>
                                         Guardar timbre
                                     </button>
+                                    <p id="bell-save-msg" class="msg" role="status"></p>
                                 </div>
                             </div>
                         </section>
@@ -709,7 +730,7 @@
                     </div>
 
 <!-- @robot:start -->
-                    <!-- Apartado Robot: mBot Ranger por USB -->
+                    <!-- Apartado Robot: mBot Ranger por Bluetooth (solo en la app) -->
                     <div class="admin-top rb-apartado" id="sec-robot" data-apartado="robot" hidden>
 
                         <!-- Conexión: siempre a la vista dentro del apartado Robot -->
@@ -738,13 +759,21 @@
                                 <div class="rb-mando__gira" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-gira"/></svg></div>
 
                                 <header class="rb-mando__barra">
-                                    <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
-                                    <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
-                                    <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
-                                    <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
-                                    <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
-                                    <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
-                                    <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
+                                    <div class="rb-grupo rb-grupo--sesion">
+                                        <button type="button" id="rb-ctl-salir" class="rb-btn rb-btn--chico" aria-label="Cerrar el mando"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                        <span id="rb-mando-estado" class="rb-estado" role="status"><i class="rb-estado__punto"></i></span>
+                                        <button type="button" id="rb-ctl-bt" class="rb-btn rb-btn--chico" aria-label="Conectar el robot"><svg class="icon" aria-hidden="true"><use href="#i-bluetooth"/></svg></button>
+                                    </div>
+                                    <div class="rb-grupo rb-grupo--info">
+                                        <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
+                                        <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
+                                    </div>
+                                    <div class="rb-grupo rb-grupo--herr">
+                                        <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
+                                        <button type="button" id="rb-dir-cal" class="rb-btn rb-btn--chico rb-dir-cal" aria-label="Alinear: el robot mira hacia donde apunta el teléfono" title="Alinear"><svg class="icon" aria-hidden="true"><use href="#i-centrar"/></svg></button>
+                                        <button type="button" id="rb-estilo" class="rb-btn rb-btn--chico rb-estilo" data-estilo="palanca" aria-label="Estilo de control: palanca. Toca para cambiar a flechas" title="Estilo de control"><svg class="icon ico-palanca" aria-hidden="true"><use href="#i-estilo-palanca"/></svg><svg class="icon ico-flechas" aria-hidden="true"><use href="#i-estilo-flechas"/></svg><svg class="icon ico-pedales" aria-hidden="true"><use href="#i-estilo-pedales"/></svg></button>
+                                        <button type="button" id="rb-turbo" class="rb-btn rb-turbo" aria-pressed="false" aria-label="Turbo: más potencia a los motores y apaga lo demás"><svg class="icon" aria-hidden="true"><use href="#i-rayo"/></svg></button>
+                                    </div>
                                 </header>
 
                                 <div class="rb-mando__cuerpo">
@@ -763,6 +792,22 @@
                                         <span id="rb-incl-estado" class="rb-incl__txt"></span>
                                     </div>
 
+                                    <div class="rb-flechas" id="rb-flechas" role="group" aria-label="Flechas: mantén una para ir hacia allá">
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--arriba" data-pad="0,1" aria-label="Adelante"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--izq" data-pad="-1,0" aria-label="Izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--der" data-pad="1,0" aria-label="Derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--abajo" data-pad="0,-1" aria-label="Atrás"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--adel-izq" data-pad="-1,1" aria-label="Adelante a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--adel-der" data-pad="1,1" aria-label="Adelante a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--atras-izq" data-pad="-1,-1" aria-label="Atrás a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-flecha rb-flecha--atras-der" data-pad="1,-1" aria-label="Atrás a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                    </div>
+
+                                    <div class="rb-pedales rb-pedales--dir" id="rb-pedales-dir" role="group" aria-label="Pedales de dirección">
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--izq" data-pad="-1,0" aria-label="Girar a la izquierda"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--der" data-pad="1,0" aria-label="Girar a la derecha"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                    </div>
+
                                     <div class="rb-centro">
                                         <button type="button" id="rb-ctl-paro" class="rb-paro-gran" aria-label="Paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg></button>
                                         <div class="rb-vel">
@@ -776,7 +821,12 @@
                                         <button type="button" id="rb-claxon" class="rb-btn rb-cara rb-cara--claxon" aria-label="Claxon: mantenlo pulsado para que siga sonando"><svg class="icon" aria-hidden="true"><use href="#i-altavoz"/></svg></button>
                                         <button type="button" class="rb-btn rb-cara rb-cara--musica" data-abre="rb-menu-musica" aria-label="Canciones" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg></button>
                                         <button type="button" class="rb-btn rb-cara rb-cara--luces" data-abre="rb-menu-luces" aria-label="Luces" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-foco"/></svg></button>
-                                        <button type="button" id="rb-incl-on" class="rb-btn rb-cara rb-cara--incl" aria-pressed="false" aria-label="Manejar inclinando el celular"><svg class="icon" aria-hidden="true" style="rotate:-25deg"><use href="#i-celular"/></svg></button>
+                                        <button type="button" id="rb-incl-on" class="rb-btn rb-cara rb-cara--incl" aria-pressed="false" data-modo="0" aria-label="Manejar inclinando el celular"><svg class="icon ico-cel" aria-hidden="true" style="rotate:-25deg"><use href="#i-celular"/></svg><svg class="icon ico-dir" aria-hidden="true"><use href="#i-direccion"/></svg></button>
+                                    </div>
+
+                                    <div class="rb-pedales rb-pedales--gas" id="rb-pedales-gas" role="group" aria-label="Pedales de aceleración">
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--acel" data-pad="0,1" aria-label="Acelerar hacia adelante"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
+                                        <button type="button" class="rb-btn rb-pedal rb-pedal--rev" data-pad="0,-1" aria-label="Reversa"><svg class="icon" aria-hidden="true"><use href="#i-flecha"/></svg></button>
                                     </div>
                                 </div>
 
@@ -819,7 +869,7 @@
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-nombre">Guardar lo que hay en pantalla con el nombre</label>
-                                        <div class="inline-form">
+                                        <div class="inline-form inline-form--ap">
                                             <input type="text" id="rb-nombre" class="input" maxlength="40" placeholder="Ej. Ritmo de mi canción">
                                             <button type="button" id="rb-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
                                             <button type="button" id="rb-borrar" class="btn btn--secondary btn--sm" disabled><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Borrar</button>
@@ -829,7 +879,7 @@
                                         <label class="field__label" for="rb-notas">Notas</label>
                                         <textarea id="rb-notas" class="textarea" rows="6" spellcheck="false"></textarea>
                                         <p id="rb-err-notas" class="msg msg--err" role="status"></p>
-                                        <p class="hint">Escribe las notas como C4 D4 E4 (con sostenido o bemol: F#4, Bb3). R es silencio. /4 dura un tiempo, /8 medio y /2 dos; la duración se repite hasta que pongas otra, y un punto la alarga (/4.). También puedes poner milisegundos: A5:120 suena 120 ms y R:300 calla 300 ms. Lo que sigue a // es un comentario.</p>
+                                        <p class="hint">Notas como C4 D4 E4 (F#4, Bb3); R es silencio. /4 dura un tiempo, /8 medio, /2 dos y un punto la alarga (/4.). A5:120 suena 120 ms. Lo que sigue a // es comentario.</p>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="rb-bpm">Velocidad: <span id="rb-bpm-v"></span></label>
@@ -840,7 +890,6 @@
                                         <input type="range" id="rb-vol" min="0" max="100" step="5">
                                     </div>
                                     <label class="rb-check"><input type="checkbox" id="rb-fuerte"><span>Que suene más fuerte (sube la canción de octava)</span></label>
-                                    <p class="hint">El volumen ya llega al tope del zumbador; las notas agudas suenan mucho más fuerte que las graves. Las notas siguen siendo las mismas, solo más arriba.</p>
                                     <div class="btn-row">
                                         <button type="button" id="rb-escuchar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Escuchar aquí</button>
                                         <button type="button" id="rb-silencio" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Callar</button>
@@ -849,10 +898,11 @@
 
                                     </div>
                                 </div>
-                                <div class="rb-card" data-solo="android">
-                                    <h4 class="panel__sub">Cántalo y el robot lo toca en pitidos</h4>
-                                    <div class="stack">
-                                        <p class="hint">Pulsa Grabar, canta una melodía (con letra o con «la la la»), cerca del micrófono y sin música de fondo, y pulsa Parar: se convierte sola en notas del zumbador.</p>
+                                <div class="rb-ops" data-solo="android">
+                                  <details class="rb-op">
+                                    <summary><span class="rb-op__t">Cántalo</span><span class="rb-op__r">Tu voz se vuelve notas del zumbador</span></summary>
+                                    <div class="rb-op__c">
+                                        <p class="hint">Pulsa Grabar y canta una melodía cerca del micrófono, sin música de fondo. Al parar se convierte en notas.</p>
                                         <div class="field">
                                             <label class="field__label" for="rb-cant-voz">Tu voz</label>
                                             <select id="rb-cant-voz" class="select"><option value="hombre">Grave (voz de hombre)</option><option value="media" selected>Media</option><option value="aguda">Aguda (mujer o niño)</option></select>
@@ -868,72 +918,13 @@
                                         </div>
                                         <p id="rb-cant-info" class="msg" role="status"></p>
                                     </div>
+                                  </details>
                                 </div>
-                                <div class="rb-card">
-                                    <h4 class="panel__sub">Agregar canciones</h4>
-                                    <div class="stack">
-                                        <label class="rb-soltar" for="rb-audio">
-                                            <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
-                                            <span>Elegir audio o MIDI</span>
-                                        </label>
-                                        <input type="file" id="rb-audio" accept="audio/*,.mid,.midi" multiple class="sr-only">
-                                        <progress id="rb-aud-prog" class="rb-aud-prog" max="1" value="0" hidden></progress>
-                                        <ul id="rb-aud-lista" class="rb-aud-lista" aria-live="polite"></ul>
-                                        <p id="rb-aud-info" class="msg" role="status"></p>
-                                        <details class="rb-avanzado">
-                                            <summary>Ajustes manuales</summary>
-                                            <div class="stack">
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-que">Qué sacar</label>
-                                                    <select id="rb-aud-que" class="select">
-                                                        <option value="melodia">La melodía: voz o instrumento principal (recomendado)</option>
-                                                        <option value="ritmo">Solo el ritmo (golpes)</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-reg">Registro de la melodía</label>
-                                                    <select id="rb-aud-reg" class="select">
-                                                        <option value="voz">Voz y melodía (medio)</option>
-                                                        <option value="agudo">Agudo (flauta, violín, voz aguda)</option>
-                                                        <option value="grave">Grave (bajo, voz grave)</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="btn-row">
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-tonal" checked><span>Ajustar las notas a la tonalidad</span></label>
-                                                <label class="rb-check"><input type="checkbox" id="rb-aud-subir" checked><span>Subir al registro donde suena bien el zumbador</span></label>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-ini">Empezar en (segundos)</label>
-                                                    <input type="number" id="rb-aud-ini" class="input" min="0" step="0.5" value="0"></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-dur">Duración (máximo 60 s)</label>
-                                                    <input type="number" id="rb-aud-dur" class="input" min="1" max="60" step="1" value="30"></div>
-                                            </div>
-                                            <div class="grid-2">
-                                                <div class="field"><label class="field__label" for="rb-aud-modo">Cómo convertir el ritmo</label>
-                                                    <select id="rb-aud-modo" class="select">
-                                                        <option value="golpes">Un toque por cada golpe (recomendado)</option>
-                                                        <option value="sostenido">Seguir el volumen</option>
-                                                    </select></div>
-                                                <div class="field"><label class="field__label" for="rb-aud-tono">Tonos del robot</label>
-                                                    <select id="rb-aud-tono" class="select">
-                                                        <option value="alterna">Alterna 4 tonos (las luces cambian de color)</option>
-                                                        <option value="agudo">Un solo tono agudo</option>
-                                                        <option value="grave">Un solo tono grave</option>
-                                                    </select></div>
-                                            </div>
-                                            <div class="field">
-                                                <label class="field__label" for="rb-aud-sens">Sensibilidad: <span id="rb-aud-sens-v">50</span></label>
-                                                <input type="range" id="rb-aud-sens" min="0" max="100" value="50">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-aud-convertir" class="btn btn--primary btn--sm">Convertir</button>
-                                            </div>
-                                            </div>
-                                        </details>
-                                    </div>
-                                </div>
-                                <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Teclado: toca y graba tus notas</h4>
-                                    <div class="stack">
-                                            <p class="hint">Toca las teclas de abajo o las de tu computadora: <b>Z X C V B N M</b> (con <b>S D G H J</b> para las negras) son una octava y <b>Q W E R T Y U</b> (con <b>2 3 5 6 7</b>) la siguiente. Pulsa <b>Grabar</b> y las notas se van registrando solas, con su duración y sus silencios.</p>
+                                <div class="rb-ops">
+                                  <details class="rb-op">
+                                    <summary><span class="rb-op__t">Teclado</span><span class="rb-op__r">Toca y graba tus notas</span></summary>
+                                    <div class="rb-op__c">
+                                            <p class="hint">Toca las teclas o las de tu computadora: <b>Z X C V B N M</b> y <b>Q W E R T Y U</b> (con <b>S D G H J</b> y <b>2 3 5 6 7</b> las negras). Pulsa <b>Grabar</b> para registrar notas, duración y silencios.</p>
                                             <div id="rb-piano" class="rb-piano" role="group" aria-label="Teclado de notas"></div>
                                             <div class="btn-row">
                                                 <button type="button" id="rb-tec-oct-menos" class="btn btn--secondary btn--sm">Octava −</button>
@@ -954,14 +945,15 @@
                                             </div>
                                             <div class="field">
                                                 <label class="field__label" for="rb-rec-nombre">Guardar la grabación con el nombre</label>
-                                                <div class="inline-form">
+                                                <div class="inline-form inline-form--ap">
                                                     <input type="text" id="rb-rec-nombre" class="input" maxlength="40" placeholder="Ej. Mi melodía">
                                                     <button type="button" id="rb-rec-guardar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-save"/></svg> Guardar</button>
                                                     <button type="button" id="rb-rec-usar" class="btn btn--secondary btn--sm">Usar como la canción</button>
                                                 </div>
                                             </div>
                                             <p id="rb-rec-info" class="msg" role="status"></p>
-                                        </div>
+                                    </div>
+                                  </details>
                                 </div>
                             </div>
                         </section>
@@ -1138,80 +1130,148 @@
                         </section>
 
                         <!-- Luces -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Yokis, control por voz" hidden>
+                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Hevy, control por voz" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Yokis</h4>
+                                    <h4 class="panel__sub">Hevy</h4>
                                     <div class="rb-jarvis">
-                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Yokis"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Yokis</span></button>
-                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
+                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Hevy"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Hevy</span><svg class="icon rb-jarvis__candado" aria-hidden="true"><use href="#i-lock"/></svg></button>
+                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status"></p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
-                                    <h4 class="rb-fn-t">La voz de Yokis</h4>
-                                    <div class="rb-calib">
-                                        <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
-                                        <label class="field"><span class="field__label">Más grave ← → más aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
-                                        <label class="field"><span class="field__label">Más calmada ← → más enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
-                                    </div>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
-                                    </div>
-                                    <p class="hint">Por defecto busca una voz masculina en español, grave y rápida. Si no te suena como quieres, elige otra voz de la lista; las voces las pone el teléfono.</p>
-                                    <h4 class="rb-fn-t">Voces entrenadas</h4>
-                                    <p class="hint">Entrena una voz con un amigo: lee unas frases, la guardas con un nombre y Yokis habla con ella. Con su propia voz solo dice las frases que se grabaron; en lo demás ajusta la voz del teléfono al tono de tu amigo. No es una clonación perfecta.</p>
-                                    <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
-                                    <div class="btn-row">
-                                        <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
-                                    </div>
-                                    <p id="rb-ent-msg" class="msg" role="status"></p>
-                                    <dialog id="rb-ent-ventana" class="rb-ventana" aria-labelledby="rb-ent-titulo">
-                                        <header class="rb-ventana__cab">
-                                            <h3 id="rb-ent-titulo">Entrenar una voz</h3>
-                                            <button type="button" id="rb-ent-cerrar" class="icon-btn" aria-label="Cerrar el entrenamiento"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
-                                        </header>
-                                        <div class="rb-ventana__cuerpo">
-                                            <div id="rb-ent-pasos" class="rb-ent-pasos">
-                                                <div class="rb-ent-prog">
-                                                    <progress id="rb-ent-prog" max="12" value="0" aria-label="Avance del entrenamiento"></progress>
-                                                    <span id="rb-ent-paso">Frase 1 de 12</span>
+                                    <div class="rb-ops">
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Voz de Hevy</span><span class="rb-op__r">Un menú con todas las voces</span></summary>
+                                            <div class="rb-op__c">
+                                                <label class="field"><span class="field__label">Voz</span><select id="rb-voz-unica" class="select"></select></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-voz-probar" class="btn btn--secondary btn--sm">Probar la voz</button>
                                                 </div>
-                                                <p class="rb-ent-pide">Que tu amigo lea en voz alta:</p>
-                                                <blockquote id="rb-ent-frase" class="rb-ent-frase"></blockquote>
-                                                <div class="rb-ent-audio">
-                                                    <button type="button" id="rb-ent-play" class="rb-ent-play" aria-label="Escuchar la grabación" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
-                                                    <canvas id="rb-ent-onda" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de la grabación"></canvas>
-                                                    <span id="rb-ent-tiempo" class="rb-ent-tiempo">0:00</span>
+                                                <p id="rb-ia-estado" class="hint" role="status"></p>
+                                                <label class="rb-check"><input type="checkbox" id="rb-habla-mueve" checked><span>Que el robot se menee al contestar</span></label>
+                                                <span class="rb-fn-t">Llaves gratis</span>
+                                                <p class="hint">Gemini: aistudio.google.com/apikey. Gradium: studio.gradium.ai (también clona voces). Sin llaves habla la voz local.</p>
+                                                <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar la IA</button>
                                                 </div>
-                                                <div class="rb-ent-botones">
-                                                    <button type="button" id="rb-ent-grabar" class="btn btn--primary">Grabar</button>
-                                                    <button type="button" id="rb-ent-sig" class="btn btn--secondary" disabled>Siguiente</button>
-                                                </div>
-                                                <p id="rb-ent-aviso" class="msg" role="status"></p>
+                                                <label class="field"><span class="field__label">Llave de Gradium</span><input type="password" id="rb-gradium-llave" class="input" autocomplete="off" spellcheck="false"></label>
                                             </div>
-                                            <div id="rb-ent-final" class="rb-ent-final" hidden>
-                                                <p class="rb-ent-pide">¡Listo! Ponle un nombre a esta voz para guardarla.</p>
-                                                <label class="field"><span class="field__label">Nombre de la voz</span><input id="rb-ent-nombre" class="input" type="text" maxlength="30" placeholder="Por ejemplo: Voz de Carlos" autocomplete="off"></label>
-                                                <div class="rb-ent-botones">
-                                                    <button type="button" id="rb-ent-guardar" class="btn btn--primary" disabled>Guardar la voz</button>
-                                                    <button type="button" id="rb-ent-atras" class="btn btn--secondary">Volver</button>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Personalidad</span><span class="rb-op__r">Seis modos</span></summary>
+                                            <div class="rb-op__c">
+                                                <div class="rb-seg rb-seg--6" role="radiogroup" aria-label="Personalidad de Hevy">
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="normal" checked><span>Normal</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="payaso"><span>Payaso</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="grosero"><span>Grosero</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="argentino"><span>Argentino</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="aura"><span>Aura</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="triste"><span>Triste</span></label>
+                                                    <label class="rb-seg__op"><input type="radio" name="rb-modo" value="cientifico"><span>Científico</span></label>
+                                                    <label class="rb-seg__op" id="rb-modo-personal" hidden><input type="radio" name="rb-modo" value="personal"><span>Personal</span></label>
+                                                </div>
+                                                <p class="hint">Payaso: chistes rancios y muchas risas. Grosero: groserías mexicanas y a veces no te hace caso. Argentino: lo mismo, con voseo y lunfardo. Triste: melancólico. Científico: respuestas técnicas. También puedes decir «Hevy, ponte triste». Parar siempre obedece.</p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Por su cuenta</span><span class="rb-op__r">Comenta y escucha solo</span></summary>
+                                            <div class="rb-op__c">
+                                                <label class="rb-check"><input type="checkbox" id="rb-solo" checked><span>Que Hevy comente cosas solo</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-escucha"><span>Escucha continua (sin tocar el micrófono)</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-cerebro" checked><span>Conversación en vivo (voz a voz con Gemini)</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-escucha-nombre"><span>En la escucha continua, exigir que empiece con «Hevy»</span></label>
+                                                <p id="rb-escucha-estado" class="hint" role="status"></p>
+                                                <p class="hint">Un toque escucha una frase; mantén pulsado el micrófono para el candado. Se apaga a los 20 minutos sin hablarle y al salir de la app. Para jugar: «Hevy, juguemos piedra, papel o tijera».</p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Memoria</span><span class="rb-op__r">Lo que recuerda y sus rutinas</span></summary>
+                                            <div class="rb-op__c">
+                                                <span class="rb-fn-t">Recuerdos</span>
+                                                <ul id="rb-memoria-lista" class="rb-mem"></ul>
+                                                <span class="rb-fn-t">Rutinas</span>
+                                                <ul id="rb-rutinas-lista" class="rb-mem"></ul>
+                                                <p class="hint">Dile «recuerda que me gusta el rock» o «cuando te diga fiesta, enciende luces de colores y gira».</p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Voces entrenadas</span><span class="rb-op__r">Con la voz de un amigo</span></summary>
+                                            <div class="rb-op__c">
+                                                <p class="hint">Un amigo lee las frases y Hevy las usa con su voz. Con «Clonar con IA» (usa tu llave de Gradium, en Voz de Hevy; hasta 5 clones gratis) habla cualquier frase con esa voz. La muestra se sube a Gradium: pídele permiso.</p>
+                                                <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
+                                                </div>
+                                                <p id="rb-ent-msg" class="msg" role="status"></p>
+                                                <dialog id="rb-ent-ventana" class="rb-ventana" aria-labelledby="rb-ent-titulo">
+                                                    <header class="rb-ventana__cab">
+                                                        <h3 id="rb-ent-titulo">Entrenar una voz</h3>
+                                                        <button type="button" id="rb-ent-cerrar" class="icon-btn" aria-label="Cerrar el entrenamiento"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                                                    </header>
+                                                    <div class="rb-ventana__cuerpo">
+                                                        <div id="rb-ent-pasos" class="rb-ent-pasos">
+                                                            <div class="rb-ent-prog">
+                                                                <progress id="rb-ent-prog" max="12" value="0" aria-label="Avance del entrenamiento"></progress>
+                                                                <span id="rb-ent-paso">Frase 1 de 12</span>
+                                                            </div>
+                                                            <p class="rb-ent-pide">Que tu amigo lea en voz alta:</p>
+                                                            <blockquote id="rb-ent-frase" class="rb-ent-frase"></blockquote>
+                                                            <div class="rb-ent-audio">
+                                                                <button type="button" id="rb-ent-play" class="rb-ent-play" aria-label="Escuchar la grabación" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
+                                                                <canvas id="rb-ent-onda" class="rb-ent-onda" width="288" height="44" aria-label="Nivel de volumen de la grabación"></canvas>
+                                                                <span id="rb-ent-tiempo" class="rb-ent-tiempo">0:00</span>
+                                                            </div>
+                                                            <div class="rb-ent-botones">
+                                                                <button type="button" id="rb-ent-grabar" class="btn btn--primary">Grabar</button>
+                                                                <button type="button" id="rb-ent-sig" class="btn btn--secondary" disabled>Siguiente</button>
+                                                            </div>
+                                                            <p id="rb-ent-aviso" class="msg" role="status"></p>
+                                                        </div>
+                                                        <div id="rb-ent-final" class="rb-ent-final" hidden>
+                                                            <p class="rb-ent-pide">¡Listo! Ponle un nombre a esta voz para guardarla.</p>
+                                                            <label class="field"><span class="field__label">Nombre de la voz</span><input id="rb-ent-nombre" class="input" type="text" maxlength="30" placeholder="Por ejemplo: Voz de Carlos" autocomplete="off"></label>
+                                                            <div class="rb-ent-botones">
+                                                                <button type="button" id="rb-ent-guardar" class="btn btn--primary" disabled>Guardar la voz</button>
+                                                                <button type="button" id="rb-ent-atras" class="btn btn--secondary">Volver</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </dialog>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Facts</span><span class="rb-op__r">«Hevy, tírate un fact»</span></summary>
+                                            <div class="rb-op__c">
+                                                <div class="field">
+                                                    <label class="field__label" for="rb-fact-texto">Un fact por línea</label>
+                                                    <textarea id="rb-fact-texto" class="textarea" rows="4" spellcheck="true"></textarea>
+                                                </div>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-fact-probar" class="btn btn--secondary btn--sm">Probar</button>
+                                                    <button type="button" id="rb-fact-restaurar" class="btn btn--secondary btn--sm">Volver a los de fábrica</button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </dialog>
-                                    <h4 class="rb-fn-t">Prueba con estas frases</h4>
-                                    <ul class="rb-frases">
-                                        <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
-                                        <li><b>Girar</b><span>«Yokis, gira a la derecha», «Yokis, gira cuarenta y cinco grados», «Yokis, da la vuelta»</span></li>
-                                        <li><b>Dibujar</b><span>«Yokis, dibuja un círculo», «Yokis, hazme una estrella»</span></li>
-                                        <li><b>Funciones</b><span>«Yokis, inicia la función zigzag», «Yokis, sigue la línea», «Yokis, activa esquivar obstáculos»</span></li>
-                                        <li><b>Canciones</b><span>«Yokis, toca estrellita», «Yokis, pon la canción de la cucaracha», «Yokis, detén la música»</span></li>
-                                        <li><b>Baile</b><span>«Yokis, baila», «Yokis, baila el zigzag con estrellita», «Yokis, deja de bailar»</span></li>
-                                        <li><b>Plática</b><span>«Yokis, cómo estás», «Yokis, cuéntame un chiste», «Yokis, qué hora es», «Yokis, gracias»</span></li>
-                                        <li><b>Luces</b><span>«Yokis, enciende las luces rojas», «Yokis, luces arcoíris», «Yokis, apaga las luces»</span></li>
-                                        <li><b>Casa y sensor</b><span>«Yokis, regresa a casa», «Yokis, haz un radar», «Yokis, activa la guardia»</span></li>
-                                        <li><b>Otros</b><span>«Yokis, toca el claxon», «Yokis, cuánta batería tienes», «Yokis, para»</span></li>
-                                    </ul>
-                                    <p class="hint">Empieza siempre con «Yokis»: sin eso no obedece. Se escucha una orden por toque y el robot tiene que estar conectado. El turbo solo se usa desde el mando.</p>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Qué decirle</span><span class="rb-op__r">Frases para probar</span></summary>
+                                            <div class="rb-op__c">
+                                                <ul class="rb-frases">
+                                                    <li><b>Moverse</b><span>«Hevy, avanza dos metros», «Hevy, ve para atrás tres segundos»</span></li>
+                                                    <li><b>Girar</b><span>«Hevy, gira a la derecha», «Hevy, gira cuarenta y cinco grados», «Hevy, da la vuelta»</span></li>
+                                                    <li><b>Dibujar</b><span>«Hevy, dibuja un círculo», «Hevy, hazme una estrella»</span></li>
+                                                    <li><b>Funciones</b><span>«Hevy, inicia la función zigzag», «Hevy, sigue la línea», «Hevy, activa esquivar obstáculos»</span></li>
+                                                    <li><b>Canciones</b><span>«Hevy, toca estrellita», «Hevy, pon la canción de la cucaracha», «Hevy, detén la música»</span></li>
+                                                    <li><b>Baile</b><span>«Hevy, baila», «Hevy, baila el zigzag con estrellita», «Hevy, deja de bailar»</span></li>
+                                                    <li><b>Plática</b><span>«Hevy, cómo estás», «Hevy, cuéntame un chiste», «Hevy, qué hora es», «Hevy, gracias»</span></li>
+                                                    <li><b>Luces</b><span>«Hevy, enciende las luces rojas», «Hevy, luces arcoíris», «Hevy, apaga las luces»</span></li>
+                                                    <li><b>Casa y sensor</b><span>«Hevy, regresa a casa», «Hevy, haz un radar», «Hevy, activa la guardia»</span></li>
+                                                    <li><b>Otros</b><span>«Hevy, toca el claxon», «Hevy, cuánta batería tienes», «Hevy, para»</span></li>
+                                                </ul>
+                                                <p class="hint">Empieza siempre con «Hevy». Una orden por toque y con el robot conectado. El turbo solo desde el mando.</p>
+                                            </div>
+                                        </details>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -1232,18 +1292,28 @@
                                         <button type="button" id="rb-lienzo-ir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Recorrer</button>
                                         <button type="button" id="rb-lienzo-borrar" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Borrar</button>
                                     </div>
-                                    <h4 class="rb-fn-t">Regresar a casa</h4>
-                                    <p class="hint">Marca un punto de salida y maneja con el mando; después el robot deshace lo que recorrió.</p>
+                                    <div class="rb-ops">
+                                    <details class="rb-op">
+                                    <summary><span class="rb-op__t">Regresar a casa</span><span class="rb-op__r">Deshace lo que recorrió</span></summary>
+                                    <div class="rb-op__c">
+                                    <p class="hint">Marca un punto de salida y maneja con el mando; después el robot vuelve solo.</p>
                                     <div class="btn-row">
                                         <button type="button" id="rb-casa-marca" class="btn btn--secondary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-casa"/></svg> Marcar casa aquí</button>
                                         <button type="button" id="rb-casa-ir" class="btn btn--primary btn--sm">Regresar a casa</button>
                                     </div>
-                                    <h4 class="rb-fn-t">Calibración</h4>
+                                    </div>
+                                    </details>
+                                    <details class="rb-op">
+                                    <summary><span class="rb-op__t">Calibración</span><span class="rb-op__r">Para que el dibujo salga medido</span></summary>
+                                    <div class="rb-op__c">
                                     <div class="rb-calib">
                                         <label class="field"><span class="field__label">Velocidad (cm por segundo)</span><input id="rb-cal-vel" class="input" type="number" inputmode="numeric" min="5" max="80" step="1" value="22"></label>
                                         <label class="field"><span class="field__label">Giro de 90° (ms)</span><input id="rb-cal-giro" class="input" type="number" inputmode="numeric" min="150" max="2000" step="10" value="500"></label>
                                     </div>
-                                    <p class="hint">Sin sensores en las ruedas el dibujo es aproximado: mide lo que avanza en 1 s y lo que tarda en girar 90° y pon esos valores. Se guardan solos.</p>
+                                    <p class="hint">Mide lo que avanza en 1 s y lo que tarda en girar 90° y pon esos valores. Se guardan solos.</p>
+                                    </div>
+                                    </details>
+                                    </div>
                                     <p id="rb-dib-msg" class="msg" role="status"></p>
                                 </div>
                             </div>
@@ -1255,16 +1325,18 @@
                                     <div class="rb-leds">
                                         <div id="rb-anillo" class="rb-anillo" role="group" aria-label="Los 12 LEDs del anillo; elige uno para cambiarle el color"></div>
                                         <div class="stack">
-                                            <div class="field">
-                                                <label class="field__label" for="rb-led-color">Color del LED elegido</label>
-                                                <input type="color" id="rb-led-color" class="rb-color">
-                                            </div>
-                                            <div class="btn-row">
-                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos de ese color</button>
+                                            <div class="rb-led-sel" role="group" aria-label="LED elegido">
+                                                <button type="button" id="rb-led-ant" class="rb-led-sel__paso" aria-label="LED anterior"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+                                                <div class="rb-led-sel__info" role="status" aria-live="polite"><span class="rb-led-sel__dot" id="rb-led-dot"></span><span><b id="rb-led-nombre">LED 1</b><small id="rb-led-color-nombre"></small></span></div>
+                                                <button type="button" id="rb-led-sig" class="rb-led-sel__paso" aria-label="LED siguiente"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
                                             </div>
                                             <div>
-                                                <span class="field__label" id="rb-paleta-label">Colores rápidos (pintan todos)</span>
-                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"></div>
+                                                <span class="field__label" id="rb-paleta-label">Toca un color para pintar ese LED</span>
+                                                <div id="rb-paleta" class="rb-paleta" role="group" aria-labelledby="rb-paleta-label"><label class="rb-sw rb-sw--otro" title="Otro color"><input type="color" id="rb-led-color" class="sr-only" aria-label="Otro color para el LED"><span class="rb-sw__dot rb-sw__dot--arco"></span><span class="rb-sw__name">Otro</span></label></div>
+                                            </div>
+                                            <div class="btn-row">
+                                                <button type="button" id="rb-led-todos" class="btn btn--secondary btn--sm">Pintar todos así</button>
+                                                <button type="button" id="rb-led-apagar" class="btn btn--secondary btn--sm">Apagar este LED</button>
                                             </div>
                                             <div class="field">
                                                 <label class="field__label" for="rb-brillo">Brillo: <span id="rb-brillo-v"></span></label>
@@ -1286,36 +1358,51 @@
                         </section>
 
                         <!-- Instalar el programa -->
+                        <section class="panel admin-sec rb-panel" id="sec-robot-telefono" data-section="robot-telefono" role="tabpanel" aria-label="Teléfonos compartidos" hidden>
+                            <div class="panel__body">
+                                <div class="rb-card rb-card--ancho">
+                                    <h4 class="panel__sub">Teléfono</h4>
+                                    <p id="rb-tel-aviso" class="rb-tel__aviso" role="status" hidden></p>
+                                    <div class="rb-ops">
+                                        <details class="rb-op" open>
+                                            <summary><span class="rb-op__t">Mi teléfono</span><span class="rb-op__r">Nombre, sala y compartir</span></summary>
+                                            <div class="rb-op__c">
+                                                <label class="field"><span class="field__label">Mi nombre</span><input type="text" id="rb-tel-nombre" class="input" maxlength="20" autocomplete="off"></label>
+                                                <label class="field"><span class="field__label">Código de sala</span><input type="text" id="rb-tel-sala" class="input" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-tel-crear" class="btn btn--secondary btn--sm">Crear sala nueva</button>
+                                                    <button type="button" id="rb-tel-borrar" class="btn btn--secondary btn--sm">Borrar mi punto</button>
+                                                </div>
+                                                <label class="rb-check"><input type="checkbox" id="rb-tel-compartir"><span>Compartir mi ubicación con la sala</span></label>
+                                                <p id="rb-tel-estado" class="hint" role="status"></p>
+                                                <p class="hint">Solo ven tu ubicación quienes tengan el código y también estén compartiendo. Se borra al apagar, a los 3 minutos sin señal y al cerrar la app. Para que Hevy te busque, pon el celular plano sobre el robot con la parte de arriba hacia el frente.</p>
+                                            </div>
+                                        </details>
+                                    </div>
+                                    <span class="rb-fn-t">Teléfonos en la sala</span>
+                                    <canvas id="rb-tel-radar" class="rb-lienzo" width="300" height="300" aria-label="Radar de teléfonos"></canvas>
+                                    <ul id="rb-tel-lista" class="rb-mem"></ul>
+                                    <div class="btn-row"><button type="button" id="rb-tel-parar" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar la búsqueda</button></div>
+                                </div>
+                            </div>
+                        </section>
+
                         <section class="panel admin-sec rb-panel" id="sec-robot-instalar" data-section="robot-instalar" role="tabpanel" aria-label="Instalar el programa en el robot" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Conexión</h4>
                                     <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (se llama «Makeblock_LE…»). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
-                                    <p class="hint" data-solo="web">Conecta el robot por USB y abre esta página en Chrome o Edge. Mientras esté conectado, lo que cambies aquí se aplica en el robot al instante: las luces enseguida y la canción o el baile reiniciándose con el cambio.</p>
                                     <div class="btn-row">
                                     <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
                                     <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
                                     <label class="rb-check"><input type="checkbox" id="rb-vivo" checked><span>Actualizar el robot en cuanto cambio algo</span></label>
                                 </div>
-                                    <p class="hint" data-solo="web"><button type="button" id="rb-todos" class="chip__link">¿No aparece tu robot en la lista? Mostrar todos los puertos</button></p>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Enlace Bluetooth</h4>
                                     <p class="hint">Aquí aparece lo que el módulo Bluetooth del robot ofrece (servicio, escritura y avisos). Si algo no conecta, mándame este texto.</p>
                                     <pre id="rb-bt-info" class="rb-bt-info">Sin conectar todavía.</pre>
-                                </div>
-
-                                <div class="rb-card rb-card--ancho" data-solo="web">
-                                    <details id="rb-instalar" class="rb-instalar" open>
-                                    <summary>Instalar el programa en el robot (una sola vez)</summary>
-                                    <ol>
-                                        <li>Descarga <a href="robot/mbot_ranger_web/mbot_ranger_web.ino" download>mbot_ranger_web.ino</a> y ábrelo en el IDE de Arduino (la carpeta debe llamarse <b>mbot_ranger_web</b>).</li>
-                                        <li>Placa: <b>Arduino Mega or Mega 2560</b>. Librería: Makeblock-Libraries (<b>MeAuriga.h</b>). Si marca error en <b>MeSuperVariable.cpp</b>, deja instalada solo la copia <b>MakeBlock_Drive_Updated</b>.</li>
-                                        <li>Con el robot conectado por USB, pulsa Subir. Conserva los modos del botón de la placa y añade un modo nuevo, el 4, que es el de la página. Si ya tenías una versión anterior, vuelve a subirlo para que las luces corran solas y se queden guardadas.</li>
-                                        <li>Cierra el IDE (y mBlock) para que no tengan ocupado el puerto, y pulsa <b>Conectar el robot</b>.</li>
-                                    </ol>
-                                </details>
                                 </div>
 
                                 <div class="rb-card rb-card--ancho">
@@ -1340,7 +1427,6 @@
                                         <div class="btn-row"><button type="button" id="rb-bat-borrar" class="btn btn--secondary btn--sm">Borrar el historial de consumo</button></div>
                                     </div>
                                 </details>
-                                    <p id="rb-diag" class="hint" hidden><span id="rb-diag-txt"></span> <button type="button" id="rb-diag-borrar" class="chip__link">Borrar este aviso</button></p>
                                 </div>
                                 <div class="rb-card rb-card--ancho" data-solo="android">
                                     <h4 class="panel__sub">Sesión</h4>
@@ -1351,10 +1437,12 @@
                             </div>
                         </section>
 
+                        <div id="rb-toast" class="rb-toast" role="status" aria-live="polite"></div>
+
                         <!-- Barra fija del apartado Robot: parar y reproducir lo de la sección -->
                         <div class="rb-barra" role="toolbar" aria-label="Controles generales del robot">
-                            <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar todo</button>
-                            <button type="button" id="rb-barra-play" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg> Reproducir</button>
+                            <button type="button" id="rb-barra-paro" class="btn btn--secondary rb-paro rb-barra__cuadro" aria-label="Parar todo" title="Parar todo"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg></button>
+                            <button type="button" id="rb-barra-play" class="btn btn--primary rb-barra__cuadro" aria-label="Reproducir" title="Reproducir"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
                             <span class="rb-barra__que">Reproduce: <b id="rb-barra-que">la canción</b></span>
                             <progress id="rb-prog" class="rb-prog" max="1" value="0" aria-label="Avance de la canción o del baile"></progress>
                             <p id="rb-msg" class="msg" role="status"></p>
@@ -1435,6 +1523,43 @@
         </form>
     </dialog>
 
+    <dialog id="admin-form-modal" class="modal" aria-labelledby="admin-form-titulo">
+        <div class="modal__head">
+            <h3 id="admin-form-titulo" class="modal__title">Nuevo admin</h3>
+            <button type="button" onclick="cerrarFormAdmin()" class="modal__close" aria-label="Cerrar">
+                <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <form id="admin-form" onsubmit="guardarAdmin(event)" class="modal__body" autocomplete="off">
+            <input type="hidden" id="admin-form-id">
+            <div class="field">
+                <label class="field__label" for="admin-form-nombre">Nombre</label>
+                <input type="text" id="admin-form-nombre" required maxlength="30" placeholder="Ej. Prefectura" class="input">
+            </div>
+            <div class="field">
+                <label class="field__label" for="admin-form-clave" id="admin-form-clave-et">Contraseña</label>
+                <div class="clave-fila">
+                    <input type="password" id="admin-form-clave" maxlength="64" autocomplete="new-password" placeholder="6 a 64 caracteres" class="input">
+                    <button type="button" id="admin-form-ver" class="btn btn--secondary btn--sm" aria-pressed="false">Ver</button>
+                    <button type="button" id="admin-form-gen" class="btn btn--secondary btn--sm">Generar</button>
+                </div>
+            </div>
+            <fieldset class="permisos">
+                <legend class="field__label">Qué puede hacer</legend>
+                <div class="permisos__acc">
+                    <button type="button" class="btn btn--secondary btn--sm" id="admin-perm-todos">Todos</button>
+                    <button type="button" class="btn btn--secondary btn--sm" id="admin-perm-ninguno">Ninguno</button>
+                </div>
+                <div id="admin-form-permisos" class="permisos__grupos"></div>
+            </fieldset>
+            <p id="admin-form-error" class="msg msg--err" role="alert" hidden></p>
+            <div class="modal__foot">
+                <button type="button" onclick="cerrarFormAdmin()" class="btn btn--secondary">Cancelar</button>
+                <button type="submit" id="admin-form-guardar" class="btn btn--primary">Guardar</button>
+            </div>
+        </form>
+    </dialog>
+
     <script src="js/api.js"></script>
     <script src="js/ayudas.js"></script>
     <script src="js/plataforma.js"></script>
@@ -1443,10 +1568,8 @@
     <script src="calendario.js"></script>
     <script src="timbre.js"></script>
     <script src="timbre-estado.js"></script>
-    <script src="robot.js"></script> <!-- @robot:line -->
-    <script src="js/robot-bluetooth.js"></script> <!-- @robot:line -->
-    <script src="js/robot-control.js"></script> <!-- @robot:line -->
-    <script src="js/robot-extras.js"></script> <!-- @robot:line -->
+    <script>if (document.documentElement.classList.contains('es-app')) ['robot.js', 'js/robot-bluetooth.js', 'js/robot-control.js', 'js/robot-extras.js', 'js/robot-telefono.js'].forEach(function (s) { document.write('<script src="' + s + '"><\/script>'); });</script> <!-- @robot:line -->
+    <script src="js/admins.js"></script>
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>

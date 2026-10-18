@@ -44,6 +44,6 @@ if (!fs.existsSync(origen)) {
     process.exit(1);
 }
 fs.mkdirSync(ENTREGA, { recursive: true });
-const destino = path.join(ENTREGA, 'CECyTE-18-' + APK.versionName + (debug ? '-debug' : '') + '.apk');
+const destino = path.join(ENTREGA, 'CECyTE-18-' + APK.versionName + (debug ? '-debug' : '') + (process.env.CECYTE_CLAVES === '1' ? '-personal' : '') + '.apk');
 fs.copyFileSync(origen, destino);
 console.log('APK listo: ' + destino + ' (' + (fs.statSync(destino).size / 1048576).toFixed(1) + ' MB)');

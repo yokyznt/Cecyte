@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { kv } from '@vercel/kv';
-import { verifyToken, adminToken } from '../lib/auth.js';
+import { exigir } from '../lib/admins.js';
 
 const KEY = 'cecyte_changes';
 const MAX = 100;
@@ -34,9 +34,7 @@ export default async function handler(req, res) {
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-    if (!verifyToken(adminToken(req))) {
-        return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
-    }
+    if (!(await exigir(req, res, kv, 'alertas'))) return;
 
     const b = req.body || {};
     try {

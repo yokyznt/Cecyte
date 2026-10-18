@@ -5,11 +5,12 @@
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/geolocation": "^8.2.4",
     "@vercel/kv": "^1.0.1",
     "web-push": "^3.6.7"
   },
   "scripts": {
-    "test": "node test/robot.test.js && node test/robot-bluetooth.test.js && node test/admin-secciones.test.js && node test/timbre.test.js && node test/calendario.test.js && node test/widget.test.js && node test/build-www.test.js && node --no-warnings test/api.test.mjs && node --no-warnings test/api-seguridad.test.mjs && node --no-warnings test/api-cambios.test.mjs && node --no-warnings test/aviso.test.mjs",
+    "test": "node test/robot.test.js && node test/robot-bluetooth.test.js && node test/admin-secciones.test.js && node test/timbre.test.js && node test/calendario.test.js && node test/widget.test.js && node test/build-www.test.js && node --no-warnings test/api.test.mjs && node --no-warnings test/api-seguridad.test.mjs && node --no-warnings test/api-cambios.test.mjs && node --no-warnings test/aviso.test.mjs && node --no-warnings test/api-telefonos.test.mjs && node --no-warnings test/api-admins.test.mjs",
     "www": "node scripts/build-www.js",
     "android:sync": "node scripts/build-www.js && npx cap sync android",
     "android:apk": "npm run android:sync && node scripts/build-apk.js"

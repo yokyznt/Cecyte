@@ -10,3 +10,5 @@ www/
 *.apk
 keystore.properties
 android/local.properties
+config/claves-locales.json
+config/modo-personal.json

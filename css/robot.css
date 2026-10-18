@@ -1,7 +1,6 @@
 /* Robot mBot Ranger (solo web de escritorio; el APK no lo incluye) */
 
 /* ==================== Robot mBot Ranger ==================== */
-@media (min-width: 1100px) { .admin-top .panel__body > .rb-full { grid-column: 1 / -1; } }
 
 .rb-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
 .rb-check input { width: 20px; height: 20px; accent-color: var(--green-700); }
@@ -31,16 +30,21 @@
 .rb-sw { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; min-height: 44px; padding: 4px 2px; border: 0; background: transparent; cursor: pointer; }
 .rb-sw__dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c); transition: scale 120ms var(--ease-out); }
 .rb-sw__name { font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
+.rb-paleta .rb-sw { inline-size: auto; block-size: auto; min-inline-size: 56px; min-block-size: 44px; padding: 4px 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .rb-sw:hover .rb-sw__dot { scale: 1.1; }
+.rb-sw[aria-pressed="true"] .rb-sw__dot { outline: 3px solid var(--green-700); outline-offset: 2px; }
+.rb-sw--otro:focus-within { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
+.rb-sw__dot--arco { background: conic-gradient(#ff2a2a, #ffd400, #22d05a, #19c9ff, #7a3dff, #ff2a2a); }
+.rb-led-sel { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
+.rb-led-sel__paso { inline-size: 48px; block-size: 48px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.rb-led-sel__paso .icon { inline-size: 24px; block-size: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.rb-led-sel__paso:active { translate: 0 2px; }
+.rb-led-sel__info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rb-led-sel__info b { display: block; font-size: var(--fs-md); }
+.rb-led-sel__info small { display: block; color: var(--ink-2); font-size: var(--fs-sm); }
+.rb-led-sel__dot { inline-size: 40px; block-size: 40px; flex: none; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--c, #000); box-shadow: inset 0 0 0 2px var(--surface); }
 .rb-sw:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; border-radius: var(--r-sm); }
 
-.rb-audio { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
-.rb-audio summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.rb-audio[open] > .stack { padding-bottom: 12px; }
-.rb-instalar { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--green-50); padding: 8px 16px; }
-.rb-instalar summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.rb-instalar ol { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
-.rb-instalar a { color: var(--green-800); font-weight: 700; }
 
 /* Funciones por modelo: tarjetas con icono agrupadas por tipo, la elegida resaltada */
 .rb-fn-grupo { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -110,11 +114,26 @@
 .rb-jarvis__mic .icon { width: 28px; height: 28px; }
 .rb-jarvis__mic:active { transform: scale(0.97); }
 .rb-jarvis__mic.is-activo { background: var(--orange-700); animation: rb-latido 0.9s ease-in-out infinite; }
+.rb-jarvis__candado { display: none; }
+.rb-jarvis__mic.is-escuchando {
+    background: var(--orange-700); outline: 3px solid var(--orange-700); outline-offset: 3px;
+    transform: scale(calc(1 + var(--nivel, 0) * 0.28)); box-shadow: 0 0 0 calc(var(--nivel, 0) * 16px) oklch(0.7 0.16 55 / 0.35);
+    transition: transform 70ms linear, box-shadow 70ms linear, background-color 150ms;
+}
+@media (prefers-reduced-motion: reduce) { .rb-jarvis__mic.is-escuchando { transform: none; } }
+.rb-jarvis__mic.is-candado .rb-jarvis__candado { display: block; }
+.rb-jarvis__mic { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .rb-jarvis__estado { margin: 0; min-height: 1.4em; text-align: center; font-weight: 600; color: var(--ink-2); }
 .rb-jarvis__hist { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 6px; }
 .rb-jarvis__hist li { padding: 8px 12px; border-radius: var(--r-md); font-size: var(--fs-sm); max-width: 86%; }
 .rb-jarvis__hist .is-yo { align-self: flex-end; background: var(--green-100); color: var(--green-900); }
 .rb-jarvis__hist .is-jarvis { align-self: flex-start; background: var(--page); color: var(--ink); }
+.rb-jarvis__hist .is-vivo { opacity: 0.75; font-style: italic; }
+.rb-tel__aviso { margin: 0 0 10px; padding: 8px 12px; border-radius: var(--r-md); background: var(--orange-100, #fde8d4); color: var(--orange-900, #7a3b00); font-size: var(--fs-sm); font-weight: 700; }
+.rb-mem { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.rb-mem li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-md); font-size: var(--fs-sm); }
+.rb-mem li span { min-width: 0; overflow-wrap: anywhere; }
+.rb-mem .rb-mem__vacio { color: var(--ink-3); border-style: dashed; justify-content: center; }
 .rb-frases { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .rb-frases li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); font-size: var(--fs-sm); }
 .rb-frases b { color: var(--green-800); }
@@ -144,14 +163,74 @@
 .rb-ajustes summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .rb-ajustes[open] > .stack { padding-bottom: 12px; }
 
+.rb-ops { display: grid; gap: 10px; margin-top: 14px; }
+.rb-op { border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--surface); }
+.rb-op > summary {
+    list-style: none; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center;
+    min-height: 60px; padding: 10px 16px; border-radius: var(--r-lg); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rb-op > summary::-webkit-details-marker { display: none; }
+.rb-op > summary::after {
+    content: ''; grid-column: 2; grid-row: 1 / span 2; width: 14px; height: 14px; background: var(--ink-3); transition: transform 200ms var(--ease-out);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.rb-op[open] > summary::after { transform: rotate(180deg); }
+.rb-op[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.rb-op > summary:focus-visible { outline: 2px solid var(--green-700); outline-offset: -2px; }
+.rb-op__t { font-weight: 800; }
+.rb-op__r { grid-column: 1; font-size: var(--fs-cap); color: var(--ink-3); }
+.rb-op__c { display: grid; gap: 14px; padding: 14px 16px 16px; }
+.rb-op__c > .hint, .rb-op__c .field { margin: 0; }
+
+.inline-form--ap { flex-wrap: wrap; }
+.inline-form--ap .input { flex: 1 1 100%; }
+
+.rb-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); }
+.rb-seg--3 { grid-template-columns: repeat(3, 1fr); }
+.rb-seg--6 { grid-template-columns: repeat(3, 1fr); border-radius: 22px; }
+.rb-seg__op[hidden] { display: none; }
+.rb-seg--6:not(:has(#rb-modo-personal:not([hidden]))) .rb-seg__op:nth-child(7) { grid-column: 1 / -1; }
+.rb-seg--6:has(#rb-modo-personal:not([hidden])) #rb-modo-personal { grid-column: 2 / 4; }
+.rb-seg__op { position: relative; display: block; }
+.rb-seg__op input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.rb-seg__op span {
+    display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; border-radius: 99px;
+    font-size: var(--fs-sm); font-weight: 700; color: var(--ink-2); text-align: center; transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.rb-seg__op input:checked + span { background: var(--green-700); color: #fff; box-shadow: var(--shadow-1); }
+.rb-seg__op input:focus-visible + span { outline: 2px solid var(--green-700); outline-offset: 2px; }
+
 /* Barra fija del apartado Robot: parar y reproducir lo de la sección que se está viendo */
 .rb-barra {
     position: sticky; bottom: 12px; z-index: 25; margin-top: 18px;
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-    padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 14px;
-    background: var(--surface); box-shadow: 0 8px 24px -14px rgb(0 0 0 / 0.45);
+    padding: 0; pointer-events: none;
 }
+.rb-barra > * { pointer-events: auto; }
+.rb-barra .btn { box-shadow: 0 6px 16px -6px rgb(0 0 0 / 0.5); }
+.rb-barra #rb-msg { display: none; }
+.rb-barra__cuadro { position: relative; transition: transform 0.12s ease; }
+.rb-barra__cuadro:active { transform: scale(0.88); }
+.rb-barra__cuadro::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 3px solid currentColor; opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+    .rb-barra__cuadro.is-pulso::after { animation: rb-anillo 0.55s ease-out; }
+    .rb-barra__cuadro.is-pulso .icon { animation: rb-pop 0.45s cubic-bezier(0.25, 1, 0.5, 1); }
+}
+@keyframes rb-anillo { from { opacity: 0.85; transform: scale(1); } to { opacity: 0; transform: scale(1.8); } }
+@keyframes rb-pop { 0% { transform: scale(1); } 40% { transform: scale(1.4) rotate(-10deg); } 100% { transform: scale(1); } }
+.rb-toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 90;
+    translate: -50% -160%; opacity: 0; pointer-events: none; max-inline-size: min(92vw, 520px);
+    padding: 10px 16px; border-radius: 14px; background: var(--ink, #1c2a22); color: #fff; font-size: var(--fs-sm); text-align: center;
+    box-shadow: 0 10px 28px -10px rgb(0 0 0 / 0.5); transition: translate 0.28s ease, opacity 0.28s ease;
+}
+.rb-toast.is-visible { translate: -50% 0; opacity: 1; }
+.rb-toast--err { background: var(--rose-700, #b3261e); }
+.rb-barra .rb-prog { background: var(--surface); border-radius: 8px; }
 .rb-barra .btn { min-height: 48px; }
+.rb-barra .rb-barra__cuadro { flex: none; inline-size: 52px; block-size: 52px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 12px; }
+.rb-barra .rb-barra__cuadro .icon { inline-size: 24px; block-size: 24px; margin: 0; }
 .rb-barra__que { font-size: var(--fs-sm); color: var(--ink-2); }
 .rb-barra__que b { color: var(--ink); }
 
@@ -268,7 +347,10 @@
 .rb-btn[hidden] { display: none; }
 
 /* Barra de arriba */
-.rb-mando__barra { display: flex; align-items: center; gap: 12px; padding: 10px 14px 8px; }
+.rb-mando__barra { display: flex; align-items: center; gap: 16px; padding: 10px 14px 8px; }
+.rb-grupo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rb-grupo--info { flex: 1; justify-content: center; }
+.rb-grupo--herr { margin-left: auto; }
 .rb-estado { display: grid; place-items: center; width: 24px; height: 44px; }
 .rb-estado__punto { width: 12px; height: 12px; border-radius: 50%; background: oklch(0.5 0.02 160); transition: background 0.2s, box-shadow 0.2s; }
 .is-listo .rb-estado__punto { background: var(--m-verde); box-shadow: 0 0 0 4px oklch(0.78 0.17 150 / 0.25); }
@@ -279,7 +361,9 @@
 
 /* Cuerpo: palanca (o inclinar) · paro y velocidad · botones de acción */
 .rb-mando__cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2vw; padding: 0 3vw 10px; }
-.rb-joy, .rb-incl { grid-column: 1; grid-row: 1; }
+.rb-joy, .rb-incl, .rb-flechas, .rb-pedales--dir { grid-column: 1; grid-row: 1; }
+.rb-centro { grid-column: 2; grid-row: 1; }
+.rb-caras, .rb-pedales--gas { grid-column: 3; grid-row: 1; }
 
 /* Palanca */
 .rb-joy {
@@ -410,16 +494,76 @@
 .rb-incl__txt:empty { display: none; }
 
 /* Turbo: botón en la barra y el mando cambia de color; lo demás queda apagado */
-.rb-turbo { width: 64px; height: 44px; margin-left: auto; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
+.rb-turbo { width: 64px; height: 44px; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
 .rb-turbo .icon { width: 24px; height: 24px; fill: currentColor; stroke-width: 1.6; }
 .rb-btn.rb-turbo[aria-pressed="true"] { background: var(--m-naranja); color: var(--m-base); }
+.rb-dir-cal { display: none; }
+.rb-mando.es-dir .rb-dir-cal { display: grid; }
 .rb-alerta { padding: 4px 10px; border-radius: 999px; background: oklch(0.55 0.2 27); color: oklch(0.98 0 0); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 .rb-turbo.is-enfriando { animation: rb-latido 0.6s ease-in-out infinite; }
 .es-turbo .rb-caras, .es-turbo .rb-vel input { opacity: 0.3; pointer-events: none; }
 .es-turbo .rb-joy__mando { background: radial-gradient(circle at 38% 32%, oklch(0.9 0.12 70), var(--m-naranja) 45%, oklch(0.62 0.17 48)); box-shadow: 0 6px 0 oklch(0.42 0.1 48), 0 10px 18px oklch(0 0 0 / 0.5), inset 0 2px 0 oklch(1 0 0 / 0.35); }
 
+/* Botón del celular: normal → inclinar → dirección (brújula). Naranja = dirección */
+.rb-cara--incl { position: relative; }
+.rb-cara--incl .ico-dir { display: none; }
+.rb-cara--incl[data-modo="2"] .ico-cel { display: none; }
+.rb-cara--incl[data-modo="2"] .ico-dir { display: block; }
+.rb-cara--incl[data-modo="2"] { background: var(--m-naranja); box-shadow: 0 5px 0 var(--m-base), 0 0 0 3px var(--m-naranja); }
+.rb-cara--incl.is-sin-brujula::after { content: ''; position: absolute; inset-block-start: 8%; inset-inline-end: 8%; inline-size: 11px; block-size: 11px; border-radius: 50%; background: var(--m-rojo); box-shadow: 0 0 0 2px var(--m-base); }
+
+/* Estilo de control: palanca · flechas · pedales (el botón de la barra muestra el que está puesto) */
+.rb-estilo .icon { display: none; }
+.rb-estilo[data-estilo="palanca"] .ico-palanca, .rb-estilo[data-estilo="flechas"] .ico-flechas, .rb-estilo[data-estilo="pedales"] .ico-pedales { display: block; }
+.rb-flechas { display: none; width: calc(var(--t) * 2.9); height: calc(var(--t) * 2.9); grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr)); gap: calc(var(--t) * 0.14); }
+.rb-flecha { border-radius: 24%; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.rb-flecha .icon { width: calc(var(--t) * 0.5); height: calc(var(--t) * 0.5); stroke-width: 2.8; }
+.rb-flecha--arriba { grid-area: 1 / 2; }
+.rb-flecha--izq { grid-area: 2 / 1; }
+.rb-flecha--der { grid-area: 2 / 3; }
+.rb-flecha--abajo { grid-area: 3 / 2; }
+.rb-flecha--adel-izq { grid-area: 1 / 1; }
+.rb-flecha--adel-der { grid-area: 1 / 3; }
+.rb-flecha--atras-izq { grid-area: 3 / 1; }
+.rb-flecha--atras-der { grid-area: 3 / 3; }
+.rb-flecha--adel-izq .icon { rotate: -45deg; }
+.rb-flecha--adel-der .icon { rotate: 45deg; }
+.rb-flecha--atras-izq .icon { rotate: -135deg; }
+.rb-flecha--atras-der .icon { rotate: 135deg; }
+.rb-flecha--izq .icon { rotate: -90deg; }
+.rb-flecha--der .icon { rotate: 90deg; }
+.rb-flecha--abajo .icon { rotate: 180deg; }
+.rb-pedales { display: none; gap: 12px; }
+.rb-pedales--dir { width: calc(var(--t) * 2.9); height: calc(var(--t) * 2.2); }
+.rb-pedales--gas { width: calc(var(--t) * 1.5); height: calc(var(--t) * 2.9); flex-direction: column; }
+.rb-pedal {
+    flex: 1; width: auto; height: auto; border-radius: 18px; color: var(--m-base); background: var(--m-menta);
+    background-image: repeating-linear-gradient(0deg, transparent 0 9px, oklch(0.12 0.02 160 / 0.22) 9px 11px);
+}
+.rb-pedal { min-width: 0; min-height: 0; }
+.rb-pedal .icon { width: calc(var(--t) * 0.46); height: calc(var(--t) * 0.46); stroke-width: 3; }
+.rb-pedal--acel { flex: 2.2; background-color: var(--m-verde); }
+.rb-pedal--rev { background-color: var(--m-naranja); }
+.rb-pedal--izq .icon { rotate: -90deg; }
+.rb-pedal--der .icon { rotate: 90deg; }
+.rb-pedal--rev .icon { rotate: 180deg; }
+.rb-mando.es-estilo-flechas:not(.es-incl) .rb-flechas { display: grid; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-pedales { display: flex; }
+.rb-mando.es-estilo-flechas:not(.es-incl) .rb-joy, .rb-mando.es-estilo-pedales:not(.es-incl) .rb-joy { display: none; }
+/* Con pedales las dos manos quedan ocupadas: las cuatro acciones pasan al centro, debajo del paro */
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-centro { align-self: start; padding-top: 6px; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-paro-gran { --p: clamp(68px, min(21dvh, 20vw), 100px); }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-caras { grid-column: 2; grid-row: 1; align-self: end; justify-self: center; grid-template-columns: repeat(4, 46px); grid-template-rows: 46px; gap: 10px; margin: 0; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara { translate: none; grid-area: 1 / auto; }
+.rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara.is-down, .rb-mando.es-estilo-pedales:not(.es-incl) .rb-cara:active { translate: 0 4px; }
+
+/* Cada botón sale solo en los modos donde sirve: inclinar el celular no usa palanca, flechas ni pedales; el modo dirección no
+   graba recorridos ni lleva el freno automático (el robot no sabe hacia dónde mira el sensor mientras gira) */
+.rb-mando.es-incl .rb-estilo { display: none; }
+.rb-mando.es-dir #rb-ctl-ruta, .rb-mando.es-dir .rb-freno { display: none; }
+
 /* Sin enlace: lo que depende del robot se ve apagado; el paro siempre queda vivo */
-.is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl { opacity: 0.35; }
+.is-sin-enlace .rb-joy, .is-sin-enlace .rb-caras, .is-sin-enlace .rb-incl, .is-sin-enlace .rb-flechas, .is-sin-enlace .rb-pedales { opacity: 0.35; }
 
 /* Vertical: pide girar el teléfono */
 .rb-mando__gira { display: none; }
@@ -438,22 +582,6 @@
 .rb-bt-info { white-space: pre-wrap; word-break: break-word; font-size: var(--fs-sm); background: var(--page, var(--surface)); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; max-height: 240px; overflow: auto; }
 
 /* Agregar canciones: un solo botón grande y la lista de lo que salió */
-.rb-soltar {
-    display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 96px; padding: 16px; border-radius: var(--r-lg); cursor: pointer;
-    border: 2px dashed var(--green-300); background: var(--green-50); color: var(--green-800); font-weight: 700; font-size: var(--fs-md);
-    transition: background 0.15s, border-color 0.15s;
-}
-.rb-soltar:hover, input:focus-visible + .rb-soltar { background: var(--green-100); border-color: var(--green-600); }
-.rb-soltar .icon { width: 28px; height: 28px; }
-.rb-aud-prog { width: 100%; height: 8px; accent-color: var(--green-600); }
-.rb-aud-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.rb-aud-item { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
-.rb-aud-item b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rb-aud-item span { flex: none; font-size: var(--fs-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.rb-aud-item.is-ok { border-color: var(--green-300); background: var(--green-50); }
-.rb-aud-item.is-error span { color: var(--rose-700); }
-.rb-avanzado > summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
-.rb-avanzado[open] > summary { margin-bottom: 8px; }
 
 .rb-ln { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--green-50); }
 .rb-ln[hidden] { display: none; }
@@ -475,19 +603,11 @@
 .rb-ventana__cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .rb-ventana__cab h3 { margin: 0; font-size: var(--fs-lg); }
 .rb-ventana__cuerpo { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
-.rb-ent-estado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
-.rb-ent-cuenta { font-weight: 800; color: var(--green-800); }
-.rb-ent-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.rb-ent-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
-.rb-ent-item.is-lista { border-color: var(--green-600); background: var(--green-50); }
-.rb-ent-item.is-grabando { border-color: var(--rose-700); background: var(--rose-100); }
-.rb-ent-item p { margin: 0; flex: 1; min-width: 0; font-size: var(--fs-sm); }
-.rb-ent-item .btn { flex: none; }
 
 .rb-vz-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.rb-vz-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
+.rb-vz-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
 .rb-vz-item.is-activa { border-color: var(--green-600); background: var(--green-50); }
-.rb-vz-item > span { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
+.rb-vz-item > span { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
 .rb-vz-item small { color: var(--ink-2); font-size: var(--fs-cap); }
 .rb-vz-item .btn { flex: none; }
 .rb-ent-pasos, .rb-ent-final { display: flex; flex-direction: column; gap: 14px; }
@@ -521,12 +641,17 @@
 .es-app .admin-head__actions { display: none; }
 .es-app .sections { transition: transform 280ms var(--ease-out); }
 .es-app .sections.is-oculta { transform: translateY(-125%); }
-.es-app .rb-barra { flex-wrap: wrap; gap: 8px; padding: 8px 10px; bottom: 8px; margin-top: 10px; }
-.es-app .rb-barra .btn { flex: 1 1 40%; min-height: 44px; padding-inline: 10px; }
+.es-app .rb-barra { flex-wrap: wrap; gap: 12px; padding: 0 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); margin-top: 10px; }
+.es-app .rb-barra .btn:not(.rb-barra__cuadro) { flex: 1 1 40%; min-height: 44px; padding-inline: 10px; }
 .es-app .rb-barra__que { display: none; }
 .es-app .rb-barra .rb-prog[value="0"] { display: none; }
 .es-app .rb-barra #rb-msg:empty { display: none; }
 .es-app .rb-barra #rb-msg { flex: 1 1 100%; margin: 0; }
+.es-app, .es-app * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+.es-app { -webkit-user-select: none; user-select: none; }
+.es-app input, .es-app textarea, .es-app [contenteditable] { -webkit-user-select: text; user-select: text; }
+.es-app ::selection { background: transparent; }
+.es-app input::selection, .es-app textarea::selection { background: Highlight; color: HighlightText; }
 
 /* App: animaciones. Solo dentro del APK (clase es-app que pone js/plataforma.js) y solo si el teléfono no pidió reducirlas */
 .es-app p.hint:not([id]):not(:has(button, a)) { display: none; }

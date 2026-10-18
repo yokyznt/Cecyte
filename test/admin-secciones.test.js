@@ -51,12 +51,12 @@ assert(toolbar.includes('openAddModal()') && toolbar.includes('Nueva Materia'), 
     const fin = html.indexOf('class="rb-barra"');
     assert(ini > 0 && fin > ini);
     const instalar = html.slice(ini, fin);
-    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-todos', 'rb-bat-quim', 'rb-bat-cap', 'rb-bat-borrar', 'rb-diag']) {
+    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-bat-quim', 'rb-bat-cap', 'rb-bat-borrar']) {
         assert(instalar.includes(`id="${id}"`), `${id} debe estar en Instalar`);
         assert.strictEqual(html.split(`id="${id}"`).length - 1, 1, `${id} solo una vez`);
     }
     const cab = html.slice(html.indexOf('<section class="panel rb-conexion"'), html.indexOf('id="sec-robot-musica"'));
-    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-todos', 'rb-msg']) assert(!cab.includes(`id="${id}"`), `${id} no va en la cabecera`);
+    for (const id of ['rb-conectar', 'rb-paro', 'rb-vivo', 'rb-msg']) assert(!cab.includes(`id="${id}"`), `${id} no va en la cabecera`);
     for (const id of ['rb-bat', 'rb-badge', 'robot-heading']) assert(cab.includes(`id="${id}"`), `${id} sí va en la cabecera`);
     // el mensaje y el avance acompañan a la barra fija, que se ve en todas las secciones del robot
     const barra = html.slice(fin);
@@ -68,5 +68,16 @@ const robotJs = fs.readFileSync(path.join(raiz, 'robot.js'), 'utf8');
 const usados = new Set([...robotJs.matchAll(/\$\('(rb-[a-z0-9-]+)'\)/g)].map(m => m[1]));
 const faltan = [...usados].filter(i => !ids.includes(i));
 assert.deepStrictEqual(faltan, [], 'ids del robot que faltan en index.html');
+
+const adminsJs = fs.readFileSync(path.join(raiz, 'js', 'admins.js'), 'utf8');
+const usadosGestion = new Set([...adminsJs.matchAll(/gestionEl\('([a-z0-9-]+)'\)/g)].map(m => m[1]));
+for (const id of ['admin-content', 'admin-quien', 'btn-gestion-admins']) usadosGestion.add(id);
+const faltanGestion = [...usadosGestion].filter(i => !ids.includes(i));
+assert.deepStrictEqual(faltanGestion, [], 'ids de la gestión de admins que faltan en index.html');
+assert(html.includes('src="js/admins.js"') && html.includes('href="css/admins.css"'), 'index.html carga js/admins.js y css/admins.css');
+
+const libAdmins = fs.readFileSync(path.join(raiz, 'lib', 'admins.js'), 'utf8');
+const permisosAdmin = [...libAdmins.matchAll(/\{ id: '([a-z0-9-]+)', grupo:/g)].map(m => m[1]);
+assert.deepStrictEqual(permisosAdmin, todas, 'los permisos de lib/admins.js son exactamente las secciones del panel');
 
 console.log('admin-secciones.test.js: todo bien');

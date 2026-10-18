@@ -449,6 +449,9 @@ function renderGroupsList() {
 
 // Switch between Student View and Admin View
 let isAdminLoggedIn = false;
+let adminSesion = null;
+
+const sesionAdmin = () => adminSesion;
 
 function switchView(view) {
     const studentView = document.getElementById('view-student');
@@ -457,6 +460,10 @@ function switchView(view) {
     const tabAdmin = document.getElementById('tab-admin');
 
     const isStudent = view === 'student';
+    if (!isStudent && !adminView.classList.contains('hidden') && isAdminLoggedIn && adminSesion && adminSesion.rol === 'master') {
+        alternarGestionAdmins();
+        return;
+    }
     studentView.classList.toggle('hidden', !isStudent);
     adminView.classList.toggle('hidden', isStudent);
     tabStudent.setAttribute('aria-pressed', String(isStudent));
@@ -470,8 +477,10 @@ async function checkAdminSession() {
         const res = await API.fetch('/api/session');
         const data = await res.json();
         isAdminLoggedIn = !!data.loggedIn;
+        adminSesion = isAdminLoggedIn ? data : null;
     } catch (err) {
         isAdminLoggedIn = false;
+        adminSesion = null;
     }
 
     if (isAdminLoggedIn) {
@@ -489,6 +498,8 @@ function showAdminLogin() {
 function showAdminContent() {
     document.getElementById('admin-login').classList.add('hidden');
     document.getElementById('admin-content').classList.remove('hidden');
+    aplicarPermisosAdmin(adminSesion && adminSesion.rol === 'admin' ? adminSesion.permisos : null);
+    mostrarQuienEntro();
     populateGroupSelectors();
     renderGroupsList();
     renderAdminTable();
@@ -512,9 +523,8 @@ async function submitLogin(e) {
         if (res.ok) {
             const datos = await res.json().catch(() => ({}));
             if (datos.token) API.guardarToken(datos.token);   // solo en el APK; la web usa la cookie
-            isAdminLoggedIn = true;
             document.getElementById('admin-password').value = '';
-            showAdminContent();
+            await checkAdminSession();
         } else {
             // 429 = demasiados intentos fallidos: el servidor dice cuánto esperar
             const datos = res.status === 429 ? await res.json().catch(() => ({})) : {};
@@ -531,7 +541,18 @@ async function logoutAdmin() {
     await API.fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => null);
     API.guardarToken(null);
     isAdminLoggedIn = false;
+    adminSesion = null;
+    cerrarGestionAdmins();
     showAdminLogin();
+}
+
+function mostrarQuienEntro() {
+    const el = document.getElementById('admin-quien');
+    if (!el || !adminSesion) return;
+    const master = adminSesion.rol === 'master';
+    el.textContent = master ? 'Maestro' : adminSesion.nombre;
+    el.parentElement.classList.toggle('is-master', master);
+    document.getElementById('btn-gestion-admins').classList.toggle('hidden', !master);
 }
 
 /// Render de la tabla semanal de horario (resalta el dia y la hora actuales)

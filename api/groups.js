@@ -8,7 +8,7 @@
 // materia por materia.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, adminToken } from '../lib/auth.js';
+import { exigir } from '../lib/admins.js';
 import { cors } from '../lib/cors.js';
 import { limpiarGrupo, GRUPOS_POR_DEFECTO, MAX_GRUPOS } from '../lib/validar.js';
 
@@ -28,9 +28,7 @@ export default async function handler(req, res) {
     }
 
     // POST y DELETE requieren sesion de admin
-    if (!verifyToken(adminToken(req))) {
-        return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
-    }
+    if (!(await exigir(req, res, kv, 'grupos'))) return;
 
     if (req.method === 'POST') {
         const { name } = req.body || {};

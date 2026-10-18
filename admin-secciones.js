@@ -8,7 +8,7 @@
 const APARTADOS = {
     horario: ['horarios', 'grupos', 'alertas'],
     timbre: ['timbre', 'ritmo', 'esp32'],
-    robot: ['robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar', 'robot-musica', 'robot-luces', 'robot-instalar'], // @robot:line
+    robot: ['robot-control', 'robot-funciones', 'robot-jarvis', 'robot-dibujar', 'robot-musica', 'robot-luces', 'robot-telefono', 'robot-instalar'], // @robot:line
 };
 const ADMIN_SECCIONES = Object.values(APARTADOS).flat();
 const ALIAS_SECCION = {
@@ -19,21 +19,36 @@ const PRIMERA_SECCION = 'horarios';
 const apartadoDe = id => Object.keys(APARTADOS).find(a => APARTADOS[a].includes(id));
 const ultimaPorApartado = {};                              // la sección que tenía cada apartado al salir de él
 
+// Permisos de quien entró: null = todo (el maestro); si no, las secciones que su contraseña abre. El servidor es quien manda; esto solo esconde lo demás.
+let permitidas = null;
+const permiso = id => permitidas === null || permitidas.has(id);
+const primeraPermitida = () => ADMIN_SECCIONES.find(permiso) || null;
+const apartadosVisibles = () => Object.keys(APARTADOS).filter(a => APARTADOS[a].some(permiso));
+
+function aplicarPermisosAdmin(lista) {
+    permitidas = Array.isArray(lista) ? new Set(lista) : null;
+    document.querySelectorAll('[data-section-tab]').forEach(b => b.classList.toggle('sin-permiso', !permiso(b.dataset.sectionTab)));
+    document.querySelectorAll('[data-apartado-tab]').forEach(b => b.classList.toggle('sin-permiso', !APARTADOS[b.dataset.apartadoTab].some(permiso)));
+    if (primeraPermitida()) mostrarSeccionAdmin(seccionGuardada(), { recordar: false });
+}
+
 function seccionGuardada() {
     const deHash = location.hash.startsWith('#admin-') ? location.hash.slice(7) : '';
     const h = ALIAS_SECCION[deHash] || deHash;
-    if (ADMIN_SECCIONES.includes(h)) return h;
+    if (ADMIN_SECCIONES.includes(h) && permiso(h)) return h;
     try {
         const g = sessionStorage.getItem('adminSeccion');
-        if (ADMIN_SECCIONES.includes(g)) return g;
+        if (ADMIN_SECCIONES.includes(g) && permiso(g)) return g;
     } catch (e) { /* sin almacenamiento: seguimos con la primera */ }
-    return PRIMERA_SECCION;
+    return primeraPermitida() || PRIMERA_SECCION;
 }
 
 // opciones: enfocar (mueve el foco a la pestaña), recordar (guarda y actualiza el enlace), desplazar (sube a la barra)
 function mostrarSeccionAdmin(id, { enfocar = false, recordar = true, desplazar = false } = {}) {
     id = ALIAS_SECCION[id] || id;
     if (!ADMIN_SECCIONES.includes(id)) id = PRIMERA_SECCION;
+    if (!permiso(id)) id = primeraPermitida();
+    if (!id) return;
     const ap = apartadoDe(id);
     ultimaPorApartado[ap] = id;
 
@@ -74,7 +89,7 @@ document.addEventListener('click', e => {
     const ap = e.target.closest('[data-apartado-tab]');
     if (ap) {
         const a = ap.dataset.apartadoTab;
-        mostrarSeccionAdmin(ultimaPorApartado[a] || APARTADOS[a][0], { desplazar: true });
+        mostrarSeccionAdmin(ultimaPorApartado[a] || APARTADOS[a].find(permiso), { desplazar: true });
         return;
     }
     const tab = e.target.closest('[data-section-tab]');
@@ -86,14 +101,14 @@ document.addEventListener('keydown', e => {
     const tab = e.target.closest && e.target.closest('[data-apartado-tab], [data-section-tab]');
     if (!tab) return;
     const esApartado = tab.hasAttribute('data-apartado-tab');
-    const lista = esApartado ? Object.keys(APARTADOS) : APARTADOS[apartadoDe(tab.dataset.sectionTab)];
+    const lista = esApartado ? apartadosVisibles() : APARTADOS[apartadoDe(tab.dataset.sectionTab)].filter(permiso);
     const actual = esApartado ? tab.dataset.apartadoTab : tab.dataset.sectionTab;
     const i = lista.indexOf(actual);
     const destino = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: lista.length - 1 }[e.key];
     if (destino === undefined) return;
     e.preventDefault();
     const nuevo = lista[(destino + lista.length) % lista.length];
-    mostrarSeccionAdmin(esApartado ? (ultimaPorApartado[nuevo] || APARTADOS[nuevo][0]) : nuevo, { enfocar: !esApartado });
+    mostrarSeccionAdmin(esApartado ? (ultimaPorApartado[nuevo] || APARTADOS[nuevo].find(permiso)) : nuevo, { enfocar: !esApartado });
     if (esApartado) document.getElementById('tab-ap-' + nuevo).focus();
 });
 

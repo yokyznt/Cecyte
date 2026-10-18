@@ -165,7 +165,6 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(R.marcoHex(blanco, 100), 'ffffff'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 0), '000000'.repeat(12));
     assert.strictEqual(R.marcoHex(blanco, 50).slice(0, 6), '808080');
-    assert.deepStrictEqual(R.hsv(0, 1, 1).map(Math.round), [255, 0, 0]);
     assert.deepStrictEqual(R.hexARgb('#ff8000'), [255, 128, 0]);
     // FX: modo, brillo y los 12 colores base SIN brillo (lo aplica el robot)
     const azul = Array.from({ length: 12 }, () => [0, 0, 255]);
@@ -187,30 +186,6 @@ for (const c of R.CANCIONES) {
     const b = R.compilar({ notas: R.leerNotas('A5:200 R:100').notas, bpm: 240 });
     assert.deepStrictEqual(a.cmds.map(c => c.l), b.cmds.map(c => c.l));
     assert.strictEqual(a.ms, 300);
-    // intervalos -> texto: pausas, tonos que alternan y duración mínima
-    const txt = R.ritmoATexto([[0, 100], [250, 350], [600, 605]]);
-    assert.strictEqual(txt, 'C5:100 R:150 E5:100 R:250 G5:10');
-    assert.deepStrictEqual(R.leerNotas(txt).errores, []);
-    assert.strictEqual(R.ritmoATexto([[200, 300]], R.TONOS_RITMO.agudo), 'R:200 A5:100');
-    // un audio larguísimo nunca pasa del máximo de notas
-    const muchos = Array.from({ length: 1000 }, (_, i) => [i * 100, i * 100 + 50]);
-    assert.deepStrictEqual(R.leerNotas(R.ritmoATexto(muchos)).errores, []);
-}
-
-// 16d) Audio -> ritmo del robot con la detección de golpes de timbre.js (8 golpes sintéticos cada 500 ms)
-{
-    const T = require('../timbre.js');
-    const sr = 8000, x = new Float32Array(sr * 4);
-    for (let c = 0; c < 8; c++) for (let i = 0; i < 240; i++) x[c * 4000 + 800 + i] = Math.sin(i * 0.9) * Math.exp(-i / 60);
-    const { intervalos } = T.audioARitmo(x, sr, { modo: 'golpes', sens: 50, golpe: 120, sep: 120 });
-    assert.strictEqual(intervalos.length, 8);
-    const { notas, errores } = R.leerNotas(R.ritmoATexto(intervalos));
-    assert.deepStrictEqual(errores, []);
-    assert.strictEqual(notas.filter(n => n.hz > 0).length, 8);
-    const total = notas.reduce((s, n) => s + n.ms, 0);
-    assert(Math.abs(total - intervalos[7][1]) <= 60, 'dura lo mismo que el audio: ' + total);
-    const { cmds, ms } = R.compilar({ notas });
-    assert.strictEqual(cmds.reduce((s, c) => s + c.ms, 0), ms);
 }
 
 // 16f) Cola: una orden de luces que llega rota (ERR) se reintenta UNA vez; las de tiempo (T, W, M) no
@@ -284,9 +259,6 @@ for (const c of R.CANCIONES) {
     }
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ff0000')), 40).slice(0, 6), '660000');
     assert.strictEqual(R.marcoHex(Array.from({ length: 12 }, () => R.hexARgb('#ffffff')), 40).slice(0, 6), '666666');
-    // el arcoíris también usa primarios puros
-    assert.deepStrictEqual(R.hsv(1 / 3, 1, 1).map(Math.round), [0, 255, 0]);
-    assert.deepStrictEqual(R.hsv(2 / 3, 1, 1).map(Math.round), [0, 0, 255]);
 }
 
 // 17) La página y el firmware hablan el mismo idioma (si uno cambia, esto avisa)
@@ -317,9 +289,7 @@ for (const c of R.CANCIONES) {
     }
     assert(!/delay\(/.test(ino.split('void esquivar')[1].split('// ---------- Botón')[0]), 'los modos del botón esperan con espera(), para que la rampa avance');
     // diagnóstico que la página lee al conectar
-    assert(ino.includes('F(" BAT=")'), 'INFO sin BAT=');
-    assert(ino.includes('F("INFO BOOT=")'), 'INFO sin BOOT');
-    assert(ino.includes('strcmp(cmd, "DIAG0")') && ino.includes('strcmp(cmd, "BAT")'));
+    assert(ino.includes('F("INFO BAT=")') && ino.includes('strcmp(cmd, "BAT")'), 'INFO y BAT con el voltaje');
     // el bootloader de esta placa puede dejar el watchdog armado: se apaga antes que nada (.init3),
     // y MCUSR ya no sirve para saber por que se reinicio (solo se limpia)
     assert(/section\("\.init3"\)/.test(ino) && /wdt_disable\(\)/.test(ino) && /MCUSR = 0;/.test(ino), 'el firmware apaga el watchdog al arrancar');
@@ -329,7 +299,7 @@ for (const c of R.CANCIONES) {
     assert(ino.includes('PONG mbot-web 1') && ino.includes('ABORTED') && ino.includes('c == \'!\''));
     assert(new RegExp(`VEL_MAX = ${R.VEL_MAX};`).test(ino), 'VEL_MAX distinto entre página y firmware');
     assert(new RegExp(`VEL_TURBO = ${R.VEL_TURBO};`).test(ino), 'VEL_TURBO distinto entre página y firmware');
-    assert(new RegExp(`Serial\\.begin\\(${R.BAUDIOS}\\)`).test(ino), 'baudios distintos');
+    assert(/Serial\.begin\(115200\)/.test(ino), 'baudios distintos');
 }
 
 // 18) Melodía de un audio: se recuperan las notas, un salto normal no se "corrige" y un salto de
@@ -361,10 +331,6 @@ for (const c of R.CANCIONES) {
     const grave = R.melodiaDeAudio(tono([[48, 0.3], [52, 0.3], [55, 0.3], [52, 0.3]]), sr, { fMin: 80, fMax: 400, tonalidad: false });
     assert.deepStrictEqual(nombres(grave).map(n => n.replace(/\d/, '')), ['C', 'E', 'G', 'E'], grave.texto);
     assert(nombres(grave).every(n => /[5-6]$/.test(n)), grave.texto);
-
-    // un MIDI se convierte igual, y a la vez suena la más aguda
-    const m = R.melodiaDeMidi([{ s: 0, e: 200, p: 60 }, { s: 0, e: 200, p: 48 }, { s: 200, e: 400, p: 64 }], { subir: false });
-    assert.deepStrictEqual(nombres(m), ['C4', 'E4'], m.texto);
 
     // y la ficha resultante es una canción que la página sabe tocar
     assert(R.leerNotas(r1.texto).notas.length === 6);
@@ -582,9 +548,75 @@ for (const c of R.CANCIONES) {
     assert(Math.abs(fin.x) < 25 && Math.abs(fin.y) < 25, 'el cuadrado vuelve cerca del inicio');
     assert.strictEqual(R.trazoDeSerie(R.itemsDeSerie([{ id: 'esquivar', seg: 20 }], 'tanque')).length, 1, 'las de sensor no se pueden predecir');
 
+    const exacto = R.pasosDeFuncion('AD 1 GD 90° GI 45°', 500, 120, 0, true);
+    assert.deepStrictEqual(exacto.map(p => p.grados || 0), [0, 90, 45], 'con giroscopio los giros llevan sus grados');
+    assert.deepStrictEqual(R.pasosDeFuncion('AD 1 GD 90°', 500, 120, 0), [{ mov: 'AD', beats: 2 }, { mov: 'GD', beats: 1 }], 'sin giroscopio no cambia nada');
+    const girando = R.compilar({ pasos: R.pasosDeFuncion('AD 1 GD 90° GI 45° AD 1', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert.deepStrictEqual(girando.filter(l => l[0] !== 'W'), ['M 110 110', 'G 90', 'G -45', 'M 110 110'], 'los giros salen como G grados y las rectas se reanudan después');
+    const conMusica = R.compilar({ notas: R.leerNotas('C5/4 C5 C5 C5').notas, pasos: R.pasosDeFuncion('GD 90°', 500, 120, 0, true), bpm: 120, vel: 110, continuo: true }).cmds.map(c => c.l);
+    assert(!conMusica.some(l => l.startsWith('G ')), 'con música el giro sigue siendo por tiempo (la orden G bloquea las notas)');
+    const progG = R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110, exacto: true });
+    assert(progG.lineas.includes('PADD G 90'), 'la serie guarda el giro exacto');
+    assert(!R.programaDeSerie(R.itemsDeSerie([{ id: 'cuadrado', seg: 4 }], 'tanque'), { giro90: 500, bpm: 120, vel: 110 }).lineas.some(l => l.startsWith('PADD G')), 'sin giroscopio no hay PADD G');
+
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/strcmp\(a, "G"\)/.test(ino) && /op == 6/.test(ino) && /strcmp\(cmd, "G"\)/.test(ino) && ino.includes('GIRO='), 'el firmware gira con el giroscopio (G, PADD G, INFO GIRO)');
+    assert(!/digitalWrite|digitalRead|pinMode|analogWrite/.test(ino.replace(/\/\/.*$/gm, '')), 'el firmware usa los registros directo (las funciones de pines pesan ~700 bytes)');
     assert(/strcmp\(a, "O"\)/.test(ino) && /pgmPon\(5\)/.test(ino), 'el firmware guarda PADD O');
     assert(/op == 5[^]*?pasoModo\(\)/.test(ino), 'el show corre el modo del segmento');
+}
+
+// 23d) Modo dirección: la palanca marca un rumbo y el robot gira hacia él (atrás = da la vuelta, no retrocede)
+{
+    const D = R.rumboDeJoystick;
+    assert.deepStrictEqual(D(0, 1, 100), { grados: 0, v: 180 }, 'arriba: rumbo 0 a toda velocidad');
+    assert.deepStrictEqual(D(1, 0, 100), { grados: 90, v: 180 }, 'derecha: 90');
+    assert.deepStrictEqual(D(-1, 0, 100), { grados: -90, v: 180 }, 'izquierda: -90');
+    assert.deepStrictEqual(D(0, -1, 100), { grados: 180, v: 180 }, 'atrás: 180, es decir, da la vuelta');
+    assert.deepStrictEqual(D(0, -1, 60), { grados: 180, v: 108 }, '60 % de 180');
+    assert.deepStrictEqual(D(0.05, 0.05, 100), { grados: 0, v: 0 }, 'zona muerta: no se mueve');
+    assert.strictEqual(D(0.7, 0.7, 100).grados, 45, 'diagonal a la derecha');
+    assert.strictEqual(D(-0.7, -0.7, 100).grados, -135, 'diagonal atrás a la izquierda');
+    assert.strictEqual(D(0, 1, 100, R.VEL_TURBO).v, R.VEL_TURBO, 'el turbo sube el tope');
+    const O = R.rumboDeOrientacion;
+    const cerca = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180) < 0.5;
+    assert(cerca(O(0, 0, 0, 0), 0), 'plano con el borde de arriba al norte');
+    assert(cerca(O(270, 0, 0, 0), 90), 'plano con el borde de arriba al este');
+    assert(cerca(O(0, 90, 0, 0), 0), 'parado: la parte trasera mira al norte');
+    assert(cerca(O(90, 90, 0, 0), 270), 'parado y girado a la izquierda: la parte trasera mira al oeste');
+    assert(cerca(O(0, 0, 0, 90), 90), 'plano en horizontal: el borde de arriba de la pantalla es el lado derecho del teléfono');
+    assert.strictEqual(R.rumboRelativo(170, 30, 0), -160, 'se envuelve a -180..180');
+    assert.strictEqual(R.rumboRelativo(10, 0, 10), 0, 'sin girar el teléfono ni la palanca, el rumbo es 0');
+    assert.strictEqual(R.rumboRelativo(350, 0, 10), -20, 'si el teléfono giró 20° a la izquierda, el robot también');
+    assert.strictEqual(R.rumboRelativo(100, 90, 100), 90, 'la palanca a la derecha, con el teléfono donde se alineó, es 90');
+    assert.strictEqual(R.rumboRelativo(190, 90, 100), -180, 'si el teléfono giró 90° a la derecha y la palanca va a la derecha, el robot da la media vuelta (180° = -180°)');
+    const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
+    assert(/\(rumbo \+ 65536L\) >> 17/.test(ino), 'el rumbo sube al girar a la derecha');
+    assert(/strcmp\(cmd, "H0"\)/.test(ino) && /strcmp\(cmd, "H1"\)/.test(ino) && /strcmp\(cmd, "H"\) && a && b/.test(ino) && /void rumboMueve/.test(ino), 'el firmware lleva el modo dirección (H0, H1, H)');
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const ctl = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8');
+    assert(/addEventListener\('deviceorientationabsolute'/.test(ctl) && /iniciarBrujula\(\);/.test(ctl) && /rumboRelativo\(hayBrujula\(\) \? C\.fiF : C\.fi0, r\.grados, C\.fi0\)/.test(ctl) && /\.es-incl \.rb-estilo \{ display: none; \}/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')) && /\.es-dir #rb-ctl-ruta, \.rb-mando\.es-dir \.rb-freno \{ display: none; \}/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'la brújula del teléfono se lee siempre y el rumbo que se manda la usa en cada revisión');
+    assert(/id="rb-dir-cal"/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')) && /\$\('rb-dir-cal'\)\.addEventListener\('click', alinearRumbo\)/.test(ctl), 'hay un botón para alinear el teléfono con el robot');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const ctlLF = ctl.replace(/\r/g, '');
+    assert(/'H ' \+ grados \+ ' ' \+ v/.test(js) && /rumboDeJoystick/.test(ctl), 'la app manda H con el rumbo de la palanca');
+    assert(!/id="rb-dir-on"/.test(html) && /ciclarCel\(\); \}\);/.test(ctl), 'el modo dirección ya no tiene botón propio: es el segundo estado del botón del celular');
+    assert(/if \(C\.dirModo\) \{ ponerRumbo\(false\); return; \}\n[^\n]*if \(C\.inclinar\) \{ ponerInclinar\(false\);[^\n]*ponerRumbo\(true\)[^\n]*\n[^\n]*ponerInclinar\(true\);/.test(ctlLF), 'el botón del celular pasa normal → inclinar → dirección → normal');
+    assert(/id="rb-estilo"/.test(html) && /const ESTILOS = \['palanca', 'flechas', 'pedales'\]/.test(ctl) && /class="rb-flechas"/.test(html) && /rb-pedales--dir/.test(html) && /rb-pedales--gas/.test(html) && (html.match(/data-pad="/g) || []).length === 12 && ['-1,1', '1,1', '-1,-1', '1,-1'].every(p => html.includes('data-pad="' + p + '" aria-label')), 'hay botón de estilo de control con palanca, flechas (4 + 4 diagonales) y pedales (2 de dirección y 2 de aceleración)');
+    assert(/if \(!f\.pad\) suavizar\(m\);/.test(ctl) && /C\.px \+= \(k1\(x\) - C\.px\) \* 0\.4;/.test(ctl), 'la palanca se suaviza y las flechas y pedales aceleran poco a poco');
+    assert(/rb-grupo--sesion/.test(html) && /rb-grupo--info/.test(html) && /rb-grupo--herr/.test(html), 'la barra del mando está agrupada en sesión, información y herramientas');
+    const fwc = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8').replace(/\r/g, '');
+    assert(/void parar\(\) \{[^}]*rumboV = 0;/.test(fwc) && /strcmp\(cmd, "M"\) && a && b\) \{[\s\S]{0,140}rumboV = 0;/.test(fwc), 'cualquier paro o una orden M cancela el control de rumbo del robot');
+    assert(/w = rumboW >> 7/.test(fwc) && /\(rumboV \* \(70 - a\)\) >> 6/.test(fwc), 'el rumbo se corrige dentro del robot, con freno por la velocidad de giro');
+}
+
+// 23c) El robot solo se controla desde la app: sin Web Serial y con la pestaña oculta en la web
+{
+    const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(!/navigator\.serial|requestPort|abrirSerie/.test(js), 'robot.js ya no usa Web Serial');
+    assert(/id="tab-ap-robot" data-solo="android"/.test(html), 'la pestaña Robot solo sale en la app');
+    assert(!/data-solo="web"/.test(html.slice(html.indexOf('id="sec-robot"'), html.indexOf('class="rb-barra"'))), 'sin instrucciones de USB en la sección del robot');
 }
 
 // 23b) Sonido más fuerte: la canción sube de octava entera (mismas notas) hasta que su nota grave pase de ~800 Hz
@@ -609,8 +641,9 @@ for (const c of R.CANCIONES) {
     const lin = R.FUNCIONES.find(f => f.id === 'linea');
     assert(lin && lin.modo === 6 && lin.v.includes('raptor'), 'seguir la línea es una función del Raptor con el modo 6');
     const fw = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
-    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw) && /LIN=1/.test(fw), 'el firmware lleva el seguidor');
+    assert(/void seguirLinea\(\)/.test(fw) && /strcmp\(cmd, "LINEA"\)/.test(fw) && /strcmp\(cmd, "SENS"\)/.test(fw), 'el firmware lleva el seguidor');
     assert(/esquinaI/.test(fw) && /s == 5 && fase\) ledsTodos\(150, 0, 0\)/.test(fw), 'direccionales en las esquinas y reversa en rojo intermitente');
+    assert(/esquinaI\[4\] = \{ 0, 1, 9, 10 \}, esquinaD\[4\] = \{ 3, 4, 6, 7 \}/.test(fw), 'el LED 1 del anillo está 2 lugares a la izquierda del frente: los intermitentes de la derecha son los LED 4, 5, 7 y 8 (índices 3, 4, 6, 7)');
     assert(/strcmp\(cmd, "INFO"\)/.test(fw), 'el firmware contesta INFO cuando se le pide (por Bluetooth no se reinicia al conectar)');
     assert(/enviar\(\['MODE 4', 'INFO'\]\)/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'la página pide INFO al conectar');
     // 2000 mAh al 50 %: faltan 1000 mAh; con 500 mA y 140 % de carga son 2,8 h
@@ -628,8 +661,8 @@ for (const c of R.CANCIONES) {
     assert(/strcmp\(cmd, "FSAVE"\)/.test(ino) && /strcmp\(cmd, "FCLR"\)/.test(ino) && /void fnCargar\(\)/.test(ino));
     const dir = Number(/const int FN_DIR = (\d+);/.exec(ino)[1]);
     const pgm = Number(/const int PGM_DIR = (\d+);/.exec(ino)[1]) + 4 + Number(/const int PGM_MAX = (\d+);/.exec(ino)[1]);
-    const diag = Number(/const int EE_BOOT = (\d+)/.exec(ino)[1]);
-    assert(dir >= pgm && dir + 4 <= diag, 'la función guardada no pisa el show ni los contadores');
+    const luces = Number(/const int EE_DIR = (\d+);/.exec(ino)[1]);
+    assert(dir >= pgm && dir + 4 <= luces, 'la función guardada no pisa el show ni las luces guardadas');
     assert(/if \(modo != 0\) fnEspera = 0;/.test(ino), 'si la página toma el control, la función no arranca sola');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
     assert(/function alListo\(\) \{[^}]*MODE 4/.test(js), 'al conectar, la página frena lo que arranca solo');
@@ -732,13 +765,13 @@ for (const c of R.CANCIONES) {
     assert.strictEqual(F(100, 100, [0, 0], 100, false).bloqueado, false, '0 no es una lectura');
     assert.strictEqual(F(100, 100, [5], 100, false).bloqueado, false, 'con una sola lectura todavía no frena');
     assert.strictEqual(F(100, 100, undefined, 0, false).bloqueado, false);
-    // el firmware responde a DIST, avisa DIST=1 en INFO y la página sabe leerlo
+    // el firmware responde a DIST y avisa PARK=1 en INFO: así la página sabe que es el programa de esta versión
     const ino = fs.readFileSync(path.join(__dirname, '..', 'robot', 'mbot_ranger_web', 'mbot_ranger_web.ino'), 'utf8');
     assert(/!strcmp\(cmd, "DIST"\)/.test(ino) && /Serial\.print\(F\("DIST "\)\)/.test(ino), 'DIST en el firmware');
-    assert(/F\(" DIST=1/.test(ino), 'INFO avisa DIST=1');
-    assert(/DIST=1 DIR=1/.test(ino) && /!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
+    assert(/F\(" PARK=1/.test(ino), 'INFO avisa PARK=1');
+    assert(/!strcmp\(cmd, "DIR"\)/.test(ino) && /!strcmp\(cmd, "LUZ"\)/.test(ino), 'firmware con DIR y LUZ');
     const js = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
-    assert(/\^DIST /.test(js) && /kv\.DIST === 1/.test(js), 'la página lee DIST y DIST=1');
+    assert(/\^DIST /.test(js) && /kv\.PARK === 1/.test(js), 'la página lee DIST y PARK=1');
 }
 
 console.log('robot.test.js: todo bien');
@@ -784,64 +817,274 @@ console.log('robot.test.js: todo bien');
     assert.strictEqual(R.giroARecorrido(-180, 500).pasos[0].izq < 0, true);
     assert.strictEqual(R.movimientoARecorrido(-1, 1000).pasos[0].izq < 0, true);
     const V = R.ordenDeVoz;
-    assert.deepStrictEqual(V('avanza'), { a: 'sinNombre' }, 'sin decir Yokis no obedece');
+    assert.deepStrictEqual(V('avanza'), { a: 'sinNombre' }, 'sin decir Hevy no obedece');
     assert.deepStrictEqual(V('para'), { a: 'sinNombre' });
-    assert.deepStrictEqual(V('Yokis'), { a: 'saludo' });
-    assert.deepStrictEqual(V('Oye Yokis, para'), { a: 'paro' });
-    assert.deepStrictEqual(V('yoquis alto ya'), { a: 'paro' }, 'tolera cómo se oye el nombre');
-    assert.deepStrictEqual(V('Yokis avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
-    assert.deepStrictEqual(V('Yokis por favor avanza dos metros'), { a: 'mover', sentido: 1, cm: 200, s: null }, 'números en palabras');
-    assert.deepStrictEqual(V('Yokis avanza medio metro'), { a: 'mover', sentido: 1, cm: 50, s: null });
-    assert.deepStrictEqual(V('Yokis ve para atrás tres segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
-    assert.deepStrictEqual(V('Yokis gira a la izquierda'), { a: 'giro', grados: -90 });
-    assert.deepStrictEqual(V('Yokis gira cuarenta y cinco grados a la derecha'), { a: 'giro', grados: 45 });
-    assert.deepStrictEqual(V('Yokis gira ciento ochenta grados'), { a: 'giro', grados: 180 });
-    assert.deepStrictEqual(V('Yokis a la derecha'), { a: 'giro', grados: 90 });
-    assert.deepStrictEqual(V('Yokis da la vuelta'), { a: 'giro', grados: 180 });
-    assert.deepStrictEqual(V('Yokis dibuja un círculo'), { a: 'figura', f: 'circulo' });
-    assert.deepStrictEqual(V('Yokis hazme una estrella'), { a: 'figura', f: 'estrella' });
-    assert.deepStrictEqual(V('Yokis regresa a casa'), { a: 'casa' });
-    assert.deepStrictEqual(V('Yokis activa el modo guardia'), { a: 'guardia', on: true });
-    assert.deepStrictEqual(V('Yokis desactiva la guardia'), { a: 'guardia', on: false });
-    assert.deepStrictEqual(V('Yokis hazme un radar'), { a: 'radar' });
-    assert.deepStrictEqual(V('Yokis quita el turbo'), { a: 'turbo', on: false });
-    assert.deepStrictEqual(V('Yokis enciende las luces rojas'), { a: 'luces', efecto: 'fijo', color: '#ff2a2a' });
-    assert.deepStrictEqual(V('Yokis pon las luces en arcoíris'), { a: 'luces', efecto: 'arcoiris' });
-    assert.deepStrictEqual(V('Yokis apaga las luces'), { a: 'luces', efecto: 'fijo', color: '#000000' });
-    assert.deepStrictEqual(V('Yokis luces respirando'), { a: 'luces', efecto: 'respirar' });
-    assert.deepStrictEqual(V('Yokis inicia la función zigzag'), { a: 'funcion', id: 'zigzag' });
-    assert.deepStrictEqual(V('Yokis activa esquivar obstáculos'), { a: 'funcion', id: 'esquivar' });
-    assert.deepStrictEqual(V('Yokis modo seguir mi mano'), { a: 'funcion', id: 'mano' });
-    assert.deepStrictEqual(V('Yokis sigue la línea'), { a: 'funcion', id: 'linea' });
-    assert.deepStrictEqual(V('Yokis deja de seguir la línea'), { a: 'paro' });
-    assert.deepStrictEqual(V('Yokis haz círculos'), { a: 'funcion', id: 'circulos' });
-    assert.deepStrictEqual(V('Yokis toca estrellita'), { a: 'cancion', id: 'estrellita' });
-    assert.deepStrictEqual(V('Yokis pon la canción de la cucaracha'), { a: 'cancion', id: 'cucaracha' });
-    assert.deepStrictEqual(V('Yokis reproduce música'), { a: 'cancion', id: null, q: '' });
-    assert.deepStrictEqual(V('Yokis toca la canción mi vals'), { a: 'cancion', id: null, q: 'mi vals' });
-    assert.deepStrictEqual(V('Yokis detén la música'), { a: 'cancionParar' });
-    assert.deepStrictEqual(V('Yokis cuánta batería tienes'), { a: 'bateria' });
-    assert.deepStrictEqual(V('Yokis toca el claxon'), { a: 'claxon' });
-    assert.deepStrictEqual(V('Yokis qué hora es'), { a: 'charla', t: 'hora' });
+    assert.deepStrictEqual(V('Hevy'), { a: 'saludo' });
+    assert.deepStrictEqual(V('Oye Hevy, para'), { a: 'paro' });
+    assert.deepStrictEqual(V('jevi alto ya'), { a: 'paro' }, 'tolera cómo se oye el nombre');
+    assert.deepStrictEqual(V('Hevy avanza 2 metros'), { a: 'mover', sentido: 1, cm: 200, s: null });
+    assert.deepStrictEqual(V('Hevy por favor avanza dos metros'), { a: 'mover', sentido: 1, cm: 200, s: null }, 'números en palabras');
+    assert.deepStrictEqual(V('Hevy avanza medio metro'), { a: 'mover', sentido: 1, cm: 50, s: null });
+    assert.deepStrictEqual(V('Hevy ve para atrás tres segundos'), { a: 'mover', sentido: -1, cm: null, s: 3 });
+    assert.deepStrictEqual(V('Hevy gira a la izquierda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('Hevy gira cuarenta y cinco grados a la derecha'), { a: 'giro', grados: 45 });
+    assert.deepStrictEqual(V('Hevy gira ciento ochenta grados'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Hevy a la derecha'), { a: 'giro', grados: 90 });
+    assert.deepStrictEqual(V('Hevy da la vuelta'), { a: 'giro', grados: 180 });
+    assert.deepStrictEqual(V('Hevy dibuja un círculo'), { a: 'figura', f: 'circulo' });
+    assert.deepStrictEqual(V('Hevy hazme una estrella'), { a: 'figura', f: 'estrella' });
+    assert.deepStrictEqual(V('Hevy regresa a casa'), { a: 'casa' });
+    assert.deepStrictEqual(V('Hevy activa el modo guardia'), { a: 'guardia', on: true });
+    assert.deepStrictEqual(V('Hevy desactiva la guardia'), { a: 'guardia', on: false });
+    assert.deepStrictEqual(V('Hevy hazme un radar'), { a: 'radar' });
+    assert.deepStrictEqual(V('Hevy quita el turbo'), { a: 'turbo', on: false });
+    assert.deepStrictEqual(V('Hevy enciende las luces rojas'), { a: 'luces', efecto: 'fijo', color: '#ff2a2a' });
+    assert.deepStrictEqual(V('Hevy pon las luces en arcoíris'), { a: 'luces', efecto: 'arcoiris' });
+    assert.deepStrictEqual(V('Hevy apaga las luces'), { a: 'luces', efecto: 'fijo', color: '#000000' });
+    assert.deepStrictEqual(V('Hevy luces respirando'), { a: 'luces', efecto: 'respirar' });
+    assert.deepStrictEqual(V('Hevy inicia la función zigzag'), { a: 'funcion', id: 'zigzag' });
+    assert.deepStrictEqual(V('Hevy activa esquivar obstáculos'), { a: 'funcion', id: 'esquivar' });
+    assert.deepStrictEqual(V('Hevy modo seguir mi mano'), { a: 'funcion', id: 'mano' });
+    assert.deepStrictEqual(V('Hevy sigue la línea'), { a: 'funcion', id: 'linea' });
+    assert.deepStrictEqual(V('Hevy deja de seguir la línea'), { a: 'paro' });
+    assert.deepStrictEqual(V('Hevy haz círculos'), { a: 'funcion', id: 'circulos' });
+    assert.deepStrictEqual(V('Hevy toca estrellita'), { a: 'cancion', id: 'estrellita' });
+    assert.deepStrictEqual(V('Hevy pon la canción de la cucaracha'), { a: 'cancion', id: 'cucaracha' });
+    assert.deepStrictEqual(V('Hevy reproduce música'), { a: 'cancion', id: null, q: '' });
+    assert.deepStrictEqual(V('Hevy toca la canción mi vals'), { a: 'cancion', id: null, q: 'mi vals' });
+    assert.deepStrictEqual(V('Hevy detén la música'), { a: 'cancionParar' });
+    assert.deepStrictEqual(V('Hevy cuánta batería tienes'), { a: 'bateria' });
+    assert.deepStrictEqual(V('Hevy toca el claxon'), { a: 'claxon' });
+    assert.deepStrictEqual(V('Hevy qué hora es'), { a: 'charla', t: 'hora' });
     assert.deepStrictEqual(V('Jarvis para'), { a: 'sinNombre' }, 'el nombre viejo ya no sirve');
-    ['yokis', 'yoquis', 'yoki', 'joquis', 'llokis', 'yo kis', 'oye yoki', 'hola yoquis'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'nombre ' + n));
-    assert.deepStrictEqual(V('Yokis baila'), { a: 'baile', id: null, cancion: null });
-    assert.deepStrictEqual(V('Yokis ponte a bailar'), { a: 'baile', id: null, cancion: null });
-    assert.deepStrictEqual(V('Yokis baila el zigzag con estrellita'), { a: 'baile', id: 'zigzag', cancion: 'estrellita' });
-    assert.deepStrictEqual(V('Yokis baila la cucaracha'), { a: 'baile', id: 'cucaracha', cancion: 'cucaracha' });
-    assert.deepStrictEqual(V('Yokis deja de bailar'), { a: 'paro' });
-    assert.deepStrictEqual(V('Yokis cómo estás'), { a: 'charla', t: 'estado' });
-    assert.deepStrictEqual(V('Yokis cuéntame un chiste'), { a: 'charla', t: 'chiste' });
-    assert.deepStrictEqual(V('Yokis gracias'), { a: 'charla', t: 'gracias' });
-    assert.deepStrictEqual(V('Yokis quién eres'), { a: 'charla', t: 'quien' });
-    assert.deepStrictEqual(V('Yokis qué puedes hacer'), { a: 'charla', t: 'ayuda' });
-    assert.deepStrictEqual(V('Yokis eres el mejor'), { a: 'charla', t: 'elogio' });
-    assert.deepStrictEqual(V('Yokis adiós'), { a: 'charla', t: 'adios' });
-    assert.strictEqual(V('Yokis cuántos planetas hay'), null);
+    assert.deepStrictEqual(V('yokis para'), { a: 'sinNombre' }, 'el nombre anterior ya no sirve');
+    assert(!/Yokis/.test(Object.values(R.FRASES).flat().join(' ') + Object.values(R.GROSERAS).flat().join(' ') + R.promptIA(false)), 'ya nadie se llama Yokis');
+    assert(/Hevy/.test(R.promptIA(false)) && /GROSERO/.test(R.promptIA(true)) && !/GROSERO/.test(R.promptIA(false)), 'el modo grosero solo va en su prompt');
+    assert(/SIEMPRE se obedece/.test(R.promptIA(true)), 'parar siempre obedece, aun en modo grosero');
+    assert(R.frase('negarse', null, () => 0, true) !== R.frase('negarse', null, () => 0, false), 'frases groseras aparte');
+    assert.strictEqual(R.frase('mover', null, () => 0, true), R.GROSERAS.aceptar[0]);
+    assert.strictEqual(R.frase('paro', null, () => 0, true), R.GROSERAS.paro[0]);
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'decir', texto: '  hola, we  ' }), { a: 'decir', texto: 'hola, we' });
+    assert.strictEqual(R.validarOrdenIA({ a: 'decir', texto: '' }), null);
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'paro', dice: 'ya paré' }), { a: 'paro', dice: 'ya paré' });
+    const plan = R.validarOrdenIA({ a: 'plan', pasos: [{ a: 'mover', sentido: 1, cm: 50 }, { a: 'giro', grados: 90 }, { a: 'decir', texto: 'no' }, { a: 'hack' }], dice: 'a lucirnos' });
+    assert.deepStrictEqual(plan.pasos.map(p => p.a), ['mover', 'giro'], 'el plan solo lleva pasos seguros');
+    assert.strictEqual(plan.dice, 'a lucirnos');
+    assert.strictEqual(R.validarOrdenIA({ a: 'plan', pasos: [{ a: 'plan', pasos: [] }] }), null);
+    const unido = R.unirRecorridos([R.movimientoARecorrido(1, 1000), R.giroARecorrido(90, 500)], 'Plan');
+    assert(unido && unido.ms === 1500 && unido.pasos.some(p => p.t >= 1000 && p.izq > 0 && p.der < 0), 'unir recorridos los encadena');
+    ['hevy', 'hevi', 'jevi', 'jebi', 'hebi', 'heavy', 'evi', 'jevy', 'he vi', 'je bi', 'oye hevi', 'hola jebi'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'nombre ' + n));
+    ['hebbie', 'jeby', 'yebi', 'hey hevi', 'ey jevi', 'ebi', 'heby', 'jebbi', 'je vi', 'he bi'].forEach(n => assert.deepStrictEqual(V(n + ' para'), { a: 'paro' }, 'oído como ' + n));
+    ['hola', 'amigo para', 'yate para', 'ya quiero que pares', 'jarvis avanza'].forEach(n => assert.strictEqual(V(n).a, 'sinNombre', 'sin nombre: ' + n));
+    assert.deepStrictEqual(V('jevi abanza dos metros'), V('Hevy avanza dos metros'));
+    assert.deepStrictEqual(V('hebi gira a la izquirda'), { a: 'giro', grados: -90 });
+    assert.deepStrictEqual(V('hevy enciende la lus roja'), V('Hevy enciende la luz roja'));
+    assert.deepStrictEqual(V('Hevy toca la cucarracha'), { a: 'cancion', id: 'cucaracha' });
+    assert.strictEqual(V('Hevy avanza dos metros').cm, 200, 'las palabras bien dichas no se tocan');
+    assert.strictEqual(R.corregirVocabulario('dos metros y medio'), 'dos metros y medio');
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'luces', efecto: 'fijo', color: 'Rojo' }), V('Hevy luz roja'));
+    assert.strictEqual(R.validarOrdenIA({ a: 'borrarTodo' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'funcion', id: 'inventada' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'luces', efecto: 'fijo', color: 'cafe' }), null);
+    assert.strictEqual(R.validarOrdenIA({ a: 'giro', grados: 99999 }).grados, 720);
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'mover', sentido: -1, cm: 'x' }), { a: 'mover', sentido: -1, cm: null, s: null });
+    assert.ok(R.promptIA().includes('circulos') && R.promptIA().includes('sinNombre'));
+    assert.deepStrictEqual(V('Hevy baila'), { a: 'baile', id: null, cancion: null });
+    assert.deepStrictEqual(V('Hevy ponte a bailar'), { a: 'baile', id: null, cancion: null });
+    assert.deepStrictEqual(V('Hevy baila el zigzag con estrellita'), { a: 'baile', id: 'zigzag', cancion: 'estrellita' });
+    assert.deepStrictEqual(V('Hevy baila la cucaracha'), { a: 'baile', id: 'cucaracha', cancion: 'cucaracha' });
+    assert.deepStrictEqual(V('Hevy deja de bailar'), { a: 'paro' });
+    assert.deepStrictEqual(V('Hevy cómo estás'), { a: 'charla', t: 'estado' });
+    assert.deepStrictEqual(V('Hevy cuéntame un chiste'), { a: 'charla', t: 'chiste' });
+    for (const d of ['Hevy tírate un facto', 'jevi tirate un fact', 'Hevy, tírate un fact por favor', 'Hevy dime un dato curioso', 'Hevy dame un dato']) {
+        assert.deepStrictEqual(V(d), { a: 'charla', t: 'fact' }, d);
+    }
+    assert(R.FRASES.fact.length >= 3, 'hay facts de fábrica');
+    const extras = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
+    assert(/function meneoHablar/.test(extras) && /enlace\(\)\.libre\(\)/.test(extras) && /E\.guardia/.test(extras.split('function meneoHablar')[1].split('function iniciarMeneo')[0]), 'Hevy menea al robot al contestar, solo si está libre y sin la guardia armada');
+    assert(/hablar\(t \|\| raiz\.Robot\.frase\(tipo, datos, undefined, modo === 'normal' \? false : modo\), tipo === 'paro'\)/.test(extras), 'al decir «para» no se mueve');
+    const MODELOS_VOZ_OK = s => !/gemini-3\.8-flash-lite-tts|gemini-2\.5-flash-preview-tts/.test(s);
+    const htmlVozIA = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    ['rb-voz-unica', 'rb-ia-llave', 'rb-ia-probar', 'rb-ia-estado', 'rb-gradium-llave'].forEach(id => assert(htmlVozIA.includes('id="' + id + '"') && extras.includes("$('" + id + "')"), 'existe ' + id));
+    assert(['normal', 'payaso', 'grosero', 'argentino', 'aura', 'triste', 'cientifico'].every(m => htmlVozIA.includes('name="rb-modo" value="' + m + '"')) && extras.includes('input[name="rb-modo"]') && /rb-seg--6/.test(htmlVozIA), 'selector de seis personalidades');
+    assert(/MODO PAYASO/.test(R.promptIA('payaso')) && !/MODO PAYASO/.test(R.promptIA('grosero')) && !/MODO PAYASO/.test(R.promptIA(false)), 'el modo payaso solo va en su prompt');
+    assert(/jajaja/i.test(R.PAYASO.paro[0] + R.PAYASO.aceptar.join('') + R.RISAS.join('')), 'el payaso se ríe');
+    assert(R.CHISTES_RANCIOS.length >= 8 && R.CHISTES_RANCIOS.every(c => /ja|ji/i.test(c)), 'chistes rancios con risas');
+    assert.strictEqual(R.frase('chiste', null, () => 0, 'payaso'), R.CHISTES_RANCIOS[0]);
+    assert.strictEqual(R.frase('mover', null, () => 0, 'payaso'), R.PAYASO.aceptar[0]);
+    assert.strictEqual(R.frase('mover', null, () => 0, 'grosero'), R.GROSERAS.aceptar[0]);
+    assert.strictEqual(R.frase('mover', null, () => 0, false), R.FRASES.mover[0]);
+    assert(/REGLA DE COHERENCIA/.test(R.promptIA(false)) && R.FUNCIONES.every(f => R.promptIA(false).includes(f.id + ': ' + f.nombre)), 'la IA conoce las funciones del robot');
+    assert(/Autonomía total/.test(R.promptIA(true)) && /Autonomía:/.test(R.promptIA(false)), 'autonomía en ambos modos');
+    const planM = R.validarOrdenIA({ a: 'plan', pasos: [{ a: 'cancion', id: 'estrellita' }, { a: 'baile', id: null, cancion: null }, { a: 'cancionParar' }, { a: 'funcion', id: 'zigzag' }], dice: 'Ahí te va estrellita' });
+    assert.deepStrictEqual(planM.pasos.map(p => p.a), ['cancion', 'baile', 'cancionParar'], 'el plan admite música y baile, no funciones');
+    const javaDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'yokyznt', 'cecyte');
+    const clon = fs.readFileSync(path.join(javaDir, 'ClonVozPlugin.java'), 'utf8');
+    assert(/@CapacitorPlugin\(name = "ClonVoz"\)/.test(clon) && /api\.gradium\.ai\/api\/voices\//.test(clon) && /x-api-key/.test(clon) && /audio_file/.test(clon) && /"language", "es"/.test(clon), 'plugin nativo que sube la muestra a Gradium');
+    assert(/registerPlugin\(ClonVozPlugin\.class\)/.test(fs.readFileSync(path.join(javaDir, 'MainActivity.java'), 'utf8')), 'el plugin de clonar está registrado');
+    assert(htmlVozIA.includes('id="rb-gradium-llave"') && /data-acc="clonar"/.test(extras) && /api\.gradium\.ai\/api\/post\/speech\/tts/.test(extras), 'clonar voz con Gradium');
+    const orden = extras.slice(extras.indexOf('async function voz(texto)'));
+    assert(orden.indexOf('reproducirGrabada(texto)') < orden.indexOf('hablarClon(texto)') && orden.indexOf('hablarClon(texto)') < orden.indexOf('hablarIA(texto)'), 'prioridad: grabada, clon, IA de Gemini, Google, teléfono');
+    assert(/translate_tts/.test(extras) && /hevy-voz-ia/.test(extras) && MODELOS_VOZ_OK(extras), 'cadena de voz con caché, sin la voz de pago por frase');
+    assert(htmlVozIA.includes('id="rb-voz-unica"') && !/rb-voz-sel|rb-voz-grave|rb-voz-rapido|rb-vozia-voz|rb-local-voz|rb-gradium-voz/.test(htmlVozIA) && /VOCES_GRADIUM/.test(extras), 'un solo menú de voces, sin ajustes de la voz del teléfono');
+    assert(/const niveles = \{ live: nivelLive, gradium: nivelGradium \}/.test(extras) && !/hablarLocal|VOCES_LOCALES|vozLocalUsada/.test(extras) && extras.indexOf('await hablarGoogle(texto, turno)') > extras.indexOf('const niveles ='), 'en vivo primero; ya no hay voz local y Google solo entra si falla todo con internet');
+    const raizRepo = path.join(__dirname, '..');
+    const registro = fs.readFileSync(path.join(javaDir, 'RegistroPlugin.java'), 'utf8');
+    assert(/@CapacitorPlugin\(name = "Registro"\)/.test(registro) && /Log\.i\("VozJS"/.test(registro) && !fs.existsSync(path.join(javaDir, 'VozLocalPlugin.java')), 'solo queda un plugin mínimo de registros; la voz local ya no existe');
+    assert(/registerPlugin\(RegistroPlugin\.class\)/.test(fs.readFileSync(path.join(javaDir, 'MainActivity.java'), 'utf8')), 'plugin de registros registrado');
+    const grad = fs.readFileSync(path.join(raizRepo, 'android', 'app', 'build.gradle'), 'utf8');
+    assert(!/sherpa|abiFilters/.test(grad), 'gradle sin la librería de voz local: el APK pesa mucho menos');
+    const ign = fs.readFileSync(path.join(raizRepo, '.gitignore'), 'utf8');
+    assert(!/libs\/\*\.aar|assets\/voz|cache-voz/.test(ign) && !fs.existsSync(path.join(raizRepo, 'scripts', 'descargar-voz-local.js')) && !/descargar-voz-local/.test(fs.readFileSync(path.join(raizRepo, 'scripts', 'build-apk.js'), 'utf8')), 'ya no se descarga ni se versiona nada de voz local');
+    assert(/\['gradium', 'live'\]/.test(extras) && !/ajustesLocal/.test(extras), 'la voz elegida va primero');
+    assert(!/grupo\('Sin internet'/.test(extras) && /grupo\('Mis voces'/.test(extras) && /grupo\('IA de Gradium'/.test(extras) && /grupo\('IA de Google \(Gemini, en vivo\)'/.test(extras), 'todas las voces en un menú, sin voces locales');
+    assert(/const CLAVES_LOCALES = \{\};/.test(extras) && !/gsk_[0-9a-f]{20,}|AIza[0-9A-Za-z_-]{20,}/.test(extras + htmlVozIA), 'ninguna llave en el código versionado');
+    assert(/config\/claves-locales\.json/.test(ign) && /CECYTE_CLAVES/.test(fs.readFileSync(path.join(raizRepo, 'scripts', 'build-www.js'), 'utf8')), 'las llaves personales solo entran con CECYTE_CLAVES=1');
+    assert(!/Di en español mexicano|tono de amigo/.test(extras), 'ya no se le pide estilo a Gemini (lo leía en voz alta)');
+    assert(/LIVE_PRIMER_AUDIO_MS = 4500/.test(extras) && /LIVE_REINTENTO_MS = 3500/.test(extras) && /for \(let intento = 0; intento < 2; intento\+\+\)/.test(extras) && /VIA\.liveFallos >= 2/.test(extras) && /VIA\.liveHasta = Date\.now\(\) \+ 10000/.test(extras), 'Live: 4,5 s, un reintento con la sesión de repuesto y bloqueo solo tras 2 fallos');
+    assert(/gemini-3\.1-flash-live-preview/.test(extras) && /BidiGenerateContent/.test(extras) && /realtimeInput: \{ text: texto \}/.test(extras), 'voz de Gemini en vivo por WebSocket');
+    assert(/function cortarLive\(\)/.test(extras) && /function callarIA\(\) \{\s+cortarLive\(\);/.test(extras) && !/s\.usos/.test(extras) && /LIVE\.repuesto/.test(extras), 'interrumpir cambia a la sesión de repuesto y cada frase usa una sesión nueva (la memoria de la sesión hacía improvisar a Gemini)');
+    assert(/const sinInternet = \(\) => raiz\.navigator\.onLine === false;/.test(extras) && /if \(sinInternet\(\)\) \{ E\.hablando = false; return; \}\s+const fin = voz\(texto\);/.test(extras) && /llaveIA\(\) && !sinInternet\(\)\) \{\s+const ia = await consultarIA/.test(extras) && /else if \(llaveIA\(\) && !sinInternet\(\)\) encenderEscucha\(true\)/.test(extras) && /Sin internet: toca el micrófono para dar una orden guardada/.test(extras) && /ESC\.on \|\| sinInternet\(\)\) return;/.test(extras) && !/nivelGemini|pedirVozIA/.test(extras), 'sin internet: no habla, no usa la IA ni el candado, responde en el chat y solo entiende lo guardado');
+    assert(/E\.callado = true;\s+hablar\(d, o\.a === 'paro'\)/.test(extras), 'la voz arranca antes que la acción');
+    assert(/function cumplirPromesa/.test(extras) && /NEGACION/.test(extras) && /CRITICAS = \['paro', 'cancionParar', 'bateria'\]/.test(extras), 'lo que dice, lo hace; parar nunca pasa por la IA');
+    assert(/gemini-flash-lite-latest/.test(extras) && /gemini-3\.1-flash-live-preview/.test(extras), 'modelos vigentes de voz y texto');
+    assert(!/thinkingBudget|gemini-2\.5-flash-lite/.test(extras), 'sin lo que Google ya rechaza');
+    assert(/if \(await hablarIA\(texto\)\) return;\s+const TTS/.test(extras), 'si la voz de IA falla, habla la del teléfono');
+    assert(Object.values(R.FRASES).flat().every(f => !/\bcompa\b/i.test(f)), 'Hevy dice «we», no «compa»');
+    assert.deepStrictEqual(V('Hevy gracias'), { a: 'charla', t: 'gracias' });
+    assert.deepStrictEqual(V('Hevy quién eres'), { a: 'charla', t: 'quien' });
+    assert.deepStrictEqual(V('Hevy qué puedes hacer'), { a: 'charla', t: 'ayuda' });
+    assert.deepStrictEqual(V('Hevy eres el mejor'), { a: 'charla', t: 'elogio' });
+    assert.deepStrictEqual(V('Hevy adiós'), { a: 'charla', t: 'adios' });
+    assert.strictEqual(V('Hevy cuántos planetas hay'), null);
     for (const tipo of Object.keys(R.FRASES)) assert(R.FRASES[tipo].length && R.FRASES[tipo].every(x => typeof x === 'string' && x.length > 3), 'frases de ' + tipo);
-    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., compa.');
+    assert.strictEqual(R.frase('hora', { hora: '7:50 p. m.' }, () => 0), 'Son las 7:50 p. m., we.');
     assert.strictEqual(R.frase('figura', { f: 'una estrella' }, () => 0.99), 'Órale, una estrella va saliendo.');
     assert(R.frase('noExiste').length > 3, 'tipo desconocido: contesta algo');
+    const VETADAS = /\b(puto|puta|maric\w+|joto|negro|negra|indio|india|retrasad\w+|mongol\w*|violar|violaci\w+|te mato|matarte|sexo|sexual)\b/i;
+    ['saludo', 'estado', 'gracias', 'elogio', 'queja', 'adios', 'quien', 'chiste', 'paro', 'aceptar', 'negarse', 'sinNombre', 'noEntendi', 'nada'].forEach(tipo => {
+        assert(R.GROSERAS[tipo].length >= 8 && new Set(R.GROSERAS[tipo]).size === R.GROSERAS[tipo].length, 'diccionario grosero amplio y sin repetidos: ' + tipo);
+    });
+    assert(Object.values(R.GROSERAS).flat().concat(Object.values(R.ARGENTINO).flat(), R.REMATES_GROSEROS, R.REMATES_ARGENTINOS, R.TRISTE.saludo, R.CIENTIFICO.fact).every(f => !VETADAS.test(f)), 'ni insultos a grupos, ni amenazas, ni sexo explícito');
+    assert(R.ARGENTINO.saludo.length >= 5 && /\b(boludo|pelotudo|che)\b/.test(R.ARGENTINO.saludo.join(' ')) && !/\b(wey|cabrón|pinche)\b/i.test(Object.values(R.ARGENTINO).flat().join(' ')), 'el modo argentino habla en argentino, sin mexicanismos');
+    assert.strictEqual(R.frase('mover', null, () => 0, 'argentino'), R.ARGENTINO.aceptar[0]);
+    assert.deepStrictEqual(V('Hevy ponte argentino'), { a: 'modo', modo: 'argentino' });
+    assert(R.AURA.saludo.length >= 4 && /skibidi/i.test(Object.values(R.AURA).flat().join(' ')) && /six seven/i.test(Object.values(R.AURA).flat().join(' ')) && /\+?67|sesenta y siete|six seven/i.test(R.AURA.aceptar.join(' ')) && Object.keys(R.GROSERAS).every(k => k === 'negarse' || k === 'fact' || R.AURA[k]), 'el modo aura habla en memes de TikTok y tiene todas las claves');
+    assert.strictEqual(R.frase('mover', null, () => 0, 'aura'), R.AURA.aceptar[0]);
+    assert.deepStrictEqual(V('Hevy ponte brainrot'), { a: 'modo', modo: 'aura' });
+    assert.deepStrictEqual(V('Hevy modo sigma'), { a: 'modo', modo: 'aura' });
+    assert(/MODO FARMEO DE AURA/.test(R.promptIA('aura')) && /MODO FARMEO DE AURA/.test(R.promptCerebro('aura')) && !/MODO FARMEO DE AURA/.test(R.promptIA('grosero')) && R.validarOrdenIA({ a: 'modo', modo: 'aura' }).modo === 'aura', 'prompt, cerebro y acción del modo aura');
+    assert(Object.values(R.AURA).flat().every(f => !/\b(puto|puta|pendejo|culero|verga|chinga\w*|cabron)\b/i.test(f)), 'el modo aura es inofensivo, sin groserías fuertes');
+    assert(/MODO ARGENTINO DESQUICIADO/.test(R.promptIA('argentino')) && /Grok/.test(R.promptIA('argentino')) && !/MODO ARGENTINO/.test(R.promptIA('grosero')) && R.validarOrdenIA({ a: 'modo', modo: 'argentino' }).modo === 'argentino', 'prompt y acción del modo argentino');
+    const rootDir = path.join(__dirname, '..');
+    const robotSrc = fs.readFileSync(path.join(rootDir, 'robot.js'), 'utf8');
+    assert(R.MODO_PERSONAL === null && R.MODOS_IA.length === 7 && !(R.ordenDeVoz('Hevy ponte cachondo') || {}).modo && /const MODO_PERSONAL = null;/.test(robotSrc), 'sin el archivo personal, el modo personal no existe');
+    assert(/modo-personal\.json/.test(fs.readFileSync(path.join(rootDir, '.gitignore'), 'utf8')) && /modoPersonal\(\)/.test(fs.readFileSync(path.join(rootDir, 'scripts', 'build-www.js'), 'utf8')) && !/cachond/i.test(robotSrc + extras + fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8')), 'el contenido del modo personal no va en el código versionado');
+    const fixture = { id: 'prueba', nombre: 'Prueba', sinonimos: { probando: 'prueba' }, lineas: ['Personalidad: eres Hevy en MODO DE PRUEBA.'], tabla: { aceptar: ['Va de prueba, cielo.'] }, tonoLive: ' Tone: test.', bienvenida: 'Hola de prueba.' };
+    const tmpRobot = path.join(require('os').tmpdir(), 'robot-personal-prueba.js');
+    fs.writeFileSync(tmpRobot, robotSrc.replace('const MODO_PERSONAL = null;', 'const MODO_PERSONAL = ' + JSON.stringify(fixture) + ';'));
+    const RP = require(tmpRobot);
+    assert(RP.MODOS_IA.includes('prueba') && RP.ordenDeVoz('Hevy ponte probando').modo === 'prueba' && /MODO DE PRUEBA/.test(RP.promptIA('prueba')) && !/MODO DE PRUEBA/.test(RP.promptIA('normal')) && RP.frase('mover', null, () => 0, 'prueba') === 'Va de prueba, cielo.' && RP.validarOrdenIA({ a: 'modo', modo: 'prueba' }).modo === 'prueba', 'con el archivo personal, el modo se fusiona (lista, voz, prompt, frases y validador)');
+    fs.unlinkSync(tmpRobot);
+    assert(htmlVozIA.includes('id="rb-modo-personal"') && /datoPersonal\(m, 'bienvenida'\)/.test(extras) && /datoPersonal\(modo, 'tonoLive'\)/.test(extras), 'la interfaz muestra y usa el modo personal solo si existe');
+    assert(/IDENTIDAD: tú NO eres un asistente aparte/.test(R.promptIA(false)) && /AUTONOMÍA: no esperas órdenes exactas/.test(R.promptIA(false)) && /sensorFrontal\(\)/.test(extras) && /popup: false/.test(extras) && !/popup: true/.test(extras), 'la IA sabe que es el robot, tiene autonomía, ve el sensor y el micrófono manual no abre la ventana de Google');
+    assert(R.REMATES_GROSEROS.length >= 20 && /\bpendejo\b/.test(R.promptIA('grosero')) && /hijo de la chingada/.test(R.promptIA('grosero')), 'el prompt grosero trae vocabulario amplio');
+    ['triste', 'cientifico'].forEach(m => {
+        const tabla = m === 'triste' ? R.TRISTE : R.CIENTIFICO;
+        Object.keys(tabla).forEach(tipo => assert(tabla[tipo].length && tabla[tipo].every(x => typeof x === 'string' && x.length > 8), m + ' ' + tipo));
+        assert.strictEqual(R.frase('mover', null, () => 0, m), tabla.aceptar[0]);
+        assert.strictEqual(R.frase('fact', null, () => 0, m), tabla.fact[0]);
+    });
+    assert(/MODO TRISTE/.test(R.promptIA('triste')) && /MODO CIENTÍFICO/.test(R.promptIA('cientifico')) && !/MODO TRISTE|MODO CIENTÍFICO/.test(R.promptIA('payaso')), 'cada modo trae su propio prompt');
+    assert(/REGLA DE FACTS, CHISTES Y TRIVIA/.test(R.promptIA(false)) && !R.validarOrdenIA({ a: 'charla', t: 'fact' }) && !R.validarOrdenIA({ a: 'charla', t: 'chiste' }), 'facts y chistes los inventa la IA, no salen enlatados');
+    assert.deepStrictEqual(V('Hevy ponte triste'), { a: 'modo', modo: 'triste' });
+    assert.deepStrictEqual(V('Hevy modo científico'), { a: 'modo', modo: 'cientifico' });
+    assert.deepStrictEqual(V('Hevy cámbiate a payaso'), { a: 'modo', modo: 'payaso' });
+    assert.deepStrictEqual(V('Hevy ponte serio'), { a: 'modo', modo: 'normal' });
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'modo', modo: 'grosero' }), { a: 'modo', modo: 'grosero' });
+    assert.strictEqual(R.validarOrdenIA({ a: 'modo', modo: 'inventado' }), null);
+    assert.deepStrictEqual(V('Hevy tijera'), { a: 'ppt', usuario: 'tijera' });
+    assert.deepStrictEqual(V('Hevy juguemos piedra papel o tijera'), { a: 'ppt' });
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'ppt', usuario: 'papel' }), { a: 'ppt', usuario: 'papel' });
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'ppt', usuario: 'lagarto' }), { a: 'ppt' });
+    ['pptInvita', 'pptGano', 'pptPerdio', 'pptEmpate', 'aburrido'].forEach(tipo => ['normal', 'grosero', 'triste', 'cientifico'].forEach(m => assert(R.frase(tipo, { mia: 'piedra', tuya: 'papel' }, () => 0, m === 'normal' ? false : m).length > 8, tipo + ' ' + m)));
+    assert(/\{mia\}/.test(R.FRASES.pptGano[0]) && /Empate/.test(R.frase('pptEmpate', { mia: 'papel' }, () => 0)), 'frases del juego');
+    assert(htmlVozIA.includes('id="rb-solo"') && htmlVozIA.includes('id="rb-escucha"') && htmlVozIA.includes('id="rb-escucha-estado"'), 'interruptores de «por su cuenta»');
+    assert(/gemini-3\.5-transcribe-live/.test(extras) && /audio\/pcm;rate=/.test(extras) && /inputTranscription/.test(extras) && /procesarTexto\(\[sinNombre \? 'Hevy ' \+ dicho : dicho\], false, dicho\)/.test(extras), 'escucha continua con transcripción en vivo');
+    assert(/habla \|\| E\.escuchando \|\| Date\.now\(\) < ESC\.ultimaHabla \+ 500 \|\| Date\.now\(\) < E\.finHabla \+ 600/.test(extras) && /1200000/.test(extras) && /document\.hidden && ESC\.on/.test(extras), 'no se oye a sí mismo y se apaga solo');
+    assert(/function iniciarMicrofono\(\)/.test(extras) && /'pointerdown', e => \{\s+largo = false;[\s\S]*?callarIA\(\);/.test(extras) && /\}, 450\);/.test(extras) && /\['pointerup', 'pointerleave'\]\.forEach/.test(extras) && /classList\.add\('is-candado'\)/.test(extras) && /rb-jarvis__candado/.test(htmlVozIA) && /is-candado/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'mantener el micrófono pone el candado y al pulsar se calla lo que dice');
+    assert(/createAnalyser\(\)/.test(extras) && /setProperty\('--nivel'/.test(extras) && /ESC\.ctx\.resume\(\)/.test(extras) && /Escucha: oí «/.test(extras) && /var\(--nivel, 0\)/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'el botón del micrófono se expande con el nivel de entrada y la escucha deja registro');
+    assert(/interimInputTranscription/.test(extras) && /function pintarVivo/.test(extras) && /is-yo is-vivo/.test(extras) && /ESC\.cola\.forEach\(d => ws\.send\(d\)\)/.test(extras) && /else if \(llaveIA\(\) && !sinInternet\(\)\) encenderEscucha\(true\)/.test(extras) && /rb-escucha-nombre/.test(htmlVozIA) && /is-vivo/.test(fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8')), 'un toque usa el mismo motor, lo que dices se escribe en el chat mientras hablas y no se pierde lo primero');
+    const A = { lat: 19.4326, lon: -99.1332 };
+    const enMetros = (o, e, n) => ({ lat: o.lat + n / 111320, lon: o.lon + e / (111320 * Math.cos(o.lat * Math.PI / 180)) });
+    assert(Math.abs(R.distanciaMetros(A, enMetros(A, 100, 0)) - 100) < 0.5 && Math.abs(R.distanciaMetros(A, enMetros(A, 0, -250)) - 250) < 0.5, 'distancia entre dos puntos GPS');
+    [[0, 100, 0], [100, 0, 90], [0, -100, 180], [-100, 0, 270], [100, 100, 45]].forEach(([e, n, rumbo]) => assert(Math.abs(R.rumboHacia(A, enMetros(A, e, n)) - rumbo) < 0.6, 'rumbo ' + rumbo));
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, 100, 0), fi0: 90 }).rumboRelativo, 0, 'ya mira hacia allá');
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, 100, 0), fi0: 0 }).rumboRelativo, 90);
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, -100, 0), fi0: 0 }).rumboRelativo, -90);
+    assert.strictEqual(Math.abs(R.decidirGuiado({ yo: A, destino: enMetros(A, 0, -100), fi0: 0 }).rumboRelativo), 180);
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, 3, 4), fi0: 0 }).accion, 'llegue', 'a 5 m ya llegó');
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, 100, 0), fi0: 0, edadDestinoMs: 50000 }).accion, 'perdido', 'sin señal del destino');
+    assert.strictEqual(R.decidirGuiado({ yo: A, destino: enMetros(A, 100, 0), fi0: 0, precision: 60 }).accion, 'esperar', 'GPS malo: espera');
+    assert.strictEqual(R.decidirGuiado({ yo: null, destino: A, fi0: 0 }).accion, 'esperar');
+    assert(R.decidirGuiado({ yo: A, destino: enMetros(A, 200, 0), fi0: 0 }).v > R.decidirGuiado({ yo: A, destino: enMetros(A, 12, 0), fi0: 0 }).v, 'más despacio al acercarse');
+    let semilla = 7;
+    const azar = () => { semilla = (semilla * 16807) % 2147483647; return semilla / 2147483647; };
+    const normal = s => s * Math.sqrt(-2 * Math.log(azar() + 1e-9)) * Math.cos(2 * Math.PI * azar());
+    [[0, 80], [80, 0], [0, -80], [-80, 0], [60, 60], [-50, 70]].forEach(([de, dn]) => [0, 15, -15].forEach(sesgo => {
+        let x = 0, y = 0, psi = 40, llego = false;
+        const objetivo = { e: de, n: dn };
+        const fi0 = psi + sesgo;
+        for (let t = 0; t < 600 && !llego; t++) {
+            const yo = enMetros(A, x + normal(3), y + normal(3)), destino = enMetros(A, objetivo.e + normal(3), objetivo.n + normal(3));
+            const d = R.decidirGuiado({ yo, destino, fi0, radio: 8, precision: 6 });
+            if (d.accion === 'llegue') { llego = true; break; }
+            assert.strictEqual(d.accion, 'avanzar');
+            const deseado = psi + 0 + (((fi0 + d.rumboRelativo - sesgo - psi) % 360 + 540) % 360 - 180);
+            const giro = Math.max(-90, Math.min(90, ((deseado - psi) % 360 + 540) % 360 - 180));
+            psi = (psi + giro + 360) % 360;
+            x += Math.sin(psi * Math.PI / 180) * 0.4;
+            y += Math.cos(psi * Math.PI / 180) * 0.4;
+        }
+        assert(llego, 'el guiado llega (destino ' + de + ',' + dn + ' con brújula torcida ' + sesgo + '°)');
+        assert(Math.hypot(x - objetivo.e, y - objetivo.n) < 20, 'queda cerca aunque el GPS tenga ruido de 3 m');
+    }));
+    assert.deepStrictEqual(V('Hevy encuentra el teléfono de Ana'), { a: 'buscar_telefono', nombre: 'ana' });
+    assert.deepStrictEqual(V('Hevy busca el celular de Beto Pérez'), { a: 'buscar_telefono', nombre: 'beto perez' });
+    assert.deepStrictEqual(V('Hevy ve por el celular del Chuy'), { a: 'buscar_telefono', nombre: 'chuy' });
+    assert.strictEqual(V('Hevy busca la canción de Ana').a, 'cancion', 'buscar una canción no es buscar un teléfono');
+    assert.deepStrictEqual(R.validarOrdenIA({ a: 'buscar_telefono', nombre: 'Ana María' }), { a: 'buscar_telefono', nombre: 'ana maria' });
+    assert.strictEqual(R.validarOrdenIA({ a: 'buscar_telefono', nombre: '' }), null);
+    ['telBusca', 'telLlegue', 'telPerdido', 'telSinCompartir', 'telSinUbicacion', 'telBloqueo', 'telGps', 'telTiempo', 'telBateria', 'telSinGiro', 'telSinBrujula'].forEach(k => assert(R.FRASES[k].length >= 1 && R.frase(k, { nombre: 'Ana', m: 12 }, () => 0).length > 10, 'frase ' + k));
+    assert(/Ana/.test(R.frase('telBusca', { nombre: 'Ana', m: 42 }, () => 0)) && /42/.test(R.frase('telBusca', { nombre: 'Ana', m: 42 }, () => 0)));
+    const tels = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-telefono.js'), 'utf8');
+    const manifiesto = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
+    const paquete = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    assert(paquete.dependencies['@capacitor/geolocation'] && !/ACCESS_FINE_LOCATION"[^>]*maxSdkVersion/.test(manifiesto) && /ACCESS_FINE_LOCATION/.test(manifiesto), 'plugin de ubicación y permiso sin tope de Android 11');
+    assert(/Plataforma\.plugin\('Geolocation'\)/.test(tels) && /watchPosition/.test(tels) && /requestPermissions/.test(tels) && /decidirGuiado/.test(tels) && /frenoPorDistancia/.test(tels) && /rumboIniciar\(true\)/.test(tels) && /rumboIniciar\(false\)/.test(tels) && /MOVIDO_M = 15, CADA_MS = 45000, CADA_BUSCADO_MS = 10000/.test(tels) && /method: 'DELETE', keepalive: true/.test(tels) && /T\.compartiendo = false/.test(tels), 'la pestaña comparte con envíos espaciados, guía con freno por obstáculo y borra al salir');
+    assert(!/auto|checked/.test((htmlVozIA.match(/id="rb-tel-compartir"[^>]*>/) || [''])[0]), 'compartir nunca arranca encendido');
+    ['rb-tel-nombre', 'rb-tel-sala', 'rb-tel-crear', 'rb-tel-borrar', 'rb-tel-compartir', 'rb-tel-estado', 'rb-tel-aviso', 'rb-tel-radar', 'rb-tel-lista', 'rb-tel-parar', 'sec-robot-telefono', 'tab-robot-telefono'].forEach(id => assert(htmlVozIA.includes('id="' + id + '"'), 'existe ' + id));
+    assert(/js\/robot-telefono\.js/.test(htmlVozIA) && /'robot-telefono', 'robot-instalar'\]/.test(fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8')) && /'robot-telefono': 'nada en esta sección'/.test(robotSrc), 'la pestaña está registrada en la página, en las secciones y en la barra');
+    assert(/buscar_telefono/.test(extras) && /raiz\.Telefonos\.parar\(\)/.test(extras) && /listar_telefonos/.test(extras) && /raiz\.Hevy = \{ hablar, di, modo: modoHevy \}/.test(extras) && /rumbo: \(\) => \(hayBrujula\(\) \? C\.fiF : null\)/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8')), 'voz, herramientas, paro y brújula conectados con la pestaña');
+    const herr = R.herramientasCerebro()[0].functionDeclarations;
+    assert(herr.some(h => h.name === 'buscar_telefono') && herr.some(h => h.name === 'listar_telefonos') && R.accionDeHerramienta('buscar_telefono', { nombre: 'Ana' }).a === 'buscar_telefono', 'herramientas del cerebro para buscar teléfonos');
+    ['mover', 'giro', 'figura', 'luces', 'claxon', 'paro', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'modo', 'ppt', 'plan', 'datos', 'recordar', 'crear_rutina', 'ejecutar_rutina'].forEach(n => assert(herr.some(h => h.name === n), 'herramienta ' + n));
+    assert.deepStrictEqual(R.accionDeHerramienta('mover', { sentido: 1, cm: 100 }), { a: 'mover', sentido: 1, cm: 100, s: null });
+    assert.strictEqual(R.accionDeHerramienta('mover', { sentido: 1, cm: 100, a: 'paro' }).a, 'mover', 'una herramienta no puede disfrazarse de otra acción');
+    assert.strictEqual(R.accionDeHerramienta('inventada', {}), null);
+    assert.deepStrictEqual(R.accionDeHerramienta('crear_rutina', { nombre: 'Fiesta', pasos: [{ a: 'luces', efecto: 'arcoiris' }, { a: 'giro', grados: 360 }, { a: 'funcion', id: 'zigzag' }] }), { a: 'aprender', nombre: 'fiesta', pasos: [{ a: 'luces', efecto: 'arcoiris' }, { a: 'giro', grados: 360 }] });
+    assert.strictEqual(R.accionDeHerramienta('crear_rutina', { nombre: 'x', pasos: [] }), null);
+    assert.deepStrictEqual(R.accionDeHerramienta('recordar', { dato: 'Le gusta el rock' }), { a: 'recordar', dato: 'Le gusta el rock' });
+    assert.strictEqual(R.rutinaEnTexto('Hevy, haz la fiesta por favor', { fiesta: [1], fie: [2] }), 'fiesta');
+    assert.strictEqual(R.rutinaEnTexto('Hevy cuéntame un chiste', { fiesta: [1] }), null);
+    assert(/MODO TRISTE/.test(R.promptCerebro('triste')) && /IDENTIDAD/.test(R.promptCerebro(false)) && /«paro»/.test(R.promptCerebro(false)) && !/\{"a":/.test(R.promptCerebro('argentino')), 'el prompt del cerebro en vivo habla de herramientas, no de JSON');
+    assert(/function conectarCerebro\(\)/.test(extras) && /toolResponse/.test(extras) && /outputAudioTranscription/.test(extras) && /caerAlFlujoNormal/.test(extras) && /function cerebroDisponible\(\)/.test(extras) && /valorSeleccion\(\)\.split\(':'\)\[0\] === 'gemini'/.test(extras) && htmlVozIA.includes('id="rb-cerebro"'), 'conversación en vivo con herramientas, respaldo y solo con voz de Gemini');
+    assert(/function interrumpirPorVoz\(\)/.test(extras) && /UMBRAL_INTERRUPCION = 0\.14/.test(extras) && /ESC\.anillo\.forEach\(enviarAudio\)/.test(extras) && /if \(ESC\.on && hablaba\) return;/.test(extras), 'si hablas encima, Hevy se calla y no se pierde lo primero que dices; tocar el micrófono mientras habla solo lo calla');
+    assert(/o\.a === 'recordar'/.test(extras) && /rutinaEnTexto\(texto, leerRutinas\(\)\)/.test(extras) && /contextoMemoria\(\),/.test(extras) && htmlVozIA.includes('id="rb-memoria-lista"') && htmlVozIA.includes('id="rb-rutinas-lista"') && R.validarOrdenIA({ a: 'recordar', dato: 'x' }).a === 'recordar' && R.validarOrdenIA({ a: 'rutina', nombre: 'Fiesta' }).nombre === 'fiesta' && /\{"a":"recordar"/.test(R.promptIA(false)), 'memoria y rutinas: guardado, menú, prompt y ejecución local');
+    assert(/function abrirTextoVivo\(\)/.test(extras) && /if \(ESC\.cerebro\) \{ liveCtx\(\); abrirTextoVivo\(\); \}/.test(extras) && /function cerrarEntrada\(\)/.test(extras) && /if \(ESC\.unico\) \{\s+cerrarEntrada\(\);/.test(extras) && /if \(ESC\.unico\) cerrarEntrada\(\); llamadasCerebro/.test(extras) && /if \(ESC\.unico\) cerrarEntrada\(\); cerrarOido\(\);/.test(extras), 'con el cerebro en vivo el texto se escribe mientras hablas y, en el modo de un toque, el micrófono se apaga al terminar tu frase');
+    assert(/silenceDurationMs: 500/.test(extras) && /function juntarTranscripcion/.test(extras) && /\\p\{Script=Latin\}/.test(extras) && /soloNombre \? 2500 : 1100/.test(extras), 'la escucha continua une segmentos, acepta el nombre en otro alfabeto y espera tras decir solo «Hevy»');
+    assert(/buaaa/i.test(R.TRISTE.saludo.join('')) && R.TRISTE.saludo.concat(R.TRISTE.estado, R.TRISTE.adios).some(f => /esposa/.test(f)) && /esposa/.test(R.promptIA('triste')) && /sobbing and crying/.test(extras), 'el modo triste llora y se inventa desgracias');
+    assert(/ahora - SOLO\.ultimo < 180000/.test(extras) && /SOLO\.bateria < 600000/.test(extras) && /consultarIA\(\[\], false, evento\)/.test(extras), 'reacciona solo con tope de frecuencia');
 }
 
 {
@@ -852,7 +1095,7 @@ console.log('robot.test.js: todo bien');
     R.VARIANTES.forEach(v => assert(html.includes(`id="i-mod-${v.id}"`), 'icono del modelo ' + v.id));
     ['radar', 'escudo', 'casa', 'fig-circulo', 'fig-cuadrado', 'fig-triangulo', 'fig-estrella'].forEach(i => assert(html.includes(`id="i-${i}"`), 'icono ' + i));
     ['robot-jarvis', 'robot-dibujar', 'robot-funciones'].forEach(sec => assert(html.includes(`id="sec-${sec}"`) && html.includes(`id="tab-${sec}"`), 'sección ' + sec));
-    assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Yokis');
+    assert(!html.includes('rb-menu-extra') && !html.includes('rb-ctl-extra'), 'el mando ya no lleva el menú de Hevy');
     assert(html.includes('id="rb-baile-panel"') && !html.includes('id="tab-robot-baile"') && !html.includes('id="sec-robot-baile"'), 'el baile es una función de Funciones con su panel de ajustes');
     assert(html.includes('id="i-fn-baile"'), 'icono del baile');
     const nav = fs.readFileSync(path.join(__dirname, '..', 'admin-secciones.js'), 'utf8');
@@ -892,11 +1135,11 @@ console.log('robot.test.js: todo bien');
     assert.deepStrictEqual(col[4], [0, 255, 60], 'la bolita es verde');
     assert(col[0][0] > 100 && col[0][1] === 0, 'las casillas pares son rojas');
     assert(col[1][0] < 20 && col[1][1] < 20, 'las impares son negras');
-    assert.deepStrictEqual(R.ordenDeVoz('Yokis juega a la ruleta'), { a: 'ruleta' });
-    assert.deepStrictEqual(R.ordenDeVoz('Yokis detén la ruleta'), { a: 'paro' });
+    assert.deepStrictEqual(R.ordenDeVoz('Hevy juega a la ruleta'), { a: 'ruleta' });
+    assert.deepStrictEqual(R.ordenDeVoz('Hevy detén la ruleta'), { a: 'paro' });
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     assert(html.includes('id="rb-ruleta-panel"') && html.includes('id="rb-rul-girar"') && html.includes('id="i-fn-ruleta"'), 'la ruleta tiene panel e icono');
-    assert(['rb-voz-sel', 'rb-voz-grave', 'rb-voz-rapido', 'rb-voz-probar'].every(id => html.includes(`id="${id}"`)), 'Yokis deja elegir su voz');
+    assert(['rb-voz-unica', 'rb-voz-probar'].every(id => html.includes(`id="${id}"`)), 'Hevy deja elegir su voz en un solo menú');
     const ex = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-extras.js'), 'utf8');
     assert(/pitch: 0\.75/.test(ex) && /rate: 1\.15/.test(ex), 'voz grave y enérgica por defecto');
 }
@@ -959,6 +1202,16 @@ console.log('robot.test.js: todo bien');
     assert(/function moverEstadoRobot/.test(pl) && /function navAutoOcultar/.test(pl) && /toque\(8\)/.test(pl), 'en la app la batería sube al encabezado, las pestañas se esconden y los toques vibran');
     const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'robot.css'), 'utf8');
     assert(/\.es-app \.admin-head__actions \{ display: none; \}/.test(css) && /\.es-app \.rb-barra__que \{ display: none; \}/.test(css), 'en la app no sale Cerrar sesión arriba y la barra de abajo es compacta');
+    assert(/\.es-app \.rb-barra \{[^}]*bottom: calc\(env\(safe-area-inset-bottom, 0px\) \+ 28px\)/.test(css) && /\.rb-barra \{[^}]*padding: 0; pointer-events: none;/.test(css), 'los botones de parar y reproducir suben un poco para que la barra del teléfono no los tape y van sueltos, sin recuadro');
+    const barra = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert(/id="rb-barra-paro"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-stop"\/><\/svg><\/button>/.test(barra) && /id="rb-barra-play"[^>]*rb-barra__cuadro[^>]*><svg[^>]*><use href="#i-play"\/><\/svg><\/button>/.test(barra), 'parar y reproducir son botones cuadrados solo con el símbolo');
+    assert(/\.es-app \{ -webkit-user-select: none; user-select: none; \}/.test(css) && /\.es-app, \.es-app \* \{ -webkit-tap-highlight-color: transparent;/.test(css) && /\.es-app ::selection \{ background: transparent; \}/.test(css) && /\.es-app input, \.es-app textarea, \.es-app \[contenteditable\] \{ -webkit-user-select: text;/.test(css), 'en la app no sale el cuadro azul al dejar presionado, pero se puede seleccionar el texto de los cuadros de escribir');
+    const rjs = fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8');
+    assert(/S\.leds\[S\.sel\] = b\.dataset\.c;/.test(rjs) && !/S\.leds\.fill\(b\.dataset\.c\)/.test(rjs) && /id="rb-led-ant"/.test(barra) && /id="rb-led-sig"/.test(barra) && /id="rb-led-apagar"/.test(barra), 'tocar un color pinta solo el LED elegido; hay flechas para cambiar de LED y botón para apagarlo');
+    assert(/\.rb-paleta \.rb-sw \{[^}]*background: transparent/.test(css), 'los colores de la paleta de luces no heredan el estilo redondo del mando');
+    assert(/id="rb-toast"/.test(barra) && /\.rb-barra #rb-msg \{ display: none; \}/.test(css) && /function mensaje\(texto, tipo, rapido\) \{\s*if \(rapido\) aviso\(texto, tipo\);/.test(rjs), 'los mensajes no salen como aviso rápido arriba salvo que se pida, y nunca en la barra de abajo');
+    assert((rjs.match(/mensaje\([^;\n]*, true\)/g) || []).length === 2 && /mensaje\('Robot conectado', 'ok', true\)/.test(rjs), 'el único aviso rápido es «Robot conectado», al conectar o al entrar al robot ya conectado');
+    assert(/\.rb-barra__cuadro\.is-pulso::after \{ animation: rb-anillo/.test(css) && /classList\.add\('is-pulso'\)/.test(rjs), 'parar y reproducir tienen animación al tocarlos');
     const man = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
     assert(/android\.permission\.VIBRATE/.test(man), 'la app puede vibrar');
     assert(/pantallaViva\(true, 'ruleta'\)/.test(rj) && /razonesPantalla/.test(fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-control.js'), 'utf8')), 'la pantalla sigue encendida con el mando, la ruleta y las rutas');

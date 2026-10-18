@@ -4,6 +4,7 @@
 
 import { kv } from '@vercel/kv';
 import { signToken } from '../lib/auth.js';
+import { esClaveMaestra, leerAdmins, claveCoincide } from '../lib/admins.js';
 import { ipDe, bloqueado, anotarFallo, olvidar } from '../lib/limite.js';
 import { cors, origenPermitido } from '../lib/cors.js';
 
@@ -28,7 +29,19 @@ export default async function handler(req, res) {
 
     const { password } = req.body || {};
 
-    if (typeof password !== 'string' || password !== process.env.ADMIN_PASSWORD) {
+    // La contraseña maestra (ADMIN_PASSWORD) o la de alguno de los admins guardados
+    let sujeto = null;
+    if (typeof password === 'string' && password.length > 0 && password.length <= 200) {
+        if (esClaveMaestra(password)) {
+            sujeto = 'master';
+        } else {
+            let admins = [];
+            try { admins = await leerAdmins(kv); } catch (e) { admins = []; }
+            const a = admins.find(x => claveCoincide(password, x));
+            if (a) sujeto = a.id;
+        }
+    }
+    if (!sujeto) {
         await anotarFallo(kv, clave, VENTANA_S);
         return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
@@ -36,7 +49,7 @@ export default async function handler(req, res) {
 
     let token;
     try {
-        token = signToken();
+        token = signToken(sujeto);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

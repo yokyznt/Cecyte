@@ -6,7 +6,7 @@
 const CACHE = 'cecyte-v2';
 const BASICOS = ['/', '/index.html', '/app.js', '/calendario.js', '/admin-secciones.js', '/logo-cecyte.png', '/manifest.webmanifest',
     '/css/fonts.css', '/css/tokens.css', '/css/base.css', '/css/components.css', '/css/pages.css', '/css/layout.css',
-    '/css/robot.css', '/css/themes/oscuro.css', '/fonts/hanken-latin.woff2', '/fonts/bricolage-latin.woff2'];
+    '/css/admins.css', '/css/robot.css','/css/themes/oscuro.css', '/fonts/hanken-latin.woff2', '/fonts/bricolage-latin.woff2'];
 // De la API solo se guarda lo público que necesita el alumno para ver su horario
 const API_GUARDABLE = ['/api/schedule', '/api/groups'];
 

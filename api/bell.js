@@ -21,7 +21,7 @@
 // así que él le pregunta a esta API cada ~5 segundos si hay algo nuevo.
 
 import { kv } from '@vercel/kv';
-import { verifyToken, adminToken } from '../lib/auth.js';
+import { exigir } from '../lib/admins.js';
 import { cors } from '../lib/cors.js';
 
 const BELL_KEY = 'cecyte_bell';
@@ -74,10 +74,6 @@ async function getBell() {
     return { ...DEFAULT_BELL, ...(saved || {}) };
 }
 
-function isAdmin(req) {
-    return verifyToken(adminToken(req));
-}
-
 // Texto para el ESP32 (ver arriba)
 function deviceText(bell, fw) {
     const rhythms = Object.entries(bell.rhythms || {}).map(([t, r]) => `${t}=${r.join(',')}`).join(';');
@@ -110,9 +106,7 @@ export default async function handler(req, res) {
         const deviceKey = req.query.key;
         const isDevice = !!process.env.BELL_DEVICE_KEY && deviceKey === process.env.BELL_DEVICE_KEY;
 
-        if (!isDevice && !isAdmin(req)) {
-            return res.status(401).json({ error: 'No autorizado' });
-        }
+        if (!isDevice && !(await exigir(req, res, kv, 'timbre', 'ritmo', 'esp32'))) return;
 
         try {
             const bell = await getBell();
@@ -153,9 +147,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        if (!isAdmin(req)) {
-            return res.status(401).json({ error: 'No autorizado. Inicia sesión de nuevo.' });
-        }
+        if (!(await exigir(req, res, kv, 'timbre', 'ritmo'))) return;
 
         const body = req.body || {};
 
