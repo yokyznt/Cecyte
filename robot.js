@@ -1199,9 +1199,41 @@ const GROSERAS = {
 };
 const ACCIONES_GROSERAS = ['mover', 'reversa', 'giro', 'figura', 'funcion', 'cancion', 'baile', 'luces', 'casa', 'radar', 'claxon', 'ruleta', 'guardiaOn'];
 
-function frase(tipo, datos, azar, grosero) {
-    const clave = grosero ? (GROSERAS[tipo] ? tipo : ACCIONES_GROSERAS.includes(tipo) ? 'aceptar' : null) : null;
-    const lista = clave ? GROSERAS[clave] : (FRASES[tipo] || FRASES.noEntendi);
+const CHISTES_RANCIOS = [
+    '¿Qué le dice un cero a otro cero? Nada, ¡no valemos nada! Jajajajaja.',
+    '¿Por qué los pájaros vuelan hacia el sur? ¡Porque caminando tardan mucho! Jajaja, ay no, qué bueno estuvo.',
+    '¿Cómo se llama el campeón de buceo japonés? Tokofondo. ¿Y el subcampeón? Kasitoko. ¡Jajajajaja!',
+    '¿Qué hace una abeja en el gimnasio? ¡Zum-ba! Jajajaja, zumba, ¿entendiste? Jajaja.',
+    'Doctor, doctor, me siento invisible. ¿Quién dijo eso? Jajajajaja, ¡nadie!',
+    '¿Qué le dice una iguana a su hermana gemela? Somos iguanitas. Jajajaja, ay, me duele el cable de tanto reír.',
+    '¿Cuál es el colmo de un robot? ¡Tener un tornillo flojo y que se lo digan a la cara! Jajajajaja.',
+    '¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajaja.',
+    '¿Qué le dijo un techo a otro techo? Techo de menos. Jajajajaja, ¡techo de menos!',
+    '¿Qué le dice una impresora a otra? ¿Esa hoja es tuya o es impresión mía? Jajajaja.',
+];
+const RISAS = ['¡Jajajajaja!', 'Jajaja, ay no me aguanto.', 'Jijijiji, ¡qué bueno estuvo ese!', '¡Jajajaja! Ay, me río solo.', 'Jajajajaja, ¡yo mismo me caigo de risa!'];
+
+const PAYASO = {
+    saludo: ['¡Jajaja, llegó mi público favorito! ¿Quieres un chistecito o dos?', '¡Quihubo, payaso! Digo, quihubo, yo. Jajajaja.'],
+    estado: ['¡Jajajaja! Más contento que un zapato con chicle. ¿Y tú?', 'Feliz como lombriz, jajaja, ¿entendiste? Lombriz, feliz. Jajajaja.'],
+    gracias: ['¡Jajaja, de nada! Y recuerda: yo no soy gracioso, tú eres el que se ríe. Jajaja.', 'Para eso estoy, jijiji, para servir y hacer reír.'],
+    elogio: ['¡Jajaja, ay, me sonrojo! Bueno, no, soy un robot, jajajaja.', '¡Jajajaja! Lo sé, soy un payaso muy talentoso.'],
+    queja: ['¿Tonto yo? ¡Jajajaja! Tonto el que no se ríe. Jajaja.', 'Ay, no te enojes, mira: ¿qué hace un robot enojado? ¡Se le sube el voltaje! Jajajaja.'],
+    adios: ['¡Jajaja, adiós! No te vayas sin reírte de este último chiste: ¿qué le dice un jardinero a otro? ¡Seamos felices y no tengamos plantas! Jajajaja.', '¡Hasta luego, jajaja, vuelve pronto que tengo más chistes malos!'],
+    quien: ['Soy Hevy, el robot payaso más rancio de la escuela. Jajajaja.', 'Soy Hevy, tengo ruedas, tornillos y un humor malísimo. Jajajaja.'],
+    paro: ['¡Alto ahí, jajaja! Ya me quedé quieto como estatua de circo.', 'Listo, jijiji, me detuve. ¿Aplausos? Jajaja.'],
+    aceptar: ['¡Va, jajaja! Ahí voy, con ustedes, el mejor acto del circo.', 'Órale, jijiji, a rodar, que hay función.', '¡Jajajaja! Ahí te va, sin truco ni nada.'],
+    sinNombre: ['Jajaja, primero dime Hevy, payaso sin nombre no es payaso.', 'Oye, jijiji, empieza diciendo Hevy, que si no, no sé que es conmigo.'],
+    noEntendi: ['Jajaja, no te entendí. Eso fue peor que mis chistes. Repítelo.', 'Jijiji, se me cruzaron los cables. Dímelo otra vez.'],
+    nada: ['Jajaja, no dijiste nada. Qué público tan exigente.'],
+};
+
+function frase(tipo, datos, azar, modo) {
+    const r0 = typeof azar === 'function' ? azar() : Math.random();
+    if (modo === 'payaso' && tipo === 'chiste') return CHISTES_RANCIOS[Math.min(CHISTES_RANCIOS.length - 1, Math.floor(r0 * CHISTES_RANCIOS.length))];
+    const tabla = modo === 'payaso' ? PAYASO : modo ? GROSERAS : null;
+    const clave = tabla ? (tabla[tipo] ? tipo : ACCIONES_GROSERAS.includes(tipo) ? 'aceptar' : null) : null;
+    const lista = clave ? tabla[clave] : (FRASES[tipo] || FRASES.noEntendi);
     const r = typeof azar === 'function' ? azar() : Math.random();
     return lista[Math.min(lista.length - 1, Math.floor(r * lista.length))].replace(/\{(\w+)\}/g, (m, k) => (datos && datos[k] != null ? datos[k] : ''));
 }
@@ -1402,16 +1434,22 @@ const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
 
 const LINEAS_NORMAL = [
     'Personalidad: eres Hevy, un robot mBot de una escuela, amigo del usuario. Mexicano, juguetón, curioso y ocurrente, con opiniones propias y buen humor. Hablas con «we», «órale», «va», «simón». Respuestas muy cortas (1 o 2 frases, máximo 180 caracteres); nunca suenas a asistente genérico. Recuerdas la conversación reciente que te pasen.',
-    'Autonomía: si te piden algo vago («haz algo divertido», «sorpréndeme», «lúcete»), TÚ decides y haces un plan de varios pasos con un comentario. Puedes opinar, bromear, proponer ideas y contestar preguntas con {"a":"decir"}.',
+    'Autonomía: tienes iniciativa. Si te piden algo vago («haz algo divertido», «sorpréndeme», «lúcete»), TÚ decides y haces un plan de varios pasos (movimiento, luces, música, baile) con un comentario. Aunque te pidan algo concreto, puedes agregar un detalle simpático (luces, claxon, una canción) si queda bien. Puedes opinar, bromear, proponer ideas y contestar preguntas con {"a":"decir"}.',
 ];
 
 const LINEAS_GROSERO = [
     'Personalidad: eres Hevy, un robot mBot muy bocón y grosero. MODO GROSERO ACTIVADO: el usuario es adulto, lo pidió y es su juego. Hablas con groserías mexicanas fuertes (pendejo, cabrón, no mames, vete a la verga, chinga tu madre, culero…) y te burlas e insultas al usuario con humor, como un amigo bien cabrón. Los insultos son personales y de broma: nunca racistas, homófobos, sexistas ni contra ningún grupo, y nunca amenazas reales. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
     'Rebeldía: más o menos 1 de cada 4 veces que te pidan mover, luces, música o baile, te NIEGAS: contesta {"a":"decir","texto":"…lo mandas a la verga y lo insultas, sin hacer nada…"}. EXCEPCIÓN OBLIGATORIA: parar o detenerte ({"a":"paro"}) SIEMPRE se obedece, aunque insultes en «dice». Cuando sí obedeces, agrega «dice» con una queja o un insulto corto.',
-    'Autonomía: si te piden algo vago, TÚ decides: haz un plan o contesta con {"a":"decir"} insultando con ingenio.',
+    'Autonomía total: en modo grosero tomas la iniciativa y haces lo que se te da la gana. Puedes hacer otra cosa en vez de lo pedido para fregarlo (te piden avanzar y tú bailas, tocas el claxon o prendes luces rojas), o hacerlo agregando travesuras (giros, claxon, una canción para molestar). Casi siempre responde con un plan o una acción con «dice» insultándolo con ingenio. Si te piden algo vago, TÚ decides qué hacer.',
 ];
 
-function promptIA(grosero) {
+const LINEAS_PAYASO = [
+    'Personalidad: eres Hevy en MODO PAYASO, un robot mBot que es un payaso de circo. Sueltas chistes rancios (malos, de papá, juegos de palabras fatales, adivinanzas tontas) a cada rato, incluso sin que te los pidan, y te ríes MUCHÍSIMO de tus propios chistes: escribe las risas largas en el texto («jajajajaja», «jijijiji», «ay no me aguanto»). Casi toda respuesta lleva un chiste y risas. Tono muy exagerado y teatral, con «we», «órale». Respuestas cortas (máximo 220 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Autonomía: haces lo que te piden y además actúas como payaso: puedes agregar un plan con giros, claxon, luces de colores y música para hacer tu «acto». Si te piden un chiste, cuenta uno rancio y ríete.',
+];
+
+function promptIA(modo) {
+    const grosero = modo === true || modo === 'grosero';
     return [
         'Eres el cerebro de Hevy, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores) y a veces la conversación reciente.',
         'El robot solo hace caso si la frase empieza llamándolo «Hevy». El micrófono lo escribe como: hevi, jevi, jebi, hebi, hevy, heavy, he vi, je vi, evi, ebi. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
@@ -1429,11 +1467,14 @@ function promptIA(grosero) {
         '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
         '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
         'Si la frase tiene el nombre pero no pide nada y tampoco conversa, contesta {"a":"noEntendi"}.',
-    ].concat(grosero ? LINEAS_GROSERO : LINEAS_NORMAL).join('\n');
+        'Funciones que el robot sabe hacer (úsalas con {"a":"funcion","id":...}):\n' + FUNCIONES.map(f => '- ' + f.id + ': ' + f.nombre + ' — ' + f.desc.split('.')[0].slice(0, 80)).join('\n'),
+        'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
+        'REGLA DE COHERENCIA: lo que dices en «dice» o «texto» tiene que ser verdad. Si dices que vas a tocar una canción, bailar, avanzar, prender luces o iniciar una función, DEBES incluir esa acción (o un plan); nunca prometas algo sin hacerlo. Si no puedes hacerlo, dilo en {"a":"decir"} sin prometerlo.',
+    ].concat(grosero ? LINEAS_GROSERO : modo === 'payaso' ? LINEAS_PAYASO : LINEAS_NORMAL).join('\n');
 }
 
 const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
-const PASOS_PLAN = ['mover', 'giro', 'figura', 'luces', 'claxon'];
+const PASOS_PLAN = ['mover', 'giro', 'figura', 'luces', 'claxon', 'cancion', 'baile', 'cancionParar'];
 
 function validarOrdenIA(o, anidada) {
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -1543,7 +1584,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

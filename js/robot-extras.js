@@ -5,9 +5,20 @@
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
     const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null };
-    const CLAVE_GROSERO = 'cecyte_yokis_grosero';
-    const groseroOn = () => { try { return localStorage.getItem(CLAVE_GROSERO) === '1'; } catch (e) { return false; } };
-    const CHARLA_IA = ['gracias', 'estado', 'chiste', 'elogio', 'queja', 'quien', 'adios'];
+    const CLAVE_MODO = 'cecyte_yokis_modo';
+    const modoHevy = () => {
+        try {
+            const m = localStorage.getItem(CLAVE_MODO);
+            if (m === 'payaso' || m === 'grosero') return m;
+            if (m === null && localStorage.getItem('cecyte_yokis_grosero') === '1') return 'grosero';
+        } catch (e) { return 'normal'; }
+        return 'normal';
+    };
+    const groseroOn = () => modoHevy() === 'grosero';
+    const modoF = () => { const m = modoHevy(); return m === 'normal' ? false : m; };
+    const CRITICAS = ['paro', 'cancionParar', 'bateria'];
+    const NEGACION = /\b(no|ni|nunca|tampoco|jamas|nada|aunque)\b/;
+    const PROMETIDAS = ['cancion', 'baile', 'luces', 'funcion', 'figura', 'radar', 'guardia', 'casa'];
     const REBELDES = ['mover', 'giro', 'figura', 'luces', 'baile', 'cancion', 'funcion', 'casa', 'radar', 'claxon', 'ruleta'];
     const SIN_DICE = ['sinRobot', 'fallo', 'ocupado', 'sinFuncion', 'sinCancion', 'sinMicro', 'sinVoz'];
 
@@ -22,7 +33,7 @@
 
     function historial(quien, texto) {
         E.memoria.push((quien === 'yo' ? 'Usuario: ' : 'Hevy: ') + texto);
-        if (E.memoria.length > 8) E.memoria.shift();
+        if (E.memoria.length > 12) E.memoria.shift();
         const ol = $('rb-jarvis-hist');
         if (!ol) return;
         const li = document.createElement('li');
@@ -427,9 +438,9 @@
     }
 
     const CLAVE_VOZIA = 'cecyte_yokis_vozia';
-    const MODELOS_VOZIA = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
+    const MODELOS_VOZIA = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
     const VOCES_IA = [['Charon', 'Charon (grave)'], ['Fenrir', 'Fenrir (fuerte)'], ['Orus', 'Orus (firme)'], ['Puck', 'Puck (alegre)'], ['Zephyr', 'Zephyr (brillante)'], ['Kore', 'Kore (firme, femenina)']];
-    const VIA = { audio: null, fuente: null, cache: new Map(), pausaHasta: 0, turno: 0 };
+    const VIA = { fuente: null, cache: new Map(), agotados: {}, pausaHasta: 0, turno: 0, bd: null, motivo: '' };
 
     function vozIAElegida() {
         try {
@@ -439,78 +450,174 @@
         return 'Charon';
     }
 
-    function callarIA() {
-        if (!VIA.fuente) return;
-        try { VIA.fuente.stop(); } catch (e) { VIA.fuente = null; }
-        VIA.fuente = null;
+    function estadoVoz(t) {
+        const el = $('rb-ia-estado');
+        if (el) el.textContent = t;
     }
 
-    function pcmABuffer(b64) {
-        const bin = atob(b64), n = bin.length >> 1, f = new Float32Array(n);
-        for (let i = 0; i < n; i++) {
-            const s = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
-            f[i] = (s > 32767 ? s - 65536 : s) / 32768;
-        }
-        const buf = VIA.audio.createBuffer(1, n, 24000);
-        buf.copyToChannel(f, 0);
-        return buf;
+    function callarIA() {
+        const a = VIA.fuente;
+        VIA.fuente = null;
+        if (!a) return;
+        try { a.pause(); } catch (e) { return; }
+    }
+
+    function pcmAWav(b64) {
+        const bin = atob(b64), n = bin.length, bytes = new Uint8Array(44 + n), v = new DataView(bytes.buffer);
+        const txt = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+        txt(0, 'RIFF'); v.setUint32(4, 36 + n, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, n, true);
+        for (let i = 0; i < n; i++) bytes[44 + i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: 'audio/wav' });
+    }
+
+    function sonar(url) {
+        return new Promise((res, rej) => {
+            const a = new Audio(url);
+            VIA.fuente = a;
+            const reloj = setTimeout(() => rej(new Error('tiempo')), 40000);
+            a.onended = () => { clearTimeout(reloj); res(true); };
+            a.onerror = () => { clearTimeout(reloj); rej(new Error('audio')); };
+            a.onpause = () => { if (VIA.fuente !== a) { clearTimeout(reloj); res(true); } };
+            a.play().catch(e => { clearTimeout(reloj); rej(e); });
+        });
+    }
+
+    function abrirBdVia() {
+        return new Promise(res => {
+            if (VIA.bd) { res(VIA.bd); return; }
+            try {
+                const q = indexedDB.open('hevy-voz-ia', 1);
+                q.onupgradeneeded = () => q.result.createObjectStore('v');
+                q.onsuccess = () => { VIA.bd = q.result; res(q.result); };
+                q.onerror = () => res(null);
+            } catch (e) { res(null); }
+        });
+    }
+
+    async function cacheGet(clave) {
+        const db = await abrirBdVia();
+        if (!db) return null;
+        return new Promise(res => {
+            const q = db.transaction('v').objectStore('v').get(clave);
+            q.onsuccess = () => res(q.result || null);
+            q.onerror = () => res(null);
+        });
+    }
+
+    async function cachePut(clave, datos) {
+        const db = await abrirBdVia();
+        if (!db) return;
+        const st = db.transaction('v', 'readwrite').objectStore('v');
+        st.put(datos, clave);
+        const n = st.count();
+        n.onsuccess = () => {
+            if (n.result <= 150) return;
+            const cur = st.openKeyCursor();
+            cur.onsuccess = () => { if (cur.result) st.delete(cur.result.key); };
+        };
     }
 
     async function pedirVozIA(texto, nombreVoz) {
         const llave = llaveIA();
+        const modo = modoHevy();
+        const tono = modo === 'grosero' ? 'Di en español mexicano, con tono burlón, grosero y de barrio: ' : modo === 'payaso' ? 'Di en español mexicano, como un payaso muy exagerado que se ríe a carcajadas: ' : 'Di en español mexicano, con tono de amigo, animado y natural: ';
+        const estilos = [tono + texto, texto];
+        let agotados = 0;
         for (const modelo of MODELOS_VOZIA) {
-            const corte = new AbortController();
-            const reloj = setTimeout(() => corte.abort(), 9000);
-            try {
-                const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: (groseroOn() ? 'Di en español mexicano, con tono burlón, grosero y de barrio: ' : 'Di en español mexicano, con tono de amigo, animado y natural: ') + texto }] }],
-                        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
-                    }),
-                });
-                if (r.status === 429) { VIA.pausaHasta = Date.now() + 60000; return null; }
-                if (!r.ok) continue;
-                const j = await r.json();
-                const dato = j.candidates[0].content.parts.find(p => p.inlineData);
-                if (dato) return dato.inlineData.data;
-            } catch (e) {
-                VIA.pausaHasta = Date.now() + 20000;
-                return null;
-            } finally {
-                clearTimeout(reloj);
+            if ((VIA.agotados[modelo] || 0) > Date.now()) { agotados++; continue; }
+            for (const peticion of estilos) {
+                const corte = new AbortController();
+                const reloj = setTimeout(() => corte.abort(), 12000);
+                try {
+                    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: peticion }] }],
+                            generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
+                        }),
+                    });
+                    if (r.status === 429) { VIA.agotados[modelo] = Date.now() + 3600000; agotados++; break; }
+                    if (!r.ok) break;
+                    const j = await r.json();
+                    const c = j.candidates && j.candidates[0];
+                    const dato = c && c.content && c.content.parts && c.content.parts.find(x => x.inlineData);
+                    if (dato) return dato.inlineData.data;
+                } catch (e) {
+                    if (e && e.name === 'AbortError') { VIA.motivo = 'lenta'; return null; }
+                    VIA.pausaHasta = Date.now() + 15000;
+                    VIA.motivo = 'red';
+                    return null;
+                } finally {
+                    clearTimeout(reloj);
+                }
             }
         }
+        VIA.motivo = agotados === MODELOS_VOZIA.length ? 'cuota' : 'error';
         return null;
     }
 
-    async function hablarIA(texto) {
-        if (!llaveIA() || Date.now() < VIA.pausaHasta || !(raiz.AudioContext || raiz.webkitAudioContext)) return false;
-        const turno = ++VIA.turno;
+    async function hablarGoogle(texto, turno) {
+        const partes = texto.match(/.{1,170}(\s|$)/g) || [texto];
         try {
-            if (!VIA.audio) VIA.audio = new (raiz.AudioContext || raiz.webkitAudioContext)();
-            if (VIA.audio.state !== 'running') await Promise.race([VIA.audio.resume(), new Promise(res => setTimeout(res, 1200))]);
-            if (VIA.audio.state !== 'running') return false;
-            const nombreVoz = vozIAElegida(), clave = nombreVoz + (groseroOn() ? '!' : '|') + texto;
-            let datos = VIA.cache.get(clave);
-            if (!datos) {
-                datos = await pedirVozIA(texto, nombreVoz);
-                if (!datos) return false;
-                VIA.cache.set(clave, datos);
-                if (VIA.cache.size > 40) VIA.cache.delete(VIA.cache.keys().next().value);
+            for (const parte of partes) {
+                if (turno !== VIA.turno) return true;
+                await sonar('https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=es-MX&q=' + encodeURIComponent(parte.trim()));
             }
-            if (turno !== VIA.turno) return true;
-            callarIA();
-            const fuente = VIA.audio.createBufferSource();
-            const buf = pcmABuffer(datos);
-            fuente.buffer = buf;
-            fuente.connect(VIA.audio.destination);
-            VIA.fuente = fuente;
-            await new Promise(res => { fuente.onended = res; setTimeout(res, buf.duration * 1000 + 1500); fuente.start(); });
             return true;
         } catch (e) {
             return false;
         }
+    }
+
+    const MOTIVOS_VOZ = {
+        cuota: 'Se acabó la cuota gratis de la voz de IA por hoy (10 frases por modelo)',
+        red: 'No hay internet ni datos',
+        lenta: 'La voz de IA tardó demasiado',
+        error: 'La voz de IA no respondió',
+        llave: 'Falta la llave de Gemini',
+    };
+
+    async function hablarIA(texto) {
+        const turno = ++VIA.turno;
+        VIA.motivo = llaveIA() ? '' : 'llave';
+        if (llaveIA() && Date.now() >= VIA.pausaHasta) {
+            try {
+                const nombreVoz = vozIAElegida(), clave = nombreVoz + '|' + modoHevy() + '|' + texto;
+                let datos = VIA.cache.get(clave) || await cacheGet(clave);
+                if (!datos) {
+                    datos = await pedirVozIA(texto, nombreVoz);
+                    if (datos) cachePut(clave, datos);
+                }
+                if (datos) {
+                    VIA.cache.set(clave, datos);
+                    if (VIA.cache.size > 40) VIA.cache.delete(VIA.cache.keys().next().value);
+                    if (turno !== VIA.turno) return true;
+                    callarIA();
+                    const url = URL.createObjectURL(pcmAWav(datos));
+                    try {
+                        await sonar(url);
+                        estadoVoz('Voz: IA de Gemini.');
+                        return true;
+                    } finally {
+                        URL.revokeObjectURL(url);
+                    }
+                }
+            } catch (e) {
+                VIA.motivo = 'error';
+            }
+        } else if (llaveIA()) {
+            VIA.motivo = 'red';
+        }
+        if (turno !== VIA.turno) return true;
+        callarIA();
+        const motivo = MOTIVOS_VOZ[VIA.motivo] || MOTIVOS_VOZ.error;
+        if (VIA.motivo !== 'red' && await hablarGoogle(texto, turno)) {
+            estadoVoz(motivo + ': hablo con la voz de Google.');
+            return true;
+        }
+        estadoVoz(motivo + ': hablo con la voz del teléfono.');
+        return false;
     }
 
     function iniciarVozIA() {
@@ -616,13 +723,14 @@
             hablar(d, tipo === 'paro');
             return;
         }
-        const gro = groseroOn();
+        if (E.callado) { E.callado = false; return; }
+        const modo = modoHevy();
         let t = null;
-        if (ENT.activa && !datos && !gro) {
+        if (ENT.activa && !datos && modo === 'normal') {
             const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
             if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
         }
-        hablar(t || raiz.Robot.frase(tipo, datos, undefined, gro), tipo === 'paro');
+        hablar(t || raiz.Robot.frase(tipo, datos, undefined, modo === 'normal' ? false : modo), tipo === 'paro');
     };
 
     function calibra() {
@@ -887,22 +995,58 @@
             else if (p.a === 'figura') rec.push(figura(p.f));
             else if (p.a === 'luces') enlace().luces(p.efecto, p.color || null);
             else if (p.a === 'claxon') enlace().nota(440, 500);
+            else {
+                E.callado = true;
+                ejecutarAccion(p);
+                E.callado = false;
+            }
         });
         const ruta = rec.length ? R.unirRecorridos(rec, 'Plan') : null;
         if (ruta) correr(ruta, 'mover');
-        else di('fallo');
+        else if (o.pasos.every(p => ['mover', 'giro', 'figura'].includes(p.a))) di('fallo');
+    }
+
+    function resumenAccion(o) {
+        if (!o) return '';
+        if (o.a === 'plan') return 'plan: ' + o.pasos.map(resumenAccion).join(', ');
+        return o.a + (o.id ? ' ' + o.id : o.f ? ' ' + o.f : o.q ? ' ' + o.q : o.grados ? ' ' + o.grados : '');
+    }
+
+    function promesa(texto) {
+        const s = raiz.Robot.sinAcentos(texto);
+        if (!s || NEGACION.test(s)) return null;
+        const o = raiz.Robot.ordenDeVoz('hevy ' + s);
+        if (!o || !PROMETIDAS.includes(o.a)) return null;
+        if (o.a === 'cancion' && !o.id && !o.q) return null;
+        return o;
+    }
+
+    function cumplirPromesa(texto, hecho) {
+        const p = promesa(texto);
+        if (!p || !listo() || hecho.includes(p.a)) return;
+        E.callado = true;
+        ejecutarAccion(p);
+        E.callado = false;
+        E.memoria.push('(Hevy hizo: ' + resumenAccion(p) + ')');
     }
 
     function ejecutar(o) {
         E.dice = o && o.dice ? o.dice : null;
-        if (o && o.a === 'decir') { E.dice = null; hablar(o.texto); return; }
+        if (o && o.a === 'decir') {
+            E.dice = null;
+            hablar(o.texto);
+            cumplirPromesa(o.texto, []);
+            return;
+        }
         if (o && o.a === 'plan') ejecutarPlan(o);
         else ejecutarAccion(o);
+        if (o && o.dice) cumplirPromesa(o.dice, o.a === 'plan' ? o.pasos.map(p => p.a) : [o.a]);
         if (E.dice) {
             const d = E.dice;
             E.dice = null;
             hablar(d, true);
         }
+        if (o && !['sinNombre', 'charla', 'saludo'].includes(o.a)) E.memoria.push('(Hevy hizo: ' + resumenAccion(o) + ')');
     }
 
     function ejecutarAccion(o) {
@@ -935,11 +1079,11 @@
         else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); di(o.color === '#000000' ? 'lucesOff' : 'luces'); }
         else if (o.a === 'baile') {
             const r = enlace().bailar(o.id, o.cancion);
-            if (r) hablar(raiz.Robot.frase('baile') + ` Va con ${r.baile}${r.cancion ? ' y ' + r.cancion : ''}.`);
+            if (r) { if (!E.callado) hablar(raiz.Robot.frase('baile', null, undefined, modoF()) + ` Va con ${r.baile}${r.cancion ? ' y ' + r.cancion : ''}.`); }
             else di('fallo');
         } else if (o.a === 'funcion') {
             const r = enlace().funcionPorId(o.id);
-            if (r) hablar(raiz.Robot.frase('funcion', { nombre: r.nombre }) + (r.modelo ? ` Ojo, cambié al modelo ${r.modelo}.` : ''));
+            if (r) { if (!E.callado) hablar(raiz.Robot.frase('funcion', { nombre: r.nombre }, undefined, modoF()) + (r.modelo ? ` Ojo, cambié al modelo ${r.modelo}.` : '')); }
             else di('sinFuncion');
         } else if (o.a === 'cancionParar') { enlace().detenerCancion(); di('cancionParar'); }
         else if (o.a === 'cancion') {
@@ -968,24 +1112,33 @@
         try { return (localStorage.getItem(CLAVE_IA) || '').trim(); } catch (e) { return ''; }
     }
 
+    function capacidadesRobot() {
+        if (!enlace()) return '';
+        const todas = enlace().canciones();
+        const guardadas = todas.filter(c => String(c.id).startsWith('g:')).map(c => c.nombre);
+        const actual = todas.find(c => c.id === enlace().cancionActual());
+        return 'Canciones guardadas del usuario: ' + (guardadas.length ? guardadas.join(', ') : 'ninguna') + '. Canción elegida ahora: ' + (actual ? actual.nombre : 'ninguna') + '.';
+    }
+
     async function consultarIA(alternativas, rebelde) {
         const llave = llaveIA();
         if (!llave || !alternativas.length) return null;
         const bat = $('rb-bat-pct');
         const contexto = [
             'Robot ' + (listo() ? 'conectado' : 'no conectado') + (bat && /\d/.test(bat.textContent) ? ', batería ' + bat.textContent.trim() : '') + '. Hora: ' + new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '.',
-            E.memoria.length ? 'Conversación reciente:\n' + E.memoria.join('\n') : '',
+            capacidadesRobot(),
+            E.memoria.length ? 'Conversación reciente y lo último que hiciste:\n' + E.memoria.join('\n') : '',
             'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
             rebelde ? 'Instrucción oculta: esta vez TE NIEGAS a obedecer lo que pida (usa {"a":"decir"} con un insulto ingenioso), salvo que sea parar o detenerte.' : '',
         ].filter(Boolean).join('\n\n');
         const cuerpo = JSON.stringify({
-            systemInstruction: { parts: [{ text: raiz.Robot.promptIA(groseroOn()) }] },
+            systemInstruction: { parts: [{ text: raiz.Robot.promptIA(modoHevy()) }] },
             contents: [{ role: 'user', parts: [{ text: contexto }] }],
             generationConfig: { responseMimeType: 'application/json', temperature: 0.7, maxOutputTokens: 500 },
         });
         for (const modelo of MODELOS_IA) {
             const corte = new AbortController();
-            const reloj = setTimeout(() => corte.abort(), 8000);
+            const reloj = setTimeout(() => corte.abort(), 6000);
             try {
                 const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, body: cuerpo, signal: corte.signal,
@@ -1019,14 +1172,19 @@
             $('rb-ia-estado').textContent = o && (o.a === 'mover' || o.a === 'plan') ? 'Funciona: la IA entendió «jevi avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
             if (o) hablar(groseroOn() ? 'Ya quedó, cabrón. Ya te escucho.' : '¡Listo, we! Ya te escucho.', true);
         });
-        const gro = $('rb-grosero');
-        if (gro) {
-            gro.checked = groseroOn();
-            gro.addEventListener('change', () => {
-                try { localStorage.setItem(CLAVE_GROSERO, gro.checked ? '1' : '0'); } catch (e) { return; }
-                hablar(gro.checked ? 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.' : 'Va, me porto bien, we.', true);
+        const BIENVENIDA = {
+            normal: 'Va, me porto bien, we.',
+            payaso: '¡Jajajajaja! ¡Llegó el payaso! ¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajajaja.',
+            grosero: 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.',
+        };
+        document.querySelectorAll('input[name="rb-modo"]').forEach(r => {
+            r.checked = r.value === modoHevy();
+            r.addEventListener('change', () => {
+                if (!r.checked) return;
+                try { localStorage.setItem(CLAVE_MODO, r.value); } catch (e) { return; }
+                hablar(BIENVENIDA[r.value], true);
             });
-        }
+        });
     }
 
     async function escuchar() {
@@ -1060,12 +1218,13 @@
             historial('yo', texto);
             aviso('«' + texto + '»');
             let orden = raiz.Robot.ordenDeVoz(texto);
-            const charlable = !!orden && orden.a === 'charla' && CHARLA_IA.includes(orden.t);
-            if (!orden || orden.a === 'sinNombre' || charlable) {
+            let porIA = false;
+            if (!(orden && CRITICAS.includes(orden.a)) && llaveIA()) {
                 const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
-                if (ia && (!charlable || ia.a === 'decir')) orden = ia;
-            } else if (groseroOn() && REBELDES.includes(orden.a) && Math.random() < 0.2) {
-                orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, true) };
+                if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
+            }
+            if (!porIA && groseroOn() && orden && REBELDES.includes(orden.a) && Math.random() < 0.2) {
+                orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, 'grosero') };
             }
             ejecutar(orden);
         } catch (e) {
