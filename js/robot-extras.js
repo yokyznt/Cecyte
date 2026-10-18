@@ -6,11 +6,13 @@
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
     const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, nHabla: 0, finHabla: 0, procesando: false };
     const CLAVE_MODO = 'cecyte_yokis_modo';
-    const MODOS = ['normal', 'payaso', 'grosero', 'argentino', 'triste', 'cientifico'];
+    const MODOS = () => (raiz.Robot && raiz.Robot.MODOS_IA) || ['normal'];
+    const personal = () => (raiz.Robot && raiz.Robot.MODO_PERSONAL) || null;
+    const datoPersonal = (modo, campo) => (personal() && personal().id === modo ? personal()[campo] : '') || '';
     const modoHevy = () => {
         try {
             const m = localStorage.getItem(CLAVE_MODO);
-            if (MODOS.includes(m)) return m;
+            if (MODOS().includes(m)) return m;
             if (m === null && localStorage.getItem('cecyte_yokis_grosero') === '1') return 'grosero';
         } catch (e) { return 'normal'; }
         return 'normal';
@@ -679,7 +681,7 @@
                 return;
             }
             s.ws = ws;
-            ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + LIVE.modelo, generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voz } } } }, systemInstruction: { parts: [{ text: LIVE_INSTRUCCION + (TONOS_LIVE[modo] || '') }] } } }));
+            ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + LIVE.modelo, generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voz } } } }, systemInstruction: { parts: [{ text: LIVE_INSTRUCCION + (TONOS_LIVE[modo] || datoPersonal(modo, 'tonoLive')) }] } } }));
             ws.onmessage = ev => procesarLive(s, ev, abierta);
             const caida = () => { s.cerrada = true; abierta(false); terminarTurno(s, false); };
             ws.onerror = caida;
@@ -1421,6 +1423,65 @@
         if (callado) aviso('Guardia armada.'); else di('guardiaOn');
     }
 
+    const CLAVE_MEMORIA = 'cecyte_yokis_memoria';
+    const CLAVE_RUTINAS = 'cecyte_yokis_rutinas';
+
+    function leerJson(clave, vacio) {
+        try { return JSON.parse(localStorage.getItem(clave)) || vacio; } catch (e) { return vacio; }
+    }
+
+    const leerMemoria = () => { const l = leerJson(CLAVE_MEMORIA, []); return Array.isArray(l) ? l : []; };
+    const leerRutinas = () => { const r = leerJson(CLAVE_RUTINAS, {}); return r && typeof r === 'object' && !Array.isArray(r) ? r : {}; };
+
+    function guardarJson(clave, valor) {
+        try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin guardado */ }
+        pintarMemoria();
+    }
+
+    function guardarMemoria(dato) {
+        guardarJson(CLAVE_MEMORIA, leerMemoria().filter(x => x !== dato).concat(dato).slice(-30));
+    }
+
+    function guardarRutina(nombre, pasos) {
+        const r = leerRutinas();
+        r[nombre] = pasos;
+        guardarJson(CLAVE_RUTINAS, r);
+    }
+
+    function contextoMemoria() {
+        const m = leerMemoria(), r = Object.keys(leerRutinas());
+        return [m.length ? 'Lo que recuerdas del usuario: ' + m.join('; ') + '.' : '', r.length ? 'Rutinas guardadas del usuario (se ejecutan con su nombre): ' + r.join(', ') + '.' : ''].filter(Boolean).join(' ');
+    }
+
+    function pintarMemoria() {
+        const lista = (id, items, borrar) => {
+            const ul = $(id);
+            if (!ul) return;
+            ul.textContent = '';
+            if (!items.length) {
+                const vacio = document.createElement('li');
+                vacio.className = 'rb-mem__vacio';
+                vacio.textContent = 'Nada guardado.';
+                ul.appendChild(vacio);
+                return;
+            }
+            items.forEach(([texto, clave]) => {
+                const li = document.createElement('li');
+                const t = document.createElement('span');
+                t.textContent = texto;
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn btn--secondary btn--sm';
+                b.textContent = 'Borrar';
+                b.addEventListener('click', () => borrar(clave));
+                li.append(t, b);
+                ul.appendChild(li);
+            });
+        };
+        lista('rb-memoria-lista', leerMemoria().map(d => [d, d]), d => guardarJson(CLAVE_MEMORIA, leerMemoria().filter(x => x !== d)));
+        lista('rb-rutinas-lista', Object.keys(leerRutinas()).map(n => [n + ' (' + leerRutinas()[n].length + ' pasos)', n]), n => { const r = leerRutinas(); delete r[n]; guardarJson(CLAVE_RUTINAS, r); });
+    }
+
     const CLAVE_FACTS = 'cecyte_yokis_facts';
     function leerFacts() {
         let t = '';
@@ -1504,7 +1565,7 @@
             cumplirPromesa(o.texto, []);
             return;
         }
-        if (E.dice && o.a !== 'plan' && (listo() || ['saludo', 'charla', 'bateria'].includes(o.a))) {
+        if (E.dice && o.a !== 'plan' && (listo() || ['saludo', 'charla', 'bateria', 'recordar', 'aprender'].includes(o.a))) {
             const d = E.dice;
             E.dice = null;
             E.callado = true;
@@ -1529,6 +1590,13 @@
         if (o.a === 'charla') { charla(o.t); return; }
         if (o.a === 'modo') { cambiarModo(o.modo); return; }
         if (o.a === 'ppt') { jugarPPT(o.usuario); return; }
+        if (o.a === 'recordar') { guardarMemoria(o.dato); if (!E.callado) hablar('Anotado, lo recuerdo.', true); return; }
+        if (o.a === 'aprender') { guardarRutina(o.nombre, o.pasos); if (!E.callado) hablar('Listo, aprendí la rutina «' + o.nombre + '».', true); return; }
+        if (o.a === 'rutina') {
+            const pasos = leerRutinas()[o.nombre];
+            if (pasos) ejecutarPlan({ a: 'plan', pasos }); else di('fallo');
+            return;
+        }
         if (o.a === 'saludo') { di('saludo'); return; }
         if (o.a === 'paro') { if (listo()) enlace().paro(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
@@ -1609,6 +1677,7 @@
             'Robot ' + (listo() ? 'conectado' : 'no conectado') + (bat && /\d/.test(bat.textContent) ? ', batería ' + bat.textContent.trim() : '') + '. Hora: ' + new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '.',
             'Modo de personalidad actual: ' + modoHevy() + '.' + sensorFrontal() + (E.corrida ? ' Estás en movimiento ahora.' : ''),
             capacidadesRobot(),
+            contextoMemoria(),
             E.memoria.length ? 'Conversación reciente y lo último que hiciste:\n' + E.memoria.join('\n') : '',
             evento ? 'EVENTO (el usuario no te habló): ' + evento + '\nResponde SOLO con {"a":"decir","texto":"..."}: un comentario espontáneo, breve y propio de tu personalidad, sin acciones.' : 'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
             rebelde ? 'Instrucción oculta: esta vez TE NIEGAS a obedecer lo que pida (usa {"a":"decir"} con un insulto ingenioso), salvo que sea parar o detenerte.' : '',
@@ -1649,10 +1718,10 @@
     };
 
     function cambiarModo(m) {
-        if (!MODOS.includes(m)) return;
+        if (!MODOS().includes(m)) return;
         try { localStorage.setItem(CLAVE_MODO, m); } catch (e) { return; }
         document.querySelectorAll('input[name="rb-modo"]').forEach(r => { r.checked = r.value === m; });
-        hablar(BIENVENIDA[m], true);
+        hablar(BIENVENIDA[m] || datoPersonal(m, 'bienvenida'), true);
     }
 
     function iniciarIA() {
@@ -1669,6 +1738,12 @@
             $('rb-ia-estado').textContent = o && (o.a === 'mover' || o.a === 'plan') ? 'Funciona: la IA entendió «jevi avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
             if (o) hablar(groseroOn() ? 'Ya quedó, cabrón. Ya te escucho.' : '¡Listo, we! Ya te escucho.', true);
         });
+        const etiquetaPersonal = $('rb-modo-personal');
+        if (etiquetaPersonal && personal()) {
+            etiquetaPersonal.querySelector('input').value = personal().id;
+            etiquetaPersonal.querySelector('span').textContent = personal().nombre;
+            etiquetaPersonal.hidden = false;
+        }
         document.querySelectorAll('input[name="rb-modo"]').forEach(r => {
             r.checked = r.value === modoHevy();
             r.addEventListener('change', () => { if (r.checked) cambiarModo(r.value); });
@@ -1687,6 +1762,13 @@
         historial('yo', mostrado || texto);
         aviso('«' + (mostrado || texto) + '»');
         let porIA = false;
+        if (!(orden && CRITICAS.includes(orden.a)) && !(orden && orden.a === 'sinNombre')) {
+            const rutina = raiz.Robot.rutinaEnTexto(texto, leerRutinas());
+            if (rutina) {
+                ejecutar({ a: 'rutina', nombre: rutina });
+                return true;
+            }
+        }
         if (!(orden && CRITICAS.includes(orden.a)) && llaveIA()) {
             const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
             if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
@@ -1737,12 +1819,17 @@
     const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
     const COLOR_PPT = { piedra: '#ff3b30', papel: '#ffffff', tijera: '#34c759' };
 
-    function jugarPPT(usuario) {
-        if (!JUGADAS_PPT.includes(usuario)) { di('pptInvita'); return; }
+    function sortearPPT(usuario) {
         const mia = JUGADAS_PPT[Math.floor(Math.random() * 3)];
         const r = (JUGADAS_PPT.indexOf(usuario) - JUGADAS_PPT.indexOf(mia) + 3) % 3;
         if (listo()) enlace().luces('fijo', COLOR_PPT[mia]);
-        di(r === 0 ? 'pptEmpate' : r === 1 ? 'pptPerdio' : 'pptGano', { mia, tuya: usuario });
+        return { mia, tuya: usuario, resultado: r === 0 ? 'empate' : r === 1 ? 'gana el usuario' : 'gana Hevy' };
+    }
+
+    function jugarPPT(usuario) {
+        if (!JUGADAS_PPT.includes(usuario)) { di('pptInvita'); return; }
+        const r = sortearPPT(usuario);
+        di(r.resultado === 'empate' ? 'pptEmpate' : r.resultado === 'gana el usuario' ? 'pptPerdio' : 'pptGano', { mia: r.mia, tuya: usuario });
     }
 
     const CLAVE_SOLO = 'cecyte_yokis_solo';
@@ -1751,7 +1838,7 @@
 
     async function comentarSolo(evento, local) {
         const ahora = Date.now();
-        if (!soloOn() || document.hidden || ahora - SOLO.ultimo < 180000 || E.escuchando || E.hablando || E.corrida || E.radar || E.dibujando || E.procesando) return;
+        if (!soloOn() || document.hidden || ahora - SOLO.ultimo < 180000 || E.escuchando || E.hablando || E.corrida || E.radar || E.dibujando || E.procesando || ESC.on) return;
         SOLO.ultimo = ahora;
         SOLO.quieto = ahora;
         const o = await consultarIA([], false, evento);
@@ -1790,7 +1877,57 @@
     const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
     const CLAVE_EXIGE_NOMBRE = 'cecyte_yokis_exige_nombre';
     const exigeNombre = () => { try { return localStorage.getItem(CLAVE_EXIGE_NOMBRE) === '1'; } catch (e) { return false; } };
-    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0 };
+    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0 };
+    const CLAVE_CEREBRO = 'cecyte_yokis_cerebro';
+    const cerebroOn = () => { try { return localStorage.getItem(CLAVE_CEREBRO) !== '0'; } catch (e) { return true; } };
+    const UMBRAL_INTERRUPCION = 0.14;
+
+    function hevyHablando() {
+        return E.hablando || LIVE.fuentes.length > 0 || !!(LIVE.ctx && LIVE.proximo > LIVE.ctx.currentTime + 0.05);
+    }
+
+    function cerebroDisponible() {
+        return cerebroOn() && !!llaveIA() && valorSeleccion().split(':')[0] === 'gemini';
+    }
+
+    function callarCerebro() {
+        LIVE.fuentes.forEach(f => { try { f.stop(); } catch (e) { /* ya parada */ } });
+        LIVE.fuentes = [];
+        LIVE.proximo = 0;
+        if (ESC.turno) ESC.turno.cancelado = true;
+        ESC.turno = null;
+    }
+
+    function enviarAudio(dato) {
+        const ws = ESC.ws;
+        if (ws && ws.readyState === 1 && ESC.lista) {
+            ws.send(dato);
+            ESC.enviados++;
+        } else if (ESC.cola.length < 16) {
+            ESC.cola.push(dato);
+        }
+    }
+
+    function armarSinVoz() {
+        clearTimeout(ESC.sinVoz);
+        ESC.sinVoz = setTimeout(() => {
+            if (!ESC.on || !ESC.unico || ESC.texto || ESC.oido || ESC.turno) return;
+            if (Date.now() - ESC.ultimoSonido < 4000) { armarSinVoz(); return; }
+            apagarEscucha('No te oí. Toca el micrófono y habla.');
+        }, 10000);
+    }
+
+    function interrumpirPorVoz() {
+        registrarVoz('Escucha: interrumpido por tu voz (nivel ' + ESC.nivelCrudo.toFixed(2) + ', eco máx ' + ESC.ecoMax.toFixed(2) + ')');
+        callarIA();
+        callarCerebro();
+        detenerMeneo();
+        if (ESC.cerebro) ESC.ignorar = true;
+        ESC.ultimaHabla = 0;
+        ESC.picoDesde = 0;
+        ESC.anillo.forEach(enviarAudio);
+        ESC.anillo = [];
+    }
 
     function estadoEscucha(t) {
         const el = $('rb-escucha-estado');
@@ -1823,6 +1960,13 @@
         clearTimeout(ESC.sinVoz);
         ESC.texto = '';
         ESC.cola = [];
+        ESC.anillo = [];
+        ESC.oido = '';
+        ESC.dijo = '';
+        ESC.ignorar = false;
+        ESC.saludar = '';
+        if (ESC.cerebro) callarCerebro();
+        ESC.cerebro = false;
         quitarVivo();
         const ws = ESC.ws;
         ESC.ws = null;
@@ -1843,7 +1987,9 @@
         b.classList.remove('is-candado', 'is-escuchando');
         b.style.removeProperty('--nivel');
         estadoEscucha(motivo || '');
+        const msg = $('rb-jarvis-msg');
         if (motivo) aviso(motivo);
+        else if (msg && /^(Te escucho|Escuchando|Conectando)/.test(msg.textContent)) aviso('');
     }
 
     const FUERA_DE_LATIN = /[^\p{Script=Latin}\p{N}\p{P}\p{S}\s]/u;
@@ -1878,6 +2024,208 @@
         const o = raiz.Robot.ordenDeVoz(ESC.texto);
         const soloNombre = o && o.a === 'saludo' && ESC.texto.split(/\s+/).length <= 2;
         ESC.espera = setTimeout(despacharTexto, soloNombre ? 2500 : 1100);
+    }
+
+    const LIVE_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=';
+    const NECESITAN_ROBOT = ['mover', 'giro', 'figura', 'luces', 'claxon', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'plan'];
+
+    function datosRobot() {
+        const ahora = new Date(), bat = $('rb-bat-pct');
+        const d = enlace() && enlace().distancias ? enlace().distancias() : null;
+        const cm = d && d.lecturas && d.lecturas.length ? d.lecturas[d.lecturas.length - 1] : 0;
+        return {
+            robot_conectado: listo(),
+            bateria: bat && /\d/.test(bat.textContent) ? bat.textContent.trim() : 'desconocida',
+            distancia_frontal_cm: listo() && cm > 0 && Date.now() - d.t < 5000 ? cm : 'sin lectura',
+            en_movimiento: !!E.corrida,
+            modo: modoHevy(),
+            hora: ahora.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+            fecha: ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
+        };
+    }
+
+    function ejecutarSilencio(o) {
+        E.callado = true;
+        try {
+            if (o.a === 'plan') ejecutarPlan(o); else ejecutarAccion(o);
+        } finally {
+            E.callado = false;
+        }
+    }
+
+    async function ejecutarHerramienta(nombre, args) {
+        if (nombre === 'datos') {
+            if (listo() && enlace().soportaDistancia && enlace().soportaDistancia()) { enlace().pedirDistancia(); await esperar(600); }
+            return datosRobot();
+        }
+        const o = raiz.Robot.accionDeHerramienta(nombre, args || {});
+        if (!o) return { ok: false, error: 'parámetros inválidos' };
+        if (o.a === 'recordar') { guardarMemoria(o.dato); return { ok: true }; }
+        if (o.a === 'aprender') { guardarRutina(o.nombre, o.pasos); return { ok: true }; }
+        if (o.a === 'rutina') {
+            const pasos = leerRutinas()[o.nombre];
+            if (!pasos) return { ok: false, error: 'esa rutina no existe', rutinas: Object.keys(leerRutinas()) };
+            if (!listo()) return { ok: false, error: 'el robot no está conectado' };
+            ejecutarSilencio({ a: 'plan', pasos });
+            return { ok: true };
+        }
+        if (o.a === 'modo') { setTimeout(() => cambiarModoCerebro(o.modo), 700); return { ok: true, modo: o.modo }; }
+        if (o.a === 'ppt') return o.usuario ? Object.assign({ ok: true }, sortearPPT(o.usuario)) : { ok: false, error: 'falta la jugada del usuario' };
+        if (o.a === 'paro') { ejecutarSilencio(o); return { ok: true }; }
+        if (NECESITAN_ROBOT.includes(o.a) && !listo()) return { ok: false, error: 'el robot no está conectado' };
+        ejecutarSilencio(o);
+        return { ok: true };
+    }
+
+    async function llamadasCerebro(tc, ws) {
+        const respuestas = [];
+        for (const c of tc.functionCalls || []) {
+            let r;
+            try { r = await ejecutarHerramienta(c.name, c.args); } catch (e) { r = { ok: false, error: 'falló' }; }
+            registrarVoz('Cerebro: ' + c.name + ' ' + JSON.stringify(c.args || {}).slice(0, 80) + ' → ' + (r.ok === false ? r.error : 'ok'));
+            respuestas.push({ id: c.id, name: c.name, response: r });
+        }
+        try { ws.send(JSON.stringify({ toolResponse: { functionResponses: respuestas } })); } catch (e) { /* conexión cerrada */ }
+    }
+
+    function cambiarModoCerebro(m) {
+        if (!MODOS().includes(m)) return;
+        try { localStorage.setItem(CLAVE_MODO, m); } catch (e) { return; }
+        document.querySelectorAll('input[name="rb-modo"]').forEach(r => { r.checked = r.value === m; });
+        if (ESC.on && ESC.cerebro) reiniciarCerebro('Acabas de cambiar de modo; salúdame en una frase corta con tu nueva personalidad.');
+    }
+
+    function instruccionCerebro() {
+        const ahora = new Date();
+        return [
+            raiz.Robot.promptCerebro(modoHevy()),
+            'Hora actual: ' + ahora.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '; fecha: ' + ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }) + '.',
+            contextoMemoria(),
+            exigeNombre() && !ESC.unico ? 'IMPORTANTE: solo respondes cuando el usuario empieza su frase llamándote «Hevy»; si no lo hace, no digas nada.' : '',
+        ].filter(Boolean).join('\n');
+    }
+
+    function cerrarOido() {
+        quitarVivo();
+        const t = normalizarOido(ESC.oido.trim());
+        ESC.oido = '';
+        if (t) historial('yo', t);
+        SOLO.quieto = Date.now();
+    }
+
+    function terminarTurnoCerebro() {
+        cerrarOido();
+        const dijo = ESC.dijo.trim().replace(/\s+/g, ' ');
+        ESC.dijo = '';
+        if (dijo) { aviso(dijo); historial('yokis', dijo); }
+        ESC.turno = null;
+        ESC.ignorar = false;
+        ESC.ultimaVez = Date.now();
+        if (ESC.unico) {
+            const espera = LIVE.ctx ? Math.max(0, (LIVE.proximo - LIVE.ctx.currentTime) * 1000) : 0;
+            setTimeout(() => { if (ESC.on && ESC.unico) apagarEscucha(''); }, espera + 400);
+        }
+    }
+
+    function reiniciarCerebro(saludo) {
+        ESC.saludar = saludo || '';
+        ESC.lista = false;
+        const ws = ESC.ws;
+        ESC.ws = null;
+        try { if (ws) ws.close(); } catch (e) { /* ya cerrado */ }
+        conectarCerebro();
+    }
+
+    function caerAlFlujoNormal(motivo) {
+        registrarVoz('Escucha: ' + motivo + '; paso a la escucha normal');
+        callarCerebro();
+        ESC.cerebro = false;
+        ESC.fallos = 0;
+        ESC.lista = false;
+        const ws = ESC.ws;
+        ESC.ws = null;
+        try { if (ws) ws.close(); } catch (e) { /* ya cerrado */ }
+        aviso('Conversación en vivo no disponible: uso la escucha normal.');
+        conectarTranscripcion();
+    }
+
+    function conectarCerebro() {
+        let ws;
+        try {
+            ws = new WebSocket(LIVE_URL + encodeURIComponent(llaveIA()));
+        } catch (e) {
+            caerAlFlujoNormal('no se pudo abrir la conversación en vivo');
+            return;
+        }
+        ESC.ws = ws;
+        ws.onopen = () => ws.send(JSON.stringify({ setup: {
+            model: 'models/' + LIVE.modelo,
+            generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: vozIAElegida() } } } },
+            systemInstruction: { parts: [{ text: instruccionCerebro() }] },
+            tools: raiz.Robot.herramientasCerebro(),
+            realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH', endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH', silenceDurationMs: 600, prefixPaddingMs: 300 } },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+        } }));
+        ws.onmessage = async ev => {
+            let m;
+            try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); } catch (e) { return; }
+            if (ESC.ws !== ws) return;
+            if (m.setupComplete) {
+                ESC.lista = true;
+                ESC.fallos = 0;
+                ESC.vioCerebro = true;
+                ESC.cola.forEach(d => ws.send(d));
+                ESC.cola = [];
+                if (ESC.saludar) { ws.send(JSON.stringify({ realtimeInput: { text: ESC.saludar } })); ESC.saludar = ''; }
+                registrarVoz('Escucha: conversación en vivo lista');
+                estadoEscucha('Conversación en vivo' + (ESC.unico ? '…' : '.'));
+                aviso('Te escucho…');
+                return;
+            }
+            if (m.toolCall) { llamadasCerebro(m.toolCall, ws); return; }
+            if (m.goAway) { registrarVoz('Escucha: el servidor pide reconectar'); reiniciarCerebro(''); return; }
+            if (m.error) { caerAlFlujoNormal('el servidor avisó ' + JSON.stringify(m.error).slice(0, 120)); return; }
+            const sc = m.serverContent;
+            if (!sc) return;
+            if (sc.interrupted) { callarCerebro(); ESC.ignorar = false; }
+            const oido = sc.inputTranscription && sc.inputTranscription.text;
+            if (oido) {
+                clearTimeout(ESC.sinVoz);
+                ESC.oido += oido;
+                ESC.ignorar = false;
+                pintarVivo(normalizarOido(ESC.oido.trim()));
+                const o = ESC.oido.trim().split(/\s+/).length <= 3 ? raiz.Robot.ordenDeVoz('hevy ' + ESC.oido.trim()) : null;
+                if (o && o.a === 'paro') { callarCerebro(); ESC.ignorar = true; ejecutarSilencio({ a: 'paro' }); }
+                if (ESC.unico) ESC.sinVoz = setTimeout(() => { if (ESC.on && ESC.unico && !ESC.turno) apagarEscucha(''); }, 25000);
+            }
+            if (sc.modelTurn && sc.modelTurn.parts) {
+                sc.modelTurn.parts.forEach(p => {
+                    if (!p.inlineData || ESC.ignorar) return;
+                    if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; cerrarOido(); }
+                    reproducirChunk(ESC.turno, p.inlineData.data);
+                });
+            }
+            const dijo = sc.outputTranscription && sc.outputTranscription.text;
+            if (dijo) { if (!ESC.dijo) cerrarOido(); ESC.dijo += dijo; }
+            if (sc.turnComplete) terminarTurnoCerebro();
+        };
+        const caida = ev => {
+            if (ESC.ws !== ws) return;
+            ESC.ws = null;
+            ESC.lista = false;
+            registrarVoz('Escucha: conversación en vivo cerrada (' + (ev && ev.code != null ? 'código ' + ev.code + (ev.reason ? ' ' + ev.reason : '') : ev && ev.type) + ')');
+            if (!ESC.on) return;
+            if (!ESC.vioCerebro || ++ESC.fallos > 3) { caerAlFlujoNormal('la conversación en vivo no responde'); return; }
+            estadoEscucha('Reconectando…');
+            ESC.reconectar = setTimeout(() => { if (ESC.on && !ESC.ws) conectarCerebro(); }, 1200);
+        };
+        ws.onclose = caida;
+        ws.onerror = caida;
+    }
+
+    function conectarMotor() {
+        if (ESC.cerebro) conectarCerebro(); else conectarTranscripcion();
     }
 
     function conectarTranscripcion() {
@@ -1954,6 +2302,14 @@
         ESC.bloqueados = 0;
         ESC.texto = '';
         ESC.cola = [];
+        ESC.anillo = [];
+        ESC.oido = '';
+        ESC.dijo = '';
+        ESC.ignorar = false;
+        ESC.vioCerebro = false;
+        ESC.ecoMax = 0;
+        ESC.cerebro = cerebroDisponible();
+        if (ESC.cerebro) liveCtx();
         const boton = $('rb-jarvis');
         boton.classList.add('is-escuchando');
         if (!ESC.unico) boton.classList.add('is-candado');
@@ -1972,8 +2328,17 @@
             medidor.getFloatTimeDomainData(onda);
             let s = 0;
             for (let i = 0; i < onda.length; i++) s += onda[i] * onda[i];
-            ESC.nivel = Math.max(Math.min(1, Math.sqrt(s / onda.length) * 9), ESC.nivel * 0.85);
+            ESC.nivelCrudo = Math.sqrt(s / onda.length);
+            if (ESC.nivelCrudo > 0.04) ESC.ultimoSonido = Date.now();
+            ESC.nivel = Math.max(Math.min(1, ESC.nivelCrudo * 9), ESC.nivel * 0.85);
             boton.style.setProperty('--nivel', ESC.nivel.toFixed(2));
+            if (hevyHablando()) {
+                ESC.ecoMax = Math.max(ESC.ecoMax, ESC.nivelCrudo);
+                if (ESC.nivelCrudo > UMBRAL_INTERRUPCION) {
+                    if (!ESC.picoDesde) ESC.picoDesde = Date.now();
+                    else if (Date.now() - ESC.picoDesde > 250) interrumpirPorVoz();
+                } else ESC.picoDesde = 0;
+            } else ESC.picoDesde = 0;
             ESC.cuadro = requestAnimationFrame(pintar);
         };
         ESC.medidor = medidor;
@@ -1982,26 +2347,29 @@
         ESC.proc = ESC.ctx.createScriptProcessor(4096, 1, 1);
         const mime = 'audio/pcm;rate=' + ESC.ctx.sampleRate;
         ESC.proc.onaudioprocess = e => {
-            if (E.hablando || E.escuchando || Date.now() < E.finHabla + 600) { ESC.bloqueados++; return; }
+            const habla = hevyHablando();
+            if (habla) ESC.ultimaHabla = Date.now();
             const f = e.inputBuffer.getChannelData(0), b = new Uint8Array(f.length * 2), v = new DataView(b.buffer);
             for (let i = 0; i < f.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, f[i])) * 32767, true);
             const dato = JSON.stringify({ realtimeInput: { audio: { data: bytesABase64(b), mimeType: mime } } });
-            const ws = ESC.ws;
-            if (ws && ws.readyState === 1 && ESC.lista) {
-                ws.send(dato);
-                ESC.enviados++;
-            } else if (ESC.cola.length < 16) {
-                ESC.cola.push(dato);
+            if (habla || E.escuchando || Date.now() < ESC.ultimaHabla + 500 || Date.now() < E.finHabla + 600) {
+                ESC.bloqueados++;
+                ESC.anillo.push(dato);
+                if (ESC.anillo.length > 6) ESC.anillo.shift();
+                return;
             }
+            ESC.anillo = [];
+            enviarAudio(dato);
         };
         fuente.connect(ESC.proc);
         ESC.proc.connect(ESC.ctx.destination);
-        conectarTranscripcion();
-        if (ESC.unico) ESC.sinVoz = setTimeout(() => { if (ESC.on && ESC.unico && !ESC.texto) apagarEscucha('No te oí. Toca el micrófono y habla.'); }, 10000);
+        conectarMotor();
+        ESC.ultimoSonido = Date.now();
+        if (ESC.unico) armarSinVoz();
         clearInterval(ESC.informe);
         ESC.informe = setInterval(() => {
             if (!ESC.on) return;
-            registrarVoz('Escucha: enviados ' + ESC.enviados + ', sin enviar ' + ESC.bloqueados + ', nivel ' + ESC.nivel.toFixed(2) + ', listo ' + ESC.lista + ', hablando ' + E.hablando + ', audio ' + (ESC.ctx ? ESC.ctx.state : '-'));
+            registrarVoz('Escucha: enviados ' + ESC.enviados + ', sin enviar ' + ESC.bloqueados + ', nivel ' + ESC.nivel.toFixed(2) + ', listo ' + ESC.lista + ', cerebro ' + ESC.cerebro + ', hablando ' + hevyHablando() + ', eco máx ' + ESC.ecoMax.toFixed(2) + ', audio ' + (ESC.ctx ? ESC.ctx.state : '-'));
         }, 4000);
     }
 
@@ -2018,12 +2386,15 @@
 
     function iniciarMicrofono() {
         const b = $('rb-jarvis');
-        let reloj = 0, largo = false, ox = 0, oy = 0;
+        let reloj = 0, largo = false, ox = 0, oy = 0, hablaba = false;
         b.addEventListener('pointerdown', e => {
             largo = false;
             ox = e.clientX;
             oy = e.clientY;
+            hablaba = hevyHablando();
             callarIA();
+            callarCerebro();
+            if (ESC.cerebro) ESC.ignorar = hablaba;
             detenerMeneo();
             clearTimeout(reloj);
             reloj = setTimeout(() => {
@@ -2039,6 +2410,7 @@
         b.addEventListener('contextmenu', e => e.preventDefault());
         b.addEventListener('click', () => {
             if (largo) { largo = false; return; }
+            if (ESC.on && hablaba) return;
             if (ESC.on) apagarEscucha(ESC.unico ? '' : 'Candado abierto.');
             else if (llaveIA()) encenderEscucha(true);
             else escuchar();
@@ -2049,6 +2421,15 @@
         const c = $('rb-escucha');
         if (!c) return;
         c.addEventListener('change', () => { if (c.checked) encenderEscucha(false); else apagarEscucha('Escucha apagada.'); });
+        pintarMemoria();
+        const cb = $('rb-cerebro');
+        if (cb) {
+            cb.checked = cerebroOn();
+            cb.addEventListener('change', () => {
+                try { localStorage.setItem(CLAVE_CEREBRO, cb.checked ? '1' : '0'); } catch (e) { /* sin guardado */ }
+                if (ESC.on) apagarEscucha('Vuelve a prender el micrófono para usar el cambio.');
+            });
+        }
         const n = $('rb-escucha-nombre');
         if (n) {
             n.checked = exigeNombre();

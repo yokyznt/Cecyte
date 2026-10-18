@@ -33,6 +33,11 @@ function quitarMarcas(texto) {
         .join('\n');
 }
 
+function modoPersonal() {
+    const f = path.join(RAIZ, 'config', 'modo-personal.json');
+    return fs.existsSync(f) ? JSON.stringify(JSON.parse(fs.readFileSync(f, 'utf8'))) : 'null';
+}
+
 function clavesLocales() {
     const f = path.join(RAIZ, 'config', 'claves-locales.json');
     return fs.existsSync(f) ? JSON.stringify(JSON.parse(fs.readFileSync(f, 'utf8'))) : '{}';
@@ -44,6 +49,7 @@ function copiarArchivo(origen, destino) {
         let t = quitarMarcas(fs.readFileSync(origen, 'utf8'));
         if (!ROBOT) for (const [de, a] of REEMPLAZOS) t = t.split(de).join(a);
         if (process.env.CECYTE_CLAVES === '1' && /robot-extras\.js$/.test(origen)) t = t.replace('const CLAVES_LOCALES = {};', 'const CLAVES_LOCALES = ' + clavesLocales() + ';');
+        if (process.env.CECYTE_CLAVES === '1' && /[\\/]robot\.js$/.test(origen)) t = t.replace('const MODO_PERSONAL = null;', 'const MODO_PERSONAL = ' + modoPersonal() + ';');
         fs.writeFileSync(destino, t);
     } else {
         fs.copyFileSync(origen, destino);

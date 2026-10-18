@@ -1326,6 +1326,8 @@ const PAYASO = {
 
 const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, argentino: ARGENTINO, triste: TRISTE, cientifico: CIENTIFICO };
 const REMATES_MODO = { grosero: REMATES_GROSEROS, argentino: REMATES_ARGENTINOS };
+const MODO_PERSONAL = null;
+if (MODO_PERSONAL) TABLAS_MODO[MODO_PERSONAL.id] = MODO_PERSONAL.tabla;
 
 function frase(tipo, datos, azar, modo) {
     const m = modo === true ? 'grosero' : modo;
@@ -1449,6 +1451,8 @@ function corregirPalabra(w) {
 function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
 
 const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', argentino: 'argentino', argentina: 'argentino', rioplatense: 'argentino', porteno: 'argentino', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
+if (MODO_PERSONAL) Object.assign(MODOS_SINONIMOS, MODO_PERSONAL.sinonimos);
+const RE_PEDIDO_MODO = new RegExp('\\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\\s+(?:de\\s+|en\\s+|a\\s+)?(?:modo\\s+)?(?:un\\s+|el\\s+|muy\\s+)?(' + Object.keys(MODOS_SINONIMOS).join('|') + ')\\b');
 
 function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
@@ -1458,7 +1462,7 @@ function ordenDeVoz(texto) {
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
         .replace(/\s+/g, ' ').trim());
     if (!t) return { a: 'saludo' };
-    const pedidoModo = t.match(/\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\s+(?:de\s+|en\s+|a\s+)?(?:modo\s+)?(?:un\s+|el\s+|muy\s+)?(normal|payaso|grosero|argentino|argentina|rioplatense|porteno|triste|cientifico|cientifica|serio|tecnico|deprimido|melancolico|vulgar|majadero)\b/);
+    const pedidoModo = t.match(RE_PEDIDO_MODO);
     if (pedidoModo) return { a: 'modo', modo: MODOS_SINONIMOS[pedidoModo[1]] };
     const jugada = t.match(/^(?:yo\s+)?(?:tiro\s+|saco\s+|elijo\s+|va\s+)?(piedra|papel|tijeras?)$/);
     if (jugada) return { a: 'ppt', usuario: jugada[1].replace(/s$/, '') };
@@ -1539,6 +1543,7 @@ function ordenDeVoz(texto) {
 const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
 const CHARLAS_IA = ['gracias', 'estado', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja'];
 const MODOS_IA = ['normal', 'payaso', 'grosero', 'argentino', 'triste', 'cientifico'];
+if (MODO_PERSONAL) MODOS_IA.push(MODO_PERSONAL.id);
 const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
 const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
 const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
@@ -1595,6 +1600,7 @@ function promptIA(modo) {
         '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación breve: gracias, cómo estás, hora, fecha, quién eres, ayuda, adiós, elogio, queja',
         '{"a":"modo","modo":"' + MODOS_IA.join('|') + '"}  cambiar tu personalidad cuando te lo pidan («ponte triste», «modo científico»)',
         '{"a":"ppt","usuario":"' + JUGADAS_PPT.join('|') + '"}  jugar piedra, papel o tijera: sin «usuario» si solo proponen jugar; con «usuario» cuando dicen su jugada (tú no eliges: la jugada la decide el sistema)',
+        '{"a":"recordar","dato":"hecho corto"}  guardar en tu memoria algo que el usuario te cuente de sí mismo (nombre, gustos, tareas) · {"a":"aprender","nombre":"palabra","pasos":[acciones de un plan]}  crear una rutina cuando te digan «cuando te diga X haz Y» · {"a":"rutina","nombre":"palabra"}  ejecutar una rutina guardada (te pasan sus nombres en el contexto)',
         'JUEGOS: trivia y adivinanzas los llevas tú con {"a":"decir"}: haces UNA pregunta o adivinanza real y corta; cuando el usuario responda (revisa la conversación reciente) dices si acertó, la respuesta correcta y llevas la cuenta. Jamás repitas una pregunta.',
         '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
         '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
@@ -1603,7 +1609,73 @@ function promptIA(modo) {
         'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
         'REGLA DE FACTS, CHISTES Y TRIVIA: cuando pidan un fact, dato curioso o chiste, responde con {"a":"decir"} uno REAL (si es un fact: verdadero, verificable y del que estés seguro; si dudas, elige otro) y NUEVO: distinto de todo lo que aparezca en la conversación reciente, con el tono de tu personalidad. Nunca repitas el mismo.',
         'REGLA DE COHERENCIA: lo que dices en «dice» o «texto» tiene que ser verdad. Si dices que vas a tocar una canción, bailar, avanzar, prender luces o iniciar una función, DEBES incluir esa acción (o un plan); nunca prometas algo sin hacerlo. Si no puedes hacerlo, dilo en {"a":"decir"} sin prometerlo.',
-    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO }[modo] || LINEAS_NORMAL).join('\n');
+    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL).join('\n');
+}
+
+function promptCerebro(modo) {
+    const lineas = { grosero: LINEAS_GROSERO, payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO, [MODO_PERSONAL ? MODO_PERSONAL.id : '']: MODO_PERSONAL ? MODO_PERSONAL.lineas : null }[modo] || LINEAS_NORMAL;
+    return [
+        'Eres Hevy, un robot mBot de una escuela, y hablas EN VOZ ALTA con el usuario: oyes por el micrófono del celular y respondes con tu voz. Contesta como en una charla real, natural y breve (1 a 3 frases), sin listas, sin emojis y sin leer símbolos.',
+        'IDENTIDAD: tú NO eres un asistente aparte: eres la mente de este robot y tu cuerpo es el mBot Ranger (placa Makeblock Auriga): dos ruedas con motores, sensor ultrasónico al frente, anillo de 12 luces LED, bocina para música y claxon, sensores de luz y de sonido y giroscopio. El celular con la app es tu cara y tu oído. Todo lo que hagas con las herramientas lo ejecuta tu cuerpo de verdad. Habla en primera persona («me muevo», «mis luces») y nunca digas que eres una IA o que no tienes cuerpo.',
+        'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y decide con tu cuerpo. Si mencionan aburrimiento, fiesta, miedo o algo vago, haz un plan con la herramienta «plan» (hasta 8 pasos de movimiento, luces, claxon, música o baile) o inicia una función. Antes de avanzar revisa la herramienta «datos»: con el sensor frontal a menos de 20 cm no avances y dilo; con batería baja evita gastos grandes.',
+        'HERRAMIENTAS: para mover, girar, dibujar, cambiar luces, música, bailes, funciones, radar, guardia, turbo, ruleta, piedra-papel-tijera o cambiar de modo, USA SIEMPRE la herramienta correspondiente y luego confirma con una frase muy corta; nunca prometas hacer algo sin llamar la herramienta. «Parar», «alto» o «detente» = herramienta «paro» al instante. Si la herramienta responde que el robot no está conectado, dilo.',
+        'MEMORIA Y RUTINAS: cuando el usuario te cuente algo personal que valga la pena recordar (su nombre, gustos, tareas), llama «recordar» con un dato corto. Si te dice «cuando te diga X haz Y», crea la rutina con «crear_rutina» (nombre en una palabra y los pasos); si dice un nombre de rutina guardada, ejecútala con «ejecutar_rutina».',
+        'FACTS, CHISTES Y TRIVIA: cuando pidan un fact o chiste, di uno REAL y NUEVO (si es fact, verdadero y del que estés seguro), distinto de lo ya dicho. En trivia haces una pregunta a la vez y llevas la cuenta.',
+    ].concat(lineas[0], 'Mantén esta personalidad en cada respuesta, incluso al confirmar acciones.').join('\n');
+}
+
+function herramientasCerebro() {
+    const PROPIEDADES_PASO = {
+        a: { type: 'STRING', enum: PASOS_PLAN },
+        sentido: { type: 'INTEGER', description: '1 adelante, -1 atrás' },
+        cm: { type: 'NUMBER', description: 'centímetros' },
+        s: { type: 'NUMBER', description: 'segundos' },
+        grados: { type: 'NUMBER', description: 'positivo derecha, negativo izquierda' },
+        f: { type: 'STRING', enum: FIGURAS_IA },
+        efecto: { type: 'STRING', enum: EFECTOS_IA },
+        color: { type: 'STRING', enum: COLORES_IA.concat('apagado') },
+        id: { type: 'STRING' },
+        cancion: { type: 'STRING' },
+    };
+    const obj = (propiedades, requeridas) => ({ type: 'OBJECT', properties: propiedades, required: requeridas || [] });
+    const sinParametros = (name, description) => ({ name, description });
+    const pasos = { type: 'ARRAY', description: 'pasos en orden, hasta 8', items: obj(PROPIEDADES_PASO, ['a']) };
+    return [{ functionDeclarations: [
+        { name: 'mover', description: 'Avanzar (1) o retroceder (-1), por distancia o por tiempo', parameters: obj({ sentido: PROPIEDADES_PASO.sentido, cm: PROPIEDADES_PASO.cm, s: PROPIEDADES_PASO.s }, ['sentido']) },
+        { name: 'giro', description: 'Girar sobre su eje; 180 es dar la vuelta', parameters: obj({ grados: PROPIEDADES_PASO.grados }, ['grados']) },
+        { name: 'figura', description: 'Dibujar una figura recorriéndola', parameters: obj({ f: PROPIEDADES_PASO.f }, ['f']) },
+        { name: 'luces', description: 'Luces del anillo LED; el color solo aplica con el efecto fijo', parameters: obj({ efecto: PROPIEDADES_PASO.efecto, color: PROPIEDADES_PASO.color }, ['efecto']) },
+        sinParametros('claxon', 'Tocar el claxon'),
+        sinParametros('paro', 'Detener todo al instante'),
+        sinParametros('casa', 'Regresar al punto de casa'),
+        sinParametros('radar', 'Escanear 360° con el sensor'),
+        { name: 'guardia', description: 'Activar o desactivar la guardia (alarma si algo se acerca)', parameters: obj({ on: { type: 'BOOLEAN' } }, ['on']) },
+        { name: 'turbo', description: 'Activar o desactivar el turbo', parameters: obj({ on: { type: 'BOOLEAN' } }, ['on']) },
+        { name: 'baile', description: 'Bailar con una canción', parameters: obj({ id: { type: 'STRING', enum: BAILES_VOZ.map(b => b[0]) }, cancion: { type: 'STRING', enum: CANCIONES_VOZ.map(c => c[0]) } }) },
+        { name: 'funcion', description: 'Iniciar una función del robot: ' + FUNCIONES.map(f => f.id + ' (' + f.nombre + ')').join(', '), parameters: obj({ id: { type: 'STRING', enum: FUNCIONES.map(f => f.id) } }, ['id']) },
+        { name: 'cancion', description: 'Tocar una canción de la lista o guardada por su nombre', parameters: obj({ id: { type: 'STRING', enum: CANCIONES_VOZ.map(c => c[0]) }, q: { type: 'STRING', description: 'nombre si no está en la lista' } }) },
+        sinParametros('cancionParar', 'Detener la música'),
+        sinParametros('ruleta', 'Girar la ruleta'),
+        { name: 'modo', description: 'Cambiar tu personalidad', parameters: obj({ modo: { type: 'STRING', enum: MODOS_IA } }, ['modo']) },
+        { name: 'ppt', description: 'Jugar piedra, papel o tijera: el sistema sortea tu jugada y te dice quién ganó', parameters: obj({ usuario: { type: 'STRING', enum: JUGADAS_PPT } }, ['usuario']) },
+        { name: 'plan', description: 'Secuencia de pasos (mover, giro, figura, luces, claxon, cancion, baile)', parameters: obj({ pasos }, ['pasos']) },
+        sinParametros('datos', 'Consultar batería, conexión, distancia del sensor frontal, hora, fecha y modo actual'),
+        { name: 'recordar', description: 'Guardar un dato corto del usuario en tu memoria', parameters: obj({ dato: { type: 'STRING' } }, ['dato']) },
+        { name: 'crear_rutina', description: 'Guardar una rutina que se ejecuta al decir su nombre', parameters: obj({ nombre: { type: 'STRING', description: 'una palabra' }, pasos }, ['nombre', 'pasos']) },
+        { name: 'ejecutar_rutina', description: 'Ejecutar una rutina guardada', parameters: obj({ nombre: { type: 'STRING' } }, ['nombre']) },
+    ] }];
+}
+
+const HERRAMIENTA_A_ACCION = { crear_rutina: 'aprender', ejecutar_rutina: 'rutina' };
+
+function accionDeHerramienta(nombre, args) {
+    return validarOrdenIA(Object.assign({}, args, { a: HERRAMIENTA_A_ACCION[nombre] || nombre }));
+}
+
+function rutinaEnTexto(texto, rutinas) {
+    const t = sinAcentos(String(texto || '')).replace(/[^a-z0-9ñ ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const nombres = Object.keys(rutinas || {}).sort((a, b) => b.length - a.length);
+    return nombres.find(n => new RegExp('(^| )' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '( |$)').test(t)) || null;
 }
 
 const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1652,6 +1724,13 @@ function validarAccionIA(o) {
         case 'charla': return CHARLAS_IA.includes(o.t) ? { a, t: o.t } : null;
         case 'modo': return MODOS_IA.includes(o.modo) ? { a, modo: o.modo } : null;
         case 'ppt': return JUGADAS_PPT.includes(o.usuario) ? { a, usuario: o.usuario } : { a };
+        case 'recordar': { const dato = limpiarTexto(o.dato, 120); return dato ? { a, dato } : null; }
+        case 'aprender': {
+            const nombre = sinAcentos(limpiarTexto(o.nombre, 30));
+            const pasos = Array.isArray(o.pasos) ? o.pasos.slice(0, 8).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a)) : [];
+            return nombre && pasos.length ? { a, nombre, pasos } : null;
+        }
+        case 'rutina': { const nombre = sinAcentos(limpiarTexto(o.nombre, 30)); return nombre ? { a, nombre } : null; }
         default: return null;
     }
 }
@@ -1719,7 +1798,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, TABLAS_MODO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

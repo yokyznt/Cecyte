@@ -1147,6 +1147,7 @@
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="argentino"><span>Argentino</span></label>
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="triste"><span>Triste</span></label>
                                                     <label class="rb-seg__op"><input type="radio" name="rb-modo" value="cientifico"><span>Científico</span></label>
+                                                    <label class="rb-seg__op" id="rb-modo-personal" hidden><input type="radio" name="rb-modo" value="personal"><span>Personal</span></label>
                                                 </div>
                                                 <p class="hint">Payaso: chistes rancios y muchas risas. Grosero: groserías mexicanas y a veces no te hace caso. Argentino: lo mismo, con voseo y lunfardo. Triste: melancólico. Científico: respuestas técnicas. También puedes decir «Hevy, ponte triste». Parar siempre obedece.</p>
                                             </div>
@@ -1156,9 +1157,20 @@
                                             <div class="rb-op__c">
                                                 <label class="rb-check"><input type="checkbox" id="rb-solo" checked><span>Que Hevy comente cosas solo</span></label>
                                                 <label class="rb-check"><input type="checkbox" id="rb-escucha"><span>Escucha continua (sin tocar el micrófono)</span></label>
+                                                <label class="rb-check"><input type="checkbox" id="rb-cerebro" checked><span>Conversación en vivo (voz a voz con Gemini)</span></label>
                                                 <label class="rb-check"><input type="checkbox" id="rb-escucha-nombre"><span>En la escucha continua, exigir que empiece con «Hevy»</span></label>
                                                 <p id="rb-escucha-estado" class="hint" role="status"></p>
                                                 <p class="hint">Un toque escucha una frase; mantén pulsado el micrófono para el candado. Se apaga a los 20 minutos sin hablarle y al salir de la app. Para jugar: «Hevy, juguemos piedra, papel o tijera».</p>
+                                            </div>
+                                        </details>
+                                        <details class="rb-op">
+                                            <summary><span class="rb-op__t">Memoria</span><span class="rb-op__r">Lo que recuerda y sus rutinas</span></summary>
+                                            <div class="rb-op__c">
+                                                <span class="rb-fn-t">Recuerdos</span>
+                                                <ul id="rb-memoria-lista" class="rb-mem"></ul>
+                                                <span class="rb-fn-t">Rutinas</span>
+                                                <ul id="rb-rutinas-lista" class="rb-mem"></ul>
+                                                <p class="hint">Dile «recuerda que me gusta el rock» o «cuando te diga fiesta, enciende luces de colores y gira».</p>
                                             </div>
                                         </details>
                                         <details class="rb-op">
