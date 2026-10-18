@@ -4,6 +4,9 @@
       "maxDuration": 60
     }
   },
+  "rewrites": [
+    { "source": "/api/push/:accion", "destination": "/api/push?accion=:accion" }
+  ],
   "headers": [
     {
       "source": "/version.json",
