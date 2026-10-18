@@ -4,7 +4,12 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null };
+    const CLAVE_GROSERO = 'cecyte_yokis_grosero';
+    const groseroOn = () => { try { return localStorage.getItem(CLAVE_GROSERO) === '1'; } catch (e) { return false; } };
+    const CHARLA_IA = ['gracias', 'estado', 'chiste', 'elogio', 'queja', 'quien', 'adios'];
+    const REBELDES = ['mover', 'giro', 'figura', 'luces', 'baile', 'cancion', 'funcion', 'casa', 'radar', 'claxon', 'ruleta'];
+    const SIN_DICE = ['sinRobot', 'fallo', 'ocupado', 'sinFuncion', 'sinCancion', 'sinMicro', 'sinVoz'];
 
     const enlace = () => raiz.RobotEnlace || null;
     const control = () => raiz.RobotControl || null;
@@ -16,6 +21,8 @@
     }
 
     function historial(quien, texto) {
+        E.memoria.push((quien === 'yo' ? 'Usuario: ' : 'Hevy: ') + texto);
+        if (E.memoria.length > 8) E.memoria.shift();
         const ol = $('rb-jarvis-hist');
         if (!ol) return;
         const li = document.createElement('li');
@@ -275,11 +282,18 @@
         if (W.rec) { W.rec.stop(); return; }
         if (!raiz.navigator.mediaDevices || !raiz.MediaRecorder) { $('rb-ent-aviso').textContent = 'Este celular no deja grabar audio aquí.'; return; }
         let flujo;
+        const pedir = () => raiz.navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
         try {
-            flujo = await raiz.navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-        } catch (e) {
-            $('rb-ent-aviso').textContent = 'No pude usar el micrófono. Dale permiso a la app en los ajustes del teléfono.';
-            return;
+            flujo = await pedir();
+        } catch (primero) {
+            const SR = raiz.Plataforma && raiz.Plataforma.plugin('SpeechRecognition');
+            try {
+                if (SR) await SR.requestPermissions();
+                flujo = await pedir().catch(() => raiz.navigator.mediaDevices.getUserMedia({ audio: true }));
+            } catch (e) {
+                $('rb-ent-aviso').textContent = 'No pude usar el micrófono (' + (e && e.name || primero && primero.name || 'sin permiso') + '). Revisa el permiso de la app en los ajustes del teléfono.';
+                return;
+            }
         }
         if (W.audio) W.audio.pause();
         const trozos = [], i = W.i;
@@ -415,13 +429,20 @@
     const CLAVE_VOZIA = 'cecyte_yokis_vozia';
     const MODELOS_VOZIA = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
     const VOCES_IA = [['Charon', 'Charon (grave)'], ['Fenrir', 'Fenrir (fuerte)'], ['Orus', 'Orus (firme)'], ['Puck', 'Puck (alegre)'], ['Zephyr', 'Zephyr (brillante)'], ['Kore', 'Kore (firme, femenina)']];
-    const VIA = { audio: null, fuente: null, cache: new Map(), pausaHasta: 0 };
+    const VIA = { audio: null, fuente: null, cache: new Map(), pausaHasta: 0, turno: 0 };
 
-    function ajustesVozIA() {
-        const a = { on: true, voz: 'Charon' };
-        try { Object.assign(a, JSON.parse(localStorage.getItem(CLAVE_VOZIA)) || {}); } catch (e) { return a; }
-        if (!VOCES_IA.some(v => v[0] === a.voz)) a.voz = 'Charon';
-        return a;
+    function vozIAElegida() {
+        try {
+            const v = JSON.parse(localStorage.getItem(CLAVE_VOZIA)).voz;
+            if (VOCES_IA.some(x => x[0] === v)) return v;
+        } catch (e) { return 'Charon'; }
+        return 'Charon';
+    }
+
+    function callarIA() {
+        if (!VIA.fuente) return;
+        try { VIA.fuente.stop(); } catch (e) { VIA.fuente = null; }
+        VIA.fuente = null;
     }
 
     function pcmABuffer(b64) {
@@ -435,7 +456,7 @@
         return buf;
     }
 
-    async function pedirVozIA(texto, a) {
+    async function pedirVozIA(texto, nombreVoz) {
         const llave = llaveIA();
         for (const modelo of MODELOS_VOZIA) {
             const corte = new AbortController();
@@ -444,8 +465,8 @@
                 const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, signal: corte.signal,
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: 'Di en español mexicano, con tono de amigo, animado y natural: ' + texto }] }],
-                        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: a.voz } } } },
+                        contents: [{ parts: [{ text: (groseroOn() ? 'Di en español mexicano, con tono burlón, grosero y de barrio: ' : 'Di en español mexicano, con tono de amigo, animado y natural: ') + texto }] }],
+                        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: nombreVoz } } } },
                     }),
                 });
                 if (r.status === 429) { VIA.pausaHasta = Date.now() + 60000; return null; }
@@ -454,7 +475,8 @@
                 const dato = j.candidates[0].content.parts.find(p => p.inlineData);
                 if (dato) return dato.inlineData.data;
             } catch (e) {
-                continue;
+                VIA.pausaHasta = Date.now() + 20000;
+                return null;
             } finally {
                 clearTimeout(reloj);
             }
@@ -463,26 +485,28 @@
     }
 
     async function hablarIA(texto) {
-        const a = ajustesVozIA();
-        if (!a.on || !llaveIA() || Date.now() < VIA.pausaHasta || !(raiz.AudioContext || raiz.webkitAudioContext)) return false;
+        if (!llaveIA() || Date.now() < VIA.pausaHasta || !(raiz.AudioContext || raiz.webkitAudioContext)) return false;
+        const turno = ++VIA.turno;
         try {
             if (!VIA.audio) VIA.audio = new (raiz.AudioContext || raiz.webkitAudioContext)();
-            if (VIA.audio.state === 'suspended') await VIA.audio.resume();
-            const clave = a.voz + '|' + texto;
+            if (VIA.audio.state !== 'running') await Promise.race([VIA.audio.resume(), new Promise(res => setTimeout(res, 1200))]);
+            if (VIA.audio.state !== 'running') return false;
+            const nombreVoz = vozIAElegida(), clave = nombreVoz + (groseroOn() ? '!' : '|') + texto;
             let datos = VIA.cache.get(clave);
             if (!datos) {
-                if (raiz.navigator.onLine === false) return false;
-                datos = await pedirVozIA(texto, a);
+                datos = await pedirVozIA(texto, nombreVoz);
                 if (!datos) return false;
                 VIA.cache.set(clave, datos);
                 if (VIA.cache.size > 40) VIA.cache.delete(VIA.cache.keys().next().value);
             }
-            if (VIA.fuente) { try { VIA.fuente.stop(); } catch (e) { VIA.fuente = null; } }
+            if (turno !== VIA.turno) return true;
+            callarIA();
             const fuente = VIA.audio.createBufferSource();
-            fuente.buffer = pcmABuffer(datos);
+            const buf = pcmABuffer(datos);
+            fuente.buffer = buf;
             fuente.connect(VIA.audio.destination);
             VIA.fuente = fuente;
-            await new Promise(res => { fuente.onended = res; fuente.start(); });
+            await new Promise(res => { fuente.onended = res; setTimeout(res, buf.duration * 1000 + 1500); fuente.start(); });
             return true;
         } catch (e) {
             return false;
@@ -490,28 +514,19 @@
     }
 
     function iniciarVozIA() {
-        const on = $('rb-vozia-on'), off = $('rb-vozia-off'), sel = $('rb-vozia-voz');
-        if (!on || !off || !sel) return;
-        const a = ajustesVozIA();
+        const sel = $('rb-vozia-voz');
+        if (!sel) return;
         sel.innerHTML = VOCES_IA.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
-        on.checked = a.on;
-        off.checked = !a.on;
-        sel.value = a.voz;
-        const mostrar = () => {
-            $('rb-voz-ia').hidden = !on.checked;
-        };
-        const guardar = () => {
+        sel.value = vozIAElegida();
+        sel.addEventListener('change', () => {
             VIA.pausaHasta = 0;
-            mostrar();
-            try { localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ on: on.checked, voz: sel.value })); } catch (e) { return; }
-            if (on.checked && !llaveIA()) $('rb-ia-estado').textContent = 'Para la voz con IA pega tu llave de Gemini en «IA gratis».';
-        };
-        [on, off].forEach(r => r.addEventListener('change', guardar));
-        sel.addEventListener('change', () => { guardar(); hablar('¡Qué onda, we! Así suena esta voz.', true); });
-        mostrar();
+            try { localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ voz: sel.value })); } catch (e) { return; }
+            hablar('¡Qué onda, we! Así suena esta voz.', true);
+        });
     }
 
     async function voz(texto) {
+        callarIA();
         if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
         if (await hablarIA(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
@@ -595,12 +610,19 @@
     }
 
     const di = (tipo, datos) => {
+        if (E.dice && !SIN_DICE.includes(tipo)) {
+            const d = E.dice;
+            E.dice = null;
+            hablar(d, tipo === 'paro');
+            return;
+        }
+        const gro = groseroOn();
         let t = null;
-        if (ENT.activa && !datos) {
+        if (ENT.activa && !datos && !gro) {
             const grabadas = (raiz.Robot.FRASES[tipo] || []).filter(x => ENT.claves.has(x));
             if (grabadas.length) t = grabadas[Math.floor(Math.random() * grabadas.length)];
         }
-        hablar(t || raiz.Robot.frase(tipo, datos), tipo === 'paro');
+        hablar(t || raiz.Robot.frase(tipo, datos, undefined, gro), tipo === 'paro');
     };
 
     function calibra() {
@@ -856,7 +878,34 @@
         di(t, datos);
     }
 
+    function ejecutarPlan(o) {
+        if (!listo()) { di('sinRobot'); return; }
+        const c = calibra(), R = raiz.Robot, rec = [];
+        o.pasos.forEach(p => {
+            if (p.a === 'mover') rec.push(R.movimientoARecorrido(p.sentido, p.s ? p.s * 1000 : p.cm ? p.cm / c.vel * 1000 : 1500));
+            else if (p.a === 'giro') rec.push(R.giroARecorrido(p.grados, c.giro));
+            else if (p.a === 'figura') rec.push(figura(p.f));
+            else if (p.a === 'luces') enlace().luces(p.efecto, p.color || null);
+            else if (p.a === 'claxon') enlace().nota(440, 500);
+        });
+        const ruta = rec.length ? R.unirRecorridos(rec, 'Plan') : null;
+        if (ruta) correr(ruta, 'mover');
+        else di('fallo');
+    }
+
     function ejecutar(o) {
+        E.dice = o && o.dice ? o.dice : null;
+        if (o && o.a === 'decir') { E.dice = null; hablar(o.texto); return; }
+        if (o && o.a === 'plan') ejecutarPlan(o);
+        else ejecutarAccion(o);
+        if (E.dice) {
+            const d = E.dice;
+            E.dice = null;
+            hablar(d, true);
+        }
+    }
+
+    function ejecutarAccion(o) {
         if (!o) { di('noEntendi'); return; }
         const c = calibra();
         if (o.a === 'sinNombre') { di('sinNombre'); return; }
@@ -919,17 +968,24 @@
         try { return (localStorage.getItem(CLAVE_IA) || '').trim(); } catch (e) { return ''; }
     }
 
-    async function consultarIA(alternativas) {
+    async function consultarIA(alternativas, rebelde) {
         const llave = llaveIA();
         if (!llave || !alternativas.length) return null;
+        const bat = $('rb-bat-pct');
+        const contexto = [
+            'Robot ' + (listo() ? 'conectado' : 'no conectado') + (bat && /\d/.test(bat.textContent) ? ', batería ' + bat.textContent.trim() : '') + '. Hora: ' + new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '.',
+            E.memoria.length ? 'Conversación reciente:\n' + E.memoria.join('\n') : '',
+            'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
+            rebelde ? 'Instrucción oculta: esta vez TE NIEGAS a obedecer lo que pida (usa {"a":"decir"} con un insulto ingenioso), salvo que sea parar o detenerte.' : '',
+        ].filter(Boolean).join('\n\n');
         const cuerpo = JSON.stringify({
-            systemInstruction: { parts: [{ text: raiz.Robot.promptIA() }] },
-            contents: [{ role: 'user', parts: [{ text: alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n') }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 300 },
+            systemInstruction: { parts: [{ text: raiz.Robot.promptIA(groseroOn()) }] },
+            contents: [{ role: 'user', parts: [{ text: contexto }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.7, maxOutputTokens: 500 },
         });
         for (const modelo of MODELOS_IA) {
             const corte = new AbortController();
-            const reloj = setTimeout(() => corte.abort(), 6000);
+            const reloj = setTimeout(() => corte.abort(), 8000);
             try {
                 const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': llave }, body: cuerpo, signal: corte.signal,
@@ -937,7 +993,7 @@
                 if (!r.ok) continue;
                 const j = await r.json();
                 const dicho = JSON.parse(j.candidates[0].content.parts.map(p => p.text || '').join(''));
-                const o = [].concat(dicho).map(raiz.Robot.validarOrdenIA).find(Boolean);
+                const o = [].concat(dicho).map(x => raiz.Robot.validarOrdenIA(x)).find(Boolean);
                 if (o) return o;
             } catch (e) {
                 continue;
@@ -953,14 +1009,24 @@
         if (!campo) return;
         campo.value = llaveIA();
         campo.addEventListener('change', () => {
+            VIA.pausaHasta = 0;
             try { localStorage.setItem(CLAVE_IA, campo.value.trim()); } catch (e) { return; }
-            $('rb-ia-estado').textContent = campo.value.trim() ? 'IA de respaldo activada.' : 'IA de respaldo apagada.';
+            $('rb-ia-estado').textContent = campo.value.trim() ? 'IA activada.' : 'IA apagada.';
         });
         $('rb-ia-probar').addEventListener('click', async () => {
             campo.dispatchEvent(new Event('change'));
-            const o = await consultarIA(['yakis avanza dos metros', 'yo kiss avanza dos metros']);
-            $('rb-ia-estado').textContent = o && o.a === 'mover' ? 'Funciona: la IA entendió «yakis avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
+            const o = await consultarIA(['jevi avanza dos metros', 'hevi avanza dos metros']);
+            $('rb-ia-estado').textContent = o && (o.a === 'mover' || o.a === 'plan') ? 'Funciona: la IA entendió «jevi avanza dos metros».' : llaveIA() ? 'No respondió: revisa la llave o tu internet.' : 'Pega primero tu llave.';
+            if (o) hablar(groseroOn() ? 'Ya quedó, cabrón. Ya te escucho.' : '¡Listo, we! Ya te escucho.', true);
         });
+        const gro = $('rb-grosero');
+        if (gro) {
+            gro.checked = groseroOn();
+            gro.addEventListener('change', () => {
+                try { localStorage.setItem(CLAVE_GROSERO, gro.checked ? '1' : '0'); } catch (e) { return; }
+                hablar(gro.checked ? 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.' : 'Va, me porto bien, we.', true);
+            });
+        }
     }
 
     async function escuchar() {
@@ -994,9 +1060,12 @@
             historial('yo', texto);
             aviso('«' + texto + '»');
             let orden = raiz.Robot.ordenDeVoz(texto);
-            if (!orden || orden.a === 'sinNombre') {
-                const ia = await consultarIA(lista.slice(0, 4));
-                if (ia) orden = ia;
+            const charlable = !!orden && orden.a === 'charla' && CHARLA_IA.includes(orden.t);
+            if (!orden || orden.a === 'sinNombre' || charlable) {
+                const ia = await consultarIA(lista.slice(0, 4), groseroOn() && Math.random() < 0.25);
+                if (ia && (!charlable || ia.a === 'decir')) orden = ia;
+            } else if (groseroOn() && REBELDES.includes(orden.a) && Math.random() < 0.2) {
+                orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, true) };
             }
             ejecutar(orden);
         } catch (e) {
@@ -1024,7 +1093,7 @@
         iniciarIA();
         iniciarVozIA();
         iniciarMeneo();
-        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Yokis. ¡Listo pa lo que sea!'); });
+        $('rb-voz-probar').addEventListener('click', () => { guardaVoz(); hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
         pintarVoces();
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {

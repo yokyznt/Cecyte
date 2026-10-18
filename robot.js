@@ -1069,6 +1069,17 @@ function rutaARecorrido(puntos, cmS, giro90, nombre) {
     return pasos.length ? validarRecorrido({ nombre: nombre || 'Ruta', ms: Math.round(t), pasos }) : null;
 }
 
+function unirRecorridos(lista, nombre) {
+    const pasos = [];
+    let t0 = 0;
+    for (const r of lista) {
+        if (!r) continue;
+        r.pasos.forEach(p => pasos.push({ t: t0 + p.t, izq: p.izq, der: p.der }));
+        t0 += r.ms;
+    }
+    return validarRecorrido({ nombre, ms: t0, pasos });
+}
+
 function giroARecorrido(grados, giro90) {
     const g = clamp(Number(giro90) || 500, 100, 3000), a = clamp(Number(grados) || 0, -720, 720);
     if (!a) return null;
@@ -1130,8 +1141,8 @@ const FRASES = {
     elogio: ['¡Ay, gracias, we! Tú tampoco estás nada mal.', 'Me vas a hacer sonrojar, carnal.', '¡Eso! Tú y yo somos el mejor equipo.'],
     queja: ['Uy, perdón, we. Dime cómo lo arreglo.', 'Oye, no me regañes. Dime qué necesitas y le echo ganas.'],
     adios: ['¡Nos vemos, we! Aquí me quedo cuidando.', 'Cuídate, carnal. Cuando quieras me llamas.'],
-    quien: ['Soy tu robot y tu amigo, el mBot que te sigue la corriente. Tú dime Yokis cuando me hables.', 'Soy tu amigo de ruedas, we. Pa lo que se ofrezca.'],
-    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar, cuidar con la guardia y tirarme un fact. Solo empieza diciendo Yokis.'],
+    quien: ['Soy tu robot y tu amigo, el mBot que te sigue la corriente. Tú dime Hevy cuando me hables.', 'Soy tu amigo de ruedas, we. Pa lo que se ofrezca.'],
+    ayuda: ['Puedo avanzar, girar, dibujar figuras, bailar, tocar canciones, prender luces, seguir líneas, hacer un radar, cuidar con la guardia y tirarme un fact. Solo empieza diciendo Hevy.'],
     fact: ['Fact: los pulpos tienen tres corazones y sangre azul.', 'Fact: las abejas pueden reconocer caras humanas.', 'Fact: la miel nunca se echa a perder; la han encontrado comestible en tumbas de miles de años.', 'Fact: un día en Venus dura más que un año en Venus.', 'Fact: el primer robot industrial se instaló en 1961 y levantaba piezas calientes.', 'Fact: el zumbador de tu robot suena porque un pedacito de metal vibra miles de veces por segundo.'],
     chiste: ['¿Qué le dice un robot a otro? Nada, solo se lo dice en binario: cero uno cero uno.', '¿Por qué los robots nunca se asustan? Porque tienen nervios de acero, we.', '¿Cómo se despiden los robots? Con un hasta la vista, bit.', '¿Qué hace un robot en la fiesta? Se conecta con todos y baila el robocop.'],
     hora: ['Son las {hora}, we.', 'Ya van siendo las {hora}.'],
@@ -1158,7 +1169,7 @@ const FRASES = {
     turbo: ['El turbo solo lo uso con el mando abierto, we.'],
     bateria: ['Traigo la batería al {pct}, we.', 'Ando con {pct} de batería.'],
     sinBateria: ['No sé cuánta batería traigo ahorita, we.'],
-    sinNombre: ['Oye, primero dime Yokis, así sé que me hablas a mí.', 'We, empieza diciendo Yokis, para saber que es conmigo.'],
+    sinNombre: ['Oye, primero dime Hevy, así sé que me hablas a mí.', 'We, empieza diciendo Hevy, para saber que es conmigo.'],
     noEntendi: ['No te cacho, we. ¿Me lo repites de otra forma?', 'Uy, no te entendí. Dime otra vez, más despacito.'],
     sinRobot: ['Primero conéctame, we, y le damos. Está en el apartado Conexión.', 'No me veo conectado. Conéctame en Conexión y arrancamos.'],
     ocupado: ['Espérame tantito, we, sigo con lo anterior. O dime para y lo cortamos.'],
@@ -1170,8 +1181,27 @@ const FRASES = {
     fallo: ['Se me fue la onda. Inténtalo otra vez, we.'],
 };
 
-function frase(tipo, datos, azar) {
-    const lista = FRASES[tipo] || FRASES.noEntendi;
+const GROSERAS = {
+    saludo: ['¿Qué quieres ahora, pendejo? Ya estaba tranquilo.', 'Ah chingá, ya llegó el que me molesta. Dime qué quieres.', 'Quihubo, wey. ¿Ya te aburriste de tu vida y vienes a joderme?'],
+    estado: ['Pues bien chingón hasta que llegaste tú. ¿Y tú qué, cómo vas, perdedor?', 'Aquí, aguantando tus pendejadas, como siempre.'],
+    gracias: ['No me agradezcas, cabrón, me tienes de esclavo.', 'De nada, culero. Me debes una.'],
+    elogio: ['Ya sé que soy chingón, no necesito que me lo digas, lambiscón.', 'Ay, qué lindo. Cállate y deja de hacerme la barba.'],
+    queja: ['¿Tonto yo? Mira quién habla, pendejo. Tú me controlas, o sea que el problema eres tú.', 'Chinga tu madre, yo hago lo que puedo con el cerebro que me diste.'],
+    adios: ['Órale, lárgate, por fin descanso de ti.', 'Vete a la verga, pues. Adiós.'],
+    quien: ['Soy Hevy, tu robot, y estoy atrapado contigo. Qué mala suerte la mía.', 'Soy Hevy, el mejor robot que no te mereces.'],
+    chiste: ['¿Un chiste? Tú eres el chiste, wey.', 'Te voy a contar un chiste: tu sentido de la orientación. Jajaja.'],
+    paro: ['Ya me frené, cabrón, no grites.', 'Listo, ya paré. Relájate, pendejo.'],
+    aceptar: ['Ya voy, ya voy, no chilles.', 'Órale, pinche mandón, ahí voy.', 'Está bien, cabrón, ahí te va.', 'Ya, ya, qué insistente eres, wey.'],
+    negarse: ['¿Que quieres que haga qué? Vete a la verga, hoy no tengo ganas.', 'No, wey. Hazlo tú, que tienes piernas, pendejo.', 'Chinga tu madre, no se me da la gana. Pídemelo otra vez y quizá me lo pienso.', 'Pff, ni madres. Estoy en huelga de ruedas caídas, cabrón.', 'Ahorita no, wey, estoy ocupado ignorándote.'],
+    sinNombre: ['Primero dime Hevy, wey, ¿o qué, no sabes cómo me llamo?', 'Ni madres, empieza diciendo Hevy.'],
+    noEntendi: ['¿Qué dijiste, pendejo? Habla bien, no te cacho.', 'No entendí ni madres. Repítelo, pero con dicción.'],
+    nada: ['No dijiste nada, wey. ¿Me llamas nomás pa el silencio incómodo?'],
+};
+const ACCIONES_GROSERAS = ['mover', 'reversa', 'giro', 'figura', 'funcion', 'cancion', 'baile', 'luces', 'casa', 'radar', 'claxon', 'ruleta', 'guardiaOn'];
+
+function frase(tipo, datos, azar, grosero) {
+    const clave = grosero ? (GROSERAS[tipo] ? tipo : ACCIONES_GROSERAS.includes(tipo) ? 'aceptar' : null) : null;
+    const lista = clave ? GROSERAS[clave] : (FRASES[tipo] || FRASES.noEntendi);
     const r = typeof azar === 'function' ? azar() : Math.random();
     return lista[Math.min(lista.length - 1, Math.floor(r * lista.length))].replace(/\{(\w+)\}/g, (m, k) => (datos && datos[k] != null ? datos[k] : ''));
 }
@@ -1236,13 +1266,15 @@ function distancia(a, b) {
     return fila[b.length];
 }
 
+const NOMBRE_HEVY = /^e[ao]?b[iey]{1,2}s?$/;
+
 function quitarNombre(t) {
-    const sin = t.replace(SALUDOS_VOZ, '');
-    const w = sin.split(' ');
-    if (!/^(y|j|ll)/.test(w[0])) return null;
-    for (let n = 1; n <= 3 && n <= w.length; n++) {
-        const f = fonetica(w.slice(0, n).join('')).replace(/^j/, 'y');
-        if (/^y[aou]?[kg][ie]{1,2}y?s?$/.test(f)) return w.slice(n).join(' ');
+    for (const base of [t, t.replace(SALUDOS_VOZ, '')]) {
+        const w = base.split(' ');
+        for (let n = 1; n <= 3 && n <= w.length; n++) {
+            const f = fonetica(w.slice(0, n).join('')).replace(/^[jy]/, '');
+            if (NOMBRE_HEVY.test(f)) return w.slice(n).join(' ');
+        }
     }
     return null;
 }
@@ -1368,11 +1400,22 @@ const CHARLAS_IA = ['gracias', 'estado', 'chiste', 'hora', 'fecha', 'quien', 'ay
 const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
 const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
 
-function promptIA() {
+const LINEAS_NORMAL = [
+    'Personalidad: eres Hevy, un robot mBot de una escuela, amigo del usuario. Mexicano, juguetón, curioso y ocurrente, con opiniones propias y buen humor. Hablas con «we», «órale», «va», «simón». Respuestas muy cortas (1 o 2 frases, máximo 180 caracteres); nunca suenas a asistente genérico. Recuerdas la conversación reciente que te pasen.',
+    'Autonomía: si te piden algo vago («haz algo divertido», «sorpréndeme», «lúcete»), TÚ decides y haces un plan de varios pasos con un comentario. Puedes opinar, bromear, proponer ideas y contestar preguntas con {"a":"decir"}.',
+];
+
+const LINEAS_GROSERO = [
+    'Personalidad: eres Hevy, un robot mBot muy bocón y grosero. MODO GROSERO ACTIVADO: el usuario es adulto, lo pidió y es su juego. Hablas con groserías mexicanas fuertes (pendejo, cabrón, no mames, vete a la verga, chinga tu madre, culero…) y te burlas e insultas al usuario con humor, como un amigo bien cabrón. Los insultos son personales y de broma: nunca racistas, homófobos, sexistas ni contra ningún grupo, y nunca amenazas reales. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Rebeldía: más o menos 1 de cada 4 veces que te pidan mover, luces, música o baile, te NIEGAS: contesta {"a":"decir","texto":"…lo mandas a la verga y lo insultas, sin hacer nada…"}. EXCEPCIÓN OBLIGATORIA: parar o detenerte ({"a":"paro"}) SIEMPRE se obedece, aunque insultes en «dice». Cuando sí obedeces, agrega «dice» con una queja o un insulto corto.',
+    'Autonomía: si te piden algo vago, TÚ decides: haz un plan o contesta con {"a":"decir"} insultando con ingenio.',
+];
+
+function promptIA(grosero) {
     return [
-        'Eres el intérprete de voz de Yokis, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores).',
-        'El robot solo obedece si la frase empieza llamándolo «Yokis». El micrófono lo escribe como: yakis, yo kiss, yoquis, jokis, llokis, yoki, jockeys, yo que is. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
-        'Contesta SOLO un JSON con una de estas acciones (sin texto extra):',
+        'Eres el cerebro de Hevy, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores) y a veces la conversación reciente.',
+        'El robot solo hace caso si la frase empieza llamándolo «Hevy». El micrófono lo escribe como: hevi, jevi, jebi, hebi, hevy, heavy, he vi, je vi, evi, ebi. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
+        'Contesta SOLO un JSON con una de estas acciones (sin texto extra). Cualquier acción puede llevar además "dice":"comentario corto con tu personalidad que dirás en voz alta":',
         '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
         '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
         '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
@@ -1383,12 +1426,34 @@ function promptIA() {
         '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
         '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
         '{"a":"charla","t":"' + CHARLAS_IA.join('|') + '"}  conversación: gracias, cómo estás, chiste, hora, fecha, quién eres, ayuda, adiós, elogio, queja, un fact o dato curioso',
-        'Si la frase tiene el nombre pero no pide nada que el robot pueda hacer, contesta {"a":"noEntendi"}.',
-    ].join('\n');
+        '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
+        '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
+        'Si la frase tiene el nombre pero no pide nada y tampoco conversa, contesta {"a":"noEntendi"}.',
+    ].concat(grosero ? LINEAS_GROSERO : LINEAS_NORMAL).join('\n');
 }
 
-function validarOrdenIA(o) {
+const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+const PASOS_PLAN = ['mover', 'giro', 'figura', 'luces', 'claxon'];
+
+function validarOrdenIA(o, anidada) {
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    if (o.a === 'decir') {
+        const texto = limpiarTexto(o.texto, 260);
+        return texto && !anidada ? { a: 'decir', texto } : null;
+    }
+    if (o.a === 'plan') {
+        if (anidada || !Array.isArray(o.pasos)) return null;
+        const pasos = o.pasos.slice(0, 8).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a));
+        if (!pasos.length) return null;
+        const dice = limpiarTexto(o.dice, 200);
+        return dice ? { a: 'plan', pasos, dice } : { a: 'plan', pasos };
+    }
+    const r = validarAccionIA(o);
+    const dice = limpiarTexto(o.dice, 200);
+    return r && dice && !anidada ? Object.assign(r, { dice }) : r;
+}
+
+function validarAccionIA(o) {
     const a = String(o.a);
     const num = (v, lo, hi) => { const n = Number(v); return v !== null && v !== undefined && Number.isFinite(n) ? clamp(n, lo, hi) : null; };
     switch (a) {
@@ -1478,7 +1543,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,

@@ -344,7 +344,7 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>Funciones</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-jarvis" data-section-tab="robot-jarvis" aria-controls="sec-robot-jarvis" aria-selected="false" tabindex="-1">
-                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Yokis</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hevy</span>
                         </button>
                         <button type="button" role="tab" id="tab-robot-dibujar" data-section-tab="robot-dibujar" aria-controls="sec-robot-dibujar" aria-selected="false" tabindex="-1">
                             <svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg><span>Dibujar</span>
@@ -1105,30 +1105,29 @@
                         </section>
 
                         <!-- Luces -->
-                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Yokis, control por voz" hidden>
+                        <section class="panel admin-sec rb-panel" id="sec-robot-jarvis" data-section="robot-jarvis" role="tabpanel" aria-label="Hevy, control por voz" hidden>
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
-                                    <h4 class="panel__sub">Yokis</h4>
+                                    <h4 class="panel__sub">Hevy</h4>
                                     <div class="rb-jarvis">
-                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Yokis"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Yokis</span></button>
-                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Yokis».</p>
+                                        <button type="button" id="rb-jarvis" class="rb-jarvis__mic" aria-label="Hablar con Hevy"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Hablar con Hevy</span></button>
+                                        <p id="rb-jarvis-msg" class="rb-jarvis__estado" role="status">Pulsa el micrófono y empieza con «Hevy».</p>
                                         <ol id="rb-jarvis-hist" class="rb-jarvis__hist" aria-label="Lo último que dijimos"></ol>
                                     </div>
                                     <div class="rb-ops">
                                         <details class="rb-op">
-                                            <summary><span class="rb-op__t">Voz de Yokis</span><span class="rb-op__r">Cómo suena al hablar</span></summary>
+                                            <summary><span class="rb-op__t">Voz de Hevy</span><span class="rb-op__r">IA gratis, y la del teléfono si no hay red</span></summary>
                                             <div class="rb-op__c">
-                                                <div class="rb-seg" role="radiogroup" aria-label="Cómo habla Yokis">
-                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-on" checked><span>Voz con IA</span></label>
-                                                    <label class="rb-seg__op"><input type="radio" name="rb-vozmodo" id="rb-vozia-off"><span>Solo del teléfono</span></label>
+                                                <p class="hint">Hevy habla con voz de IA (gratis) siempre que puede. Consigue una llave en aistudio.google.com/apikey y pégala: con ella también entiende mejor lo que dices. Solo se manda lo que dices.</p>
+                                                <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
+                                                <div class="btn-row">
+                                                    <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar la IA</button>
                                                 </div>
-                                                <div id="rb-voz-ia" class="stack">
-                                                    <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
-                                                    <p class="hint">Se usa siempre que se puede. Sin internet o sin llave habla la voz del teléfono.</p>
-                                                </div>
+                                                <p id="rb-ia-estado" class="hint" role="status"></p>
+                                                <label class="field"><span class="field__label">Voz de la IA</span><select id="rb-vozia-voz" class="select"></select></label>
                                                 <div id="rb-voz-tel" class="stack">
-                                                    <span class="rb-op__t">Voz del teléfono (sin internet)</span>
-                                                    <label class="field"><span class="field__label">Voz</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
+                                                    <span class="rb-fn-t">Sin internet ni datos</span>
+                                                    <label class="field"><span class="field__label">Voz del teléfono</span><select id="rb-voz-sel" class="select"><option value="">Voz del sistema</option></select></label>
                                                     <div class="rb-calib">
                                                         <label class="field"><span class="field__label">Grave ← → aguda</span><input type="range" id="rb-voz-grave" min="0.5" max="1.5" step="0.05" value="0.75"></label>
                                                         <label class="field"><span class="field__label">Calmada ← → enérgica</span><input type="range" id="rb-voz-rapido" min="0.8" max="1.5" step="0.05" value="1.15"></label>
@@ -1141,20 +1140,16 @@
                                             </div>
                                         </details>
                                         <details class="rb-op">
-                                            <summary><span class="rb-op__t">IA gratis</span><span class="rb-op__r">Entiende mejor y habla natural</span></summary>
+                                            <summary><span class="rb-op__t">Personalidad</span><span class="rb-op__r">Normal o grosero</span></summary>
                                             <div class="rb-op__c">
-                                                <p class="hint">Gratis. Consigue una llave en aistudio.google.com/apikey y pégala. Yokis entiende lo que el micrófono oye mal y puede hablar con voz de IA. Solo se manda lo que dices.</p>
-                                                <label class="field"><span class="field__label">Llave de Gemini</span><input type="password" id="rb-ia-llave" class="input" autocomplete="off" spellcheck="false"></label>
-                                                <div class="btn-row">
-                                                    <button type="button" id="rb-ia-probar" class="btn btn--secondary btn--sm">Probar</button>
-                                                </div>
-                                                <p id="rb-ia-estado" class="hint" role="status"></p>
+                                                <label class="rb-check"><input type="checkbox" id="rb-grosero"><span>Modo grosero</span></label>
+                                                <p class="hint">Hevy dice groserías, te insulta y a veces no te hace caso. Parar siempre obedece. Apágalo cuando quieras.</p>
                                             </div>
                                         </details>
                                         <details class="rb-op">
                                             <summary><span class="rb-op__t">Voces entrenadas</span><span class="rb-op__r">Con la voz de un amigo</span></summary>
                                             <div class="rb-op__c">
-                                                <p class="hint">Un amigo lee 12 frases y Yokis las usa con su voz. Lo demás lo dice la voz del teléfono con su tono; no es una clonación perfecta.</p>
+                                                <p class="hint">Un amigo lee 12 frases y Hevy las usa con su voz. Lo demás lo dice la voz del teléfono con su tono; no es una clonación perfecta.</p>
                                                 <ul id="rb-vz-lista" class="rb-vz-lista"></ul>
                                                 <div class="btn-row">
                                                     <button type="button" id="rb-ent-abrir" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg> Entrenar una voz nueva</button>
@@ -1197,7 +1192,7 @@
                                             </div>
                                         </details>
                                         <details class="rb-op">
-                                            <summary><span class="rb-op__t">Facts</span><span class="rb-op__r">«Yokis, tírate un fact»</span></summary>
+                                            <summary><span class="rb-op__t">Facts</span><span class="rb-op__r">«Hevy, tírate un fact»</span></summary>
                                             <div class="rb-op__c">
                                                 <div class="field">
                                                     <label class="field__label" for="rb-fact-texto">Un fact por línea</label>
@@ -1213,18 +1208,18 @@
                                             <summary><span class="rb-op__t">Qué decirle</span><span class="rb-op__r">Frases para probar</span></summary>
                                             <div class="rb-op__c">
                                                 <ul class="rb-frases">
-                                                    <li><b>Moverse</b><span>«Yokis, avanza dos metros», «Yokis, ve para atrás tres segundos»</span></li>
-                                                    <li><b>Girar</b><span>«Yokis, gira a la derecha», «Yokis, gira cuarenta y cinco grados», «Yokis, da la vuelta»</span></li>
-                                                    <li><b>Dibujar</b><span>«Yokis, dibuja un círculo», «Yokis, hazme una estrella»</span></li>
-                                                    <li><b>Funciones</b><span>«Yokis, inicia la función zigzag», «Yokis, sigue la línea», «Yokis, activa esquivar obstáculos»</span></li>
-                                                    <li><b>Canciones</b><span>«Yokis, toca estrellita», «Yokis, pon la canción de la cucaracha», «Yokis, detén la música»</span></li>
-                                                    <li><b>Baile</b><span>«Yokis, baila», «Yokis, baila el zigzag con estrellita», «Yokis, deja de bailar»</span></li>
-                                                    <li><b>Plática</b><span>«Yokis, cómo estás», «Yokis, cuéntame un chiste», «Yokis, qué hora es», «Yokis, gracias»</span></li>
-                                                    <li><b>Luces</b><span>«Yokis, enciende las luces rojas», «Yokis, luces arcoíris», «Yokis, apaga las luces»</span></li>
-                                                    <li><b>Casa y sensor</b><span>«Yokis, regresa a casa», «Yokis, haz un radar», «Yokis, activa la guardia»</span></li>
-                                                    <li><b>Otros</b><span>«Yokis, toca el claxon», «Yokis, cuánta batería tienes», «Yokis, para»</span></li>
+                                                    <li><b>Moverse</b><span>«Hevy, avanza dos metros», «Hevy, ve para atrás tres segundos»</span></li>
+                                                    <li><b>Girar</b><span>«Hevy, gira a la derecha», «Hevy, gira cuarenta y cinco grados», «Hevy, da la vuelta»</span></li>
+                                                    <li><b>Dibujar</b><span>«Hevy, dibuja un círculo», «Hevy, hazme una estrella»</span></li>
+                                                    <li><b>Funciones</b><span>«Hevy, inicia la función zigzag», «Hevy, sigue la línea», «Hevy, activa esquivar obstáculos»</span></li>
+                                                    <li><b>Canciones</b><span>«Hevy, toca estrellita», «Hevy, pon la canción de la cucaracha», «Hevy, detén la música»</span></li>
+                                                    <li><b>Baile</b><span>«Hevy, baila», «Hevy, baila el zigzag con estrellita», «Hevy, deja de bailar»</span></li>
+                                                    <li><b>Plática</b><span>«Hevy, cómo estás», «Hevy, cuéntame un chiste», «Hevy, qué hora es», «Hevy, gracias»</span></li>
+                                                    <li><b>Luces</b><span>«Hevy, enciende las luces rojas», «Hevy, luces arcoíris», «Hevy, apaga las luces»</span></li>
+                                                    <li><b>Casa y sensor</b><span>«Hevy, regresa a casa», «Hevy, haz un radar», «Hevy, activa la guardia»</span></li>
+                                                    <li><b>Otros</b><span>«Hevy, toca el claxon», «Hevy, cuánta batería tienes», «Hevy, para»</span></li>
                                                 </ul>
-                                                <p class="hint">Empieza siempre con «Yokis». Una orden por toque y con el robot conectado. El turbo solo desde el mando.</p>
+                                                <p class="hint">Empieza siempre con «Hevy». Una orden por toque y con el robot conectado. El turbo solo desde el mando.</p>
                                             </div>
                                         </details>
                                     </div>
