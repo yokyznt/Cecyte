@@ -404,7 +404,11 @@
         const llaveG = $('rb-gradium-llave');
         if (llaveG) {
             llaveG.value = llaveGradium();
-            llaveG.addEventListener('change', () => { try { localStorage.setItem(CLAVE_GRADIUM, llaveG.value.trim()); } catch (e) { return; } mensajeEnt(llaveG.value.trim() ? 'Llave de Gradium guardada.' : 'Llave de Gradium borrada.'); });
+            llaveG.addEventListener('change', () => {
+                VIA.gradiumHasta = 0;
+                try { localStorage.setItem(CLAVE_GRADIUM, llaveG.value.trim()); } catch (e) { return; }
+                estadoVoz(llaveG.value.trim() ? 'Llave de Gradium guardada.' : 'Llave de Gradium borrada.');
+            });
         }
         $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
         $('rb-ent-cerrar').addEventListener('click', () => (raiz.RobotUI ? raiz.RobotUI.cerrarSuave($('rb-ent-ventana')) : $('rb-ent-ventana').close()));
@@ -619,6 +623,8 @@
         if (turno !== VIA.turno) return true;
         callarIA();
         const motivo = MOTIVOS_VOZ[VIA.motivo] || MOTIVOS_VOZ.error;
+        if (VIA.motivo !== 'red' && await hablarGradium(texto, vozGradiumElegida(), 'IA de Gradium (' + (VOCES_GRADIUM.find(x => x[0] === vozGradiumElegida()) || ['', ''])[1] + ')', turno)) return true;
+        if (turno !== VIA.turno) return true;
         if (VIA.motivo !== 'red' && await hablarGoogle(texto, turno)) {
             estadoVoz(motivo + ': hablo con la voz de Google.');
             return true;
@@ -632,6 +638,16 @@
         if (!sel) return;
         sel.innerHTML = VOCES_IA.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
         sel.value = vozIAElegida();
+        const selG = $('rb-gradium-voz');
+        if (selG) {
+            selG.innerHTML = VOCES_GRADIUM.map(v => `<option value="${v[0]}">${v[1]}</option>`).join('');
+            selG.value = vozGradiumElegida();
+            selG.addEventListener('change', () => {
+                VIA.gradiumHasta = 0;
+                try { localStorage.setItem(CLAVE_VOZGR, selG.value); } catch (e) { return; }
+                hablarGradium('¡Qué onda, we! Así suena esta voz.', selG.value, 'IA de Gradium');
+            });
+        }
         sel.addEventListener('change', () => {
             VIA.pausaHasta = 0;
             try { localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ voz: sel.value })); } catch (e) { return; }
@@ -723,20 +739,34 @@
         }
     }
 
-    async function hablarClon(texto) {
-        const m = ENT.activa && ENT.voces.find(v => v.nombre === ENT.activa);
-        const llave = llaveGradium();
-        if (!m || !m.clon || !llave) return false;
-        const turno = ++VIA.turno;
+    const VOCES_GRADIUM = [['yPxeHKlCzaHeKd_V', 'Carlos'], ['Gijj_GPBfJVcP-FZ', 'Miguel'], ['aCWBiYUiQ4VwW8_b', 'Pablo'], ['xu7iJ_fn2ElcWp2s', 'Sergio (España)'], ['B36pbz5_UoWn4BDl', 'Valentina (México)'], ['s4CzgVHP5cEkB9LD', 'Sofía'], ['PqjKPYFyGNsg1YU-', 'Elena']];
+    const CLAVE_VOZGR = 'cecyte_yokis_vozgr';
+    VIA.gradiumHasta = 0;
+
+    function vozGradiumElegida() {
         try {
-            const clave = 'clon|' + m.clon + '|' + texto;
+            const v = localStorage.getItem(CLAVE_VOZGR);
+            if (VOCES_GRADIUM.some(x => x[0] === v)) return v;
+        } catch (e) { return VOCES_GRADIUM[0][0]; }
+        return VOCES_GRADIUM[0][0];
+    }
+
+    async function hablarGradium(texto, voiceId, etiqueta, turnoDado) {
+        const llave = llaveGradium();
+        if (!llave || Date.now() < VIA.gradiumHasta) return false;
+        const turno = turnoDado || ++VIA.turno;
+        try {
+            const clave = 'gradium|' + voiceId + '|' + texto;
             let datos = VIA.cache.get(clave) || await cacheGet(clave);
             if (!datos) {
                 const r = await fetch('https://api.gradium.ai/api/post/speech/tts', {
                     method: 'POST', headers: { 'x-api-key': llave, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: texto, voice_id: m.clon, output_format: 'wav', only_audio: true }),
+                    body: JSON.stringify({ text: texto, voice_id: voiceId, output_format: 'wav', only_audio: true }),
                 });
-                if (!r.ok) return false;
+                if (!r.ok) {
+                    VIA.gradiumHasta = Date.now() + (r.status === 401 || r.status === 402 || r.status === 429 ? 3600000 : 15000);
+                    return false;
+                }
                 datos = bytesABase64(new Uint8Array(await r.arrayBuffer()));
                 cachePut(clave, datos);
             }
@@ -746,14 +776,21 @@
             const url = URL.createObjectURL(new Blob([base64ABytes(datos)], { type: 'audio/wav' }));
             try {
                 await sonar(url);
-                estadoVoz('Voz: clon de «' + m.nombre + '».');
+                estadoVoz('Voz: ' + etiqueta + '.');
                 return true;
             } finally {
                 URL.revokeObjectURL(url);
             }
         } catch (e) {
+            VIA.gradiumHasta = Date.now() + 15000;
             return false;
         }
+    }
+
+    function hablarClon(texto) {
+        const m = ENT.activa && ENT.voces.find(v => v.nombre === ENT.activa);
+        if (!m || !m.clon) return Promise.resolve(false);
+        return hablarGradium(texto, m.clon, 'clon de «' + m.nombre + '»');
     }
 
     async function voz(texto) {
