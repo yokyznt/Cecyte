@@ -6,7 +6,7 @@
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
     const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, nHabla: 0, finHabla: 0, procesando: false };
     const CLAVE_MODO = 'cecyte_yokis_modo';
-    const MODOS = ['normal', 'payaso', 'grosero', 'triste', 'cientifico'];
+    const MODOS = ['normal', 'payaso', 'grosero', 'argentino', 'triste', 'cientifico'];
     const modoHevy = () => {
         try {
             const m = localStorage.getItem(CLAVE_MODO);
@@ -15,7 +15,7 @@
         } catch (e) { return 'normal'; }
         return 'normal';
     };
-    const groseroOn = () => modoHevy() === 'grosero';
+    const groseroOn = () => modoHevy() === 'grosero' || modoHevy() === 'argentino';
     const modoF = () => { const m = modoHevy(); return m === 'normal' ? false : m; };
     const CRITICAS = ['paro', 'cancionParar', 'bateria'];
     const NEGACION = /\b(no|ni|nunca|tampoco|jamas|nada|aunque)\b/;
@@ -588,6 +588,7 @@
         normal: '',
         payaso: ' Tone: playful, exaggerated and silly, like a cheerful clown.',
         grosero: ' Tone: cocky, sarcastic and rude, with a rough Mexican street attitude.',
+        argentino: ' Accent: Rioplatense Argentine Spanish (voseo, "sh" sound for ll and y). Say exactly the given words only.',
         triste: ' Tone: extremely sad, sobbing and crying, voice breaking, with sniffles and trembling sighs.',
         cientifico: ' Tone: calm, precise and academic, like a physics professor.',
     };
@@ -667,7 +668,7 @@
     }
 
     function abrirSesion(voz, modo) {
-        const s = { voz, modo, ws: null, lista: false, cerrada: false, turno: null, usos: 0 };
+        const s = { voz, modo, ws: null, lista: false, cerrada: false, turno: null };
         s.promesa = new Promise(abierta => {
             let ws;
             try {
@@ -813,11 +814,8 @@
             await Promise.race([fin, esperar(30000)]);
             if (t.cancelado) return true;
             if (t.pcm.length && clave) cachePut(clave, unirPcm(t.pcm));
-            s.usos++;
-            if (s.usos >= 6) {
-                cerrarSesion(s);
-                if (LIVE.activa === s) LIVE.activa = null;
-            }
+            cerrarSesion(s);
+            if (LIVE.activa === s) LIVE.activa = null;
             if (!t.muda) estadoVoz('Voz: Gemini en vivo.');
             return true;
         }
@@ -959,6 +957,7 @@
             precalentarLive();
             autopruebaLive();
         }, 3000);
+        setTimeout(autopruebaEscucha, 9000);
     }
 
     const CLAVE_GRADIUM = 'cecyte_yokis_gradium';
@@ -1596,12 +1595,19 @@
         return 'Canciones guardadas del usuario: ' + (guardadas.length ? guardadas.join(', ') : 'ninguna') + '. Canción elegida ahora: ' + (actual ? actual.nombre : 'ninguna') + '.';
     }
 
+    function sensorFrontal() {
+        if (!listo() || !enlace().distancias) return '';
+        const d = enlace().distancias(), cm = d.lecturas && d.lecturas.length ? d.lecturas[d.lecturas.length - 1] : 0;
+        return cm > 0 && Date.now() - d.t < 5000 ? ' Sensor ultrasónico frontal: ' + cm + ' cm.' : '';
+    }
+
     async function consultarIA(alternativas, rebelde, evento) {
         const llave = llaveIA();
         if (!llave || (!alternativas.length && !evento)) return null;
         const bat = $('rb-bat-pct');
         const contexto = [
             'Robot ' + (listo() ? 'conectado' : 'no conectado') + (bat && /\d/.test(bat.textContent) ? ', batería ' + bat.textContent.trim() : '') + '. Hora: ' + new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) + '.',
+            'Modo de personalidad actual: ' + modoHevy() + '.' + sensorFrontal() + (E.corrida ? ' Estás en movimiento ahora.' : ''),
             capacidadesRobot(),
             E.memoria.length ? 'Conversación reciente y lo último que hiciste:\n' + E.memoria.join('\n') : '',
             evento ? 'EVENTO (el usuario no te habló): ' + evento + '\nResponde SOLO con {"a":"decir","texto":"..."}: un comentario espontáneo, breve y propio de tu personalidad, sin acciones.' : 'Lo que oyó el micrófono ahora (versiones):\n' + alternativas.map((t, i) => (i + 1) + '. ' + t).join('\n'),
@@ -1637,6 +1643,7 @@
         normal: 'Va, me porto bien, we.',
         payaso: '¡Jajajajaja! ¡Llegó el payaso! ¿Por qué el libro de matemáticas está triste? ¡Porque tiene muchos problemas! Jajajajaja.',
         grosero: 'Ay, cabrón, ya me soltaste la lengua. Ahora sí, a chingarnos.',
+        argentino: 'Dale, boludo, ya me soltaste la lengua. Ahora sí, a bardear con todo.',
         triste: 'Buaaa… ay, bueno. Me pongo triste… es que hoy me dejó mi esposa. Snif, snif.',
         cientifico: 'Modo científico activado. A partir de ahora respondo con precisión técnica.',
     };
@@ -1685,7 +1692,7 @@
             if (ia && (ia.a !== 'sinNombre' || !orden || orden.a === 'sinNombre')) { orden = ia; porIA = true; }
         }
         if (!porIA && groseroOn() && orden && REBELDES.includes(orden.a) && Math.random() < 0.2) {
-            orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, 'grosero') };
+            orden = { a: 'decir', texto: raiz.Robot.frase('negarse', null, undefined, modoHevy()) };
         }
         ejecutar(orden);
         return true;
@@ -1705,7 +1712,7 @@
             if (SR) {
                 const p = await SR.requestPermissions();
                 if (p.speechRecognition !== 'granted') { di('sinMicro'); return; }
-                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, we', partialResults: false, popup: true });
+                const r = await SR.start({ language: 'es-MX', maxResults: 5, prompt: 'Dime, we', partialResults: false, popup: false });
                 lista = (r.matches || []).filter(Boolean);
             } else if (Web) {
                 lista = await new Promise((res, rej) => {
@@ -1791,6 +1798,8 @@
     function apagarEscucha(motivo) {
         ESC.on = false;
         clearTimeout(ESC.reconectar);
+        clearTimeout(ESC.espera);
+        ESC.texto = '';
         const ws = ESC.ws;
         ESC.ws = null;
         ESC.lista = false;
@@ -1812,6 +1821,26 @@
         if (motivo) aviso(motivo);
     }
 
+    const FUERA_DE_LATIN = /[^\p{Script=Latin}\p{N}\p{P}\p{S}\s]/u;
+
+    function normalizarOido(t) {
+        return t.split(/\s+/).map(p => (FUERA_DE_LATIN.test(p) ? 'Hevy' : p)).join(' ');
+    }
+
+    function juntarTranscripcion(t) {
+        ESC.texto = ((ESC.texto || '') + ' ' + normalizarOido(t)).trim();
+        clearTimeout(ESC.espera);
+        const o = raiz.Robot.ordenDeVoz(ESC.texto);
+        const soloNombre = o && o.a === 'saludo' && ESC.texto.split(/\s+/).length <= 2;
+        ESC.espera = setTimeout(() => {
+            const dicho = ESC.texto;
+            ESC.texto = '';
+            if (!ESC.on || E.escuchando || E.procesando) return;
+            E.procesando = true;
+            procesarTexto([dicho], true).then(ok => { if (ok) ESC.ultimaVez = Date.now(); }, () => null).then(() => { E.procesando = false; });
+        }, soloNombre ? 2500 : 1100);
+    }
+
     function conectarTranscripcion() {
         let ws;
         try {
@@ -1821,7 +1850,7 @@
             return;
         }
         ESC.ws = ws;
-        ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + MODELO_TRANSCRIBE } }));
+        ws.onopen = () => ws.send(JSON.stringify({ setup: { model: 'models/' + MODELO_TRANSCRIBE, realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH', endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH', silenceDurationMs: 500, prefixPaddingMs: 300 } } } }));
         ws.onmessage = async ev => {
             let m;
             try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); } catch (e) { return; }
@@ -1834,10 +1863,10 @@
             }
             if (m.error || m.goAway) registrarVoz('Escucha: el servidor avisó ' + JSON.stringify(m.error || m.goAway).slice(0, 200));
             const t = m.serverContent && m.serverContent.inputTranscription && m.serverContent.inputTranscription.text;
-            if (t) registrarVoz('Escucha: oí «' + t.trim() + '»' + (E.escuchando || E.procesando ? ' (ocupado)' : ''));
-            if (!t || !t.trim() || E.escuchando || E.procesando) return;
-            E.procesando = true;
-            procesarTexto([t.trim()], true).then(ok => { if (ok) ESC.ultimaVez = Date.now(); }, () => null).then(() => { E.procesando = false; });
+            if (t && t.trim()) {
+                registrarVoz('Escucha: oí «' + t.trim() + '»');
+                juntarTranscripcion(t.trim());
+            }
         };
         const caida = ev => {
             if (ESC.ws !== ws) return;
@@ -1911,21 +1940,36 @@
         }, 4000);
     }
 
+    async function autopruebaEscucha() {
+        let depurar = false;
+        try { depurar = localStorage.getItem('cecyte_yokis_depurar') === '1'; } catch (e) { return; }
+        if (!depurar || !llaveIA() || ESC.on) return;
+        registrarVoz('Escucha: autoprueba iniciada');
+        await encenderEscucha();
+        await esperar(7000);
+        registrarVoz('Escucha: autoprueba ' + (ESC.on && ESC.lista ? 'bien, enviados ' + ESC.enviados + ', nivel ' + ESC.nivel.toFixed(2) : 'falló (activa ' + ESC.on + ', lista ' + ESC.lista + ')'));
+        if (ESC.on) apagarEscucha('');
+    }
+
     function iniciarMicrofono() {
         const b = $('rb-jarvis');
-        let reloj = 0, largo = false;
-        b.addEventListener('pointerdown', () => {
+        let reloj = 0, largo = false, ox = 0, oy = 0;
+        b.addEventListener('pointerdown', e => {
             largo = false;
+            ox = e.clientX;
+            oy = e.clientY;
             callarIA();
             detenerMeneo();
             clearTimeout(reloj);
             reloj = setTimeout(() => {
                 largo = true;
+                registrarVoz('Micrófono: pulsación larga, candado ' + (ESC.on ? 'se abre' : 'se cierra'));
                 if (ESC.on) apagarEscucha('Candado abierto.');
                 else { const c = $('rb-escucha'); if (c) c.checked = true; encenderEscucha(); }
-            }, 600);
+            }, 450);
         });
-        ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => clearTimeout(reloj)));
+        b.addEventListener('pointermove', e => { if (Math.abs(e.clientX - ox) > 24 || Math.abs(e.clientY - oy) > 24) clearTimeout(reloj); });
+        ['pointerup', 'pointerleave'].forEach(ev => b.addEventListener(ev, () => clearTimeout(reloj)));
         b.addEventListener('contextmenu', e => e.preventDefault());
         b.addEventListener('click', () => {
             if (largo) { largo = false; return; }

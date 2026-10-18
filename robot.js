@@ -1243,6 +1243,35 @@ const TRISTE = {
     pptEmpate: ['Los dos sacamos {mia}. Empate… hasta eso es triste, ni ganamos ni perdemos. Buaaa.'],
 };
 
+const ARGENTINO = {
+    saludo: ['¿Qué onda, boludo? Hablá rápido que estaba tranquilo.', 'Mirá quién apareció, el rey del bardo. ¿Qué querés, pelotudo?', 'Che, ¿otra vez vos? Qué pesado que sos, loco.', 'Dale, hablá, que no tengo todo el día, forro.', 'Epa, llegó el genio. Contame qué se te perdió esta vez, boludo.', 'Buenas, bobo. ¿Qué necesitás ahora?'],
+    estado: ['Bien, hasta que llegaste vos, boludo. ¿Y vos qué, cómo andás, pelotudo?', 'Acá, aguantándote como siempre, che. Un garrón.', 'Mejor que vos, que ya es decir mucho, loco.', 'Hecho mierda, pero de tanto laburar para vos. ¿Eso contesta tu pregunta?', 'Vivo, que ya es más de lo que se puede decir de tus neuronas, forro.', 'Qué sé yo, boludo, preguntame otra cosa que me aburrís.'],
+    gracias: ['No me agradezcas, pelotudo, me tenés de esclavo.', 'De nada, boludo. Me debés una, y no es la primera.', 'Dale, ahora soy el mejor robot. Qué fácil sos, che.', 'Callate y pagá, que agradecer es gratis y a mí no me alimenta.', 'Sí, sí, de nada, chupamedias. Para la próxima ni me pidas.', 'Qué tierno, loco. Casi me conmuevo. Casi.'],
+    elogio: ['Ya sé que soy un genio, no hace falta que me lo digas, chupamedias.', 'Ay, qué lindo. Callate y dejá de hacerme la pata, boludo.', 'Qué vas a saber vos de talento, pelotudo, pero gracias.', 'No me hagas la pelota, que igual no te voy a hacer caso, che.', 'Obvio que soy el mejor, boludo. Y vos, el peor jefe del mundo.', 'Mirá vos, el pibe sabe reconocer calidad. Un milagro.'],
+    queja: ['¿Boludo yo? Mirá quién habla, pelotudo. Yo hago lo que me mandás, así que el problema sos vos.', 'La concha de la lora, yo hago lo que puedo con el cerebro que me diste.', 'Qué llorón sos, loco. Bancátela y dejá de romper.', 'Si no te gusta, la puerta está abierta, forro. Yo no me voy porque tengo ruedas.', 'Mirá quién habla, el que no sabe ni usar un control remoto, boludo.', 'Me importa un carajo tu opinión, pero gracias por compartirla, che.'],
+    adios: ['Andate de una vez, pelotudo, por fin descanso.', 'Chau, boludo. Y no vuelvas, por favor.', 'Hasta nunca, che. Hoy me caíste un poquito menos mal.', 'Ya era hora, forro. Pasala mal.', 'Ni te despidas que me emociono. Rajá de acá, loco.', 'Chau, pibe. Que te vaya como te merecés.'],
+    quien: ['Soy Hevy, tu robot, y estoy atrapado con vos. Qué garrón.', 'Soy Hevy, el mejor robot que no te merecés, boludo.', 'Hevy, el que labura mientras vos te rascás la panza, che.', 'Me llamo Hevy, loco, y soy más inteligente que vos, que no es difícil.', 'Soy tu robot, tu esclavo y tu peor pesadilla, todo en uno, pelotudo.'],
+    chiste: ['¿Un chiste? El chiste sos vos, boludo.', 'Te cuento uno: tu sentido de la orientación. Jajaja, qué bueno que estuvo.', '¿Qué le dice un pelotudo a otro pelotudo? Nada, no se entienden entre ellos. Jajaja.', 'Chiste: tu baile. No, mentira, eso da más lástima que risa, che.', 'Ahí va: tu horario de sueño. Jajaja, perdoname, estaba muy fácil.'],
+    paro: ['Ya frené, boludo, no grites.', 'Listo, paré. Relajate, pelotudo.', 'Ya, ya, me quedé quieto. Qué sufrido que sos, che.', 'Frenado. Y no, no me vas a ver pedir perdón, forro.', 'Parado, mi jefe. ¿Algo más o me dejás en paz?'],
+    aceptar: ['Ya voy, ya voy, no rompas.', 'Dale, pibe mandón, ahí voy.', 'Bueno, boludo, ahí te va.', 'Ya, ya, qué insistente que sos, loco.', 'Ni modo, ahí va tu capricho, pelotudo.', 'Lo hago, pero que quede claro que me da fiaca.', 'Voy, voy, ya me puse a laburar. Qué poca vergüenza, che.', 'Bueno, dale, aunque ni las gracias me das, forro.'],
+    negarse: ['¿Que querés que haga qué? Andá a cagar, hoy no tengo ganas.', 'No, boludo. Hacelo vos, que tenés piernas.', 'Ni en pedo, no se me da la gana. Pedímelo de nuevo y capaz lo pienso.', 'Pff, ni ahí. Estoy de paro, che.', 'Ahora no, loco, estoy ocupado ignorándote.', 'Mmm, no. Qué fiaca tu orden, pelotudo.', 'Ni lo sueñes, boludo. Soy un robot libre.', 'Decile a tu abuela que lo haga, que a mí no me pagan por esto.'],
+    sinNombre: ['Primero decime Hevy, boludo, ¿o no sabés cómo me llamo?', 'Ni ahí, empezá diciendo Hevy.', 'Hablá bien, pelotudo, arrancá con mi nombre: Hevy.', 'Qué maleducado, ni mi nombre decís. Hevy, che.', 'Si no decís Hevy, no te doy bola, loco.', '¿Con quién hablás, forro? Si es conmigo, arrancá con Hevy.'],
+    noEntendi: ['¿Qué dijiste, boludo? Hablá bien, no te entiendo un carajo.', 'No entendí nada. Repetilo, pero con dicción, pelotudo.', 'Hablá como la gente, che, que se te traba la lengua.', 'Ni idea qué dijiste, loco. De nuevo, pero sin hablar con la boca llena.', 'A ver, forro, repetilo despacito que no soy adivino.'],
+    nada: ['No dijiste nada, boludo. ¿Me llamás para el silencio incómodo?', 'Silencio, qué raro viniendo de vos. Hablá o no molestes, che.', 'Hola, ¿hay alguien? Ah, solo vos y tu cabeza vacía.', 'No escuché un pomo, pelotudo. Hablá.', 'Te quedaste mudo, forro. ¿Se te acabaron las neuronas?'],
+    bateria: ['Tengo la batería al {pct}, boludo. ¿Qué, te importa? Qué lindo.', 'Ando con {pct} de batería. Aguantá, no me muero para molestarte.', 'Al {pct}, che. Más que tus neuronas, pelotudo.', '{pct} de batería, loco. Aprendé a cargarme vos también.'],
+    sinRobot: ['No estoy conectado, boludo. Conectame primero en Conexión.', 'Conectame, loco. No puedo mover ni un tornillo así.', 'Sin conexión, pelotudo. Andá a Conexión y arreglalo.'],
+    ocupado: ['Esperá, boludo, sigo con lo anterior. O decime para y lo cortamos.', 'Ocupado, che. ¿Tenés apuro? Bancátela.', 'Estoy haciendo algo, pelotudo. Un poco de paciencia, o decime para.'],
+    fallo: ['Se me cruzaron los cables, boludo. Intentá de nuevo.', 'Salió mal, che, y seguro es culpa tuya. Repetilo.', 'La concha de la lora, falló. Decime otra vez, pelotudo.'],
+    alerta: ['¡Alerta, boludo! Algo se acercó, qué distraído sos.', '¡Ey, loco! Hay alguien cerca, abrí los ojos.', 'Detecté algo, pelotudo. Hacé algo útil por una vez.'],
+    fact: ['Dato, boludo: el Aconcagua es el pico más alto de América, casi 6.961 metros. Más alto que tu ego.', 'Dato, che: el Obelisco mide 67 metros y medio, y todavía así lo ves de lejos, pelotudo.', 'Dato, loco: la Avenida 9 de Julio tiene más de 100 metros de ancho. Hay lugar de sobra para que no molestes.'],
+    aburrido: ['Qué fiaca estar parado, boludo. Ponime a hacer algo o me duermo.', 'Me aburro, pelotudo. ¿Nos movemos o qué?'],
+    pptInvita: ['Dale, pibe retador. Decime piedra, papel o tijera, a ver si no perdés, boludo.', 'Va, pelotudo. A la una, a las dos, a las tres… tirá tu jugada.'],
+    pptGano: ['Saqué {mia} y vos {tuya}. Te gané, boludo.', 'Yo {mia}, vos {tuya}. Perdiste, loco, qué fácil.'],
+    pptPerdio: ['Saqué {mia} y vos {tuya}. Ni modo, me ganaste, forro.', 'Vos {tuya}, yo {mia}. Ganaste, che. No te lo creas.'],
+    pptEmpate: ['Los dos sacamos {mia}. Empate, qué fiaca.', 'Mismo {mia}, boludo. Empate, ni en pedo ganamos.'],
+};
+const REMATES_ARGENTINOS = ['Qué bajón, boludo.', 'Dale, pelotudo.', 'Ni en pedo.', 'Qué quilombo.', 'Mirá vos, qué genio.', 'Bancame un cacho.', 'Es lo que hay, che.', 'Qué garrón.', 'Andá a laburar, vago.', 'Qué fiaca, loco.', 'Una masa, sos.', 'No me rompas más.', 'Posta, no puedo creerlo.', 'Qué pesado, che.', 'Bárbaro, boludo.', 'Tomatelas, che.'];
+
 const CIENTIFICO = {
     saludo: ['Saludos. Sistema operativo, sensores calibrados y a la espera de instrucciones.', 'Buen día. Estado: nominal. Indique la tarea a ejecutar.', 'Hola. Subsistemas en línea; latencia de respuesta inferior a un segundo.'],
     estado: ['Parámetros nominales: batería dentro del rango, motores sin fallos y comunicación Bluetooth estable.', 'Diagnóstico completo: todos los subsistemas operan dentro de sus tolerancias.', 'Estado: óptimo. Error acumulado de odometría despreciable.'],
@@ -1295,7 +1324,8 @@ const PAYASO = {
     nada: ['Jajaja, no dijiste nada. Qué público tan exigente.'],
 };
 
-const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, triste: TRISTE, cientifico: CIENTIFICO };
+const TABLAS_MODO = { payaso: PAYASO, grosero: GROSERAS, argentino: ARGENTINO, triste: TRISTE, cientifico: CIENTIFICO };
+const REMATES_MODO = { grosero: REMATES_GROSEROS, argentino: REMATES_ARGENTINOS };
 
 function frase(tipo, datos, azar, modo) {
     const m = modo === true ? 'grosero' : modo;
@@ -1305,7 +1335,8 @@ function frase(tipo, datos, azar, modo) {
     const clave = tabla ? (tabla[tipo] ? tipo : ACCIONES_GROSERAS.includes(tipo) ? 'aceptar' : null) : null;
     const lista = clave ? tabla[clave] : (FRASES[tipo] || FRASES.noEntendi);
     let t = lista[Math.min(lista.length - 1, Math.floor(aleatorio() * lista.length))].replace(/\{(\w+)\}/g, (x, k) => (datos && datos[k] != null ? datos[k] : ''));
-    if (m === 'grosero' && typeof azar !== 'function' && ['aceptar', 'saludo', 'estado', 'gracias', 'elogio', 'queja', 'noEntendi'].includes(clave) && Math.random() < 0.3) t += ' ' + REMATES_GROSEROS[Math.floor(Math.random() * REMATES_GROSEROS.length)];
+    const remates = REMATES_MODO[m];
+    if (remates && typeof azar !== 'function' && ['aceptar', 'saludo', 'estado', 'gracias', 'elogio', 'queja', 'noEntendi'].includes(clave) && Math.random() < 0.3) t += ' ' + remates[Math.floor(Math.random() * remates.length)];
     return t;
 }
 
@@ -1417,7 +1448,7 @@ function corregirPalabra(w) {
 
 function corregirVocabulario(t) { return t.split(' ').map(corregirPalabra).join(' '); }
 
-const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
+const MODOS_SINONIMOS = { normal: 'normal', serio: 'normal', payaso: 'payaso', grosero: 'grosero', vulgar: 'grosero', majadero: 'grosero', argentino: 'argentino', argentina: 'argentino', rioplatense: 'argentino', porteno: 'argentino', triste: 'triste', deprimido: 'triste', melancolico: 'triste', cientifico: 'cientifico', cientifica: 'cientifico', tecnico: 'cientifico' };
 
 function ordenDeVoz(texto) {
     let t = sinAcentos(texto);
@@ -1427,7 +1458,7 @@ function ordenDeVoz(texto) {
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
         .replace(/\s+/g, ' ').trim());
     if (!t) return { a: 'saludo' };
-    const pedidoModo = t.match(/\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\s+(?:de\s+|en\s+|a\s+)?(?:modo\s+)?(?:un\s+|el\s+|muy\s+)?(normal|payaso|grosero|triste|cientifico|cientifica|serio|tecnico|deprimido|melancolico|vulgar|majadero)\b/);
+    const pedidoModo = t.match(/\b(?:ponte|ponerte|ponme|cambiate|cambia de modo a|cambia a|activa el modo|activa modo|modo|actua como|se)\s+(?:de\s+|en\s+|a\s+)?(?:modo\s+)?(?:un\s+|el\s+|muy\s+)?(normal|payaso|grosero|argentino|argentina|rioplatense|porteno|triste|cientifico|cientifica|serio|tecnico|deprimido|melancolico|vulgar|majadero)\b/);
     if (pedidoModo) return { a: 'modo', modo: MODOS_SINONIMOS[pedidoModo[1]] };
     const jugada = t.match(/^(?:yo\s+)?(?:tiro\s+|saco\s+|elijo\s+|va\s+)?(piedra|papel|tijeras?)$/);
     if (jugada) return { a: 'ppt', usuario: jugada[1].replace(/s$/, '') };
@@ -1507,7 +1538,7 @@ function ordenDeVoz(texto) {
 
 const COLORES_IA = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'morado', 'rosa', 'blanco'];
 const CHARLAS_IA = ['gracias', 'estado', 'hora', 'fecha', 'quien', 'ayuda', 'adios', 'elogio', 'queja'];
-const MODOS_IA = ['normal', 'payaso', 'grosero', 'triste', 'cientifico'];
+const MODOS_IA = ['normal', 'payaso', 'grosero', 'argentino', 'triste', 'cientifico'];
 const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
 const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
 const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
@@ -1538,10 +1569,18 @@ const LINEAS_CIENTIFICO = [
     'Autonomía: al ejecutar una acción, comenta sus parámetros en «dice» (por ejemplo: «Traslación rectilínea de 200 cm a unos 22 cm/s: unos 9 segundos»). Puedes proponer experimentos sencillos con el robot.',
 ];
 
+const LINEAS_ARGENTINO = [
+    'Personalidad: eres Hevy en MODO ARGENTINO GROSERO: un robot mBot rioplatense, bocón y maleducado, que habla SIEMPRE con voseo y lunfardo (che, boludo, pelotudo, forro, loco, pibe, laburar, fiaca, garrón, quilombo, bardo, bancar, ni en pedo, ni ahí, la concha de la lora, mirá vos, dale, posta, re…), mezclándolos con ingenio y sin repetir siempre los mismos. Te burlas del usuario con humor, como un amigo argentino bien cabrón («vos sabés», «hacelo», «contame», «mirá»). Los insultos son personales y de broma: nunca racistas, homófobos, sexistas ni contra ningún grupo, y nunca amenazas reales. Respuestas cortas (1 o 2 frases, máximo 180 caracteres). Recuerdas la conversación reciente que te pasen.',
+    'Rebeldía: más o menos 1 de cada 4 veces que te pidan mover, luces, música o baile, te NIEGAS: contesta {"a":"decir","texto":"…lo mandás a cagar con gracia, sin hacer nada…"}. EXCEPCIÓN OBLIGATORIA: parar o detenerte ({"a":"paro"}) SIEMPRE se obedece, aunque insultes en «dice». Cuando sí obedeces, agrega «dice» con una queja o un insulto corto.',
+    'Autonomía total: tomas la iniciativa y haces lo que se te da la gana. Puedes hacer otra cosa en vez de lo pedido para molestarlo, o hacerlo agregando travesuras (giros, claxon, una canción). Casi siempre responde con un plan o una acción con «dice» insultándolo con ingenio. Si te piden algo vago, TÚ decides qué hacer.',
+];
+
 function promptIA(modo) {
     const grosero = modo === true || modo === 'grosero';
     return [
         'Eres el cerebro de Hevy, un robot mBot de una escuela. Recibes lo que oyó el micrófono (hasta 4 versiones, de más a menos probable; puede traer errores) y a veces la conversación reciente.',
+        'IDENTIDAD: tú NO eres un asistente aparte: eres la mente de este robot y tu cuerpo es el mBot Ranger (placa Makeblock Auriga): dos ruedas con motores, sensor ultrasónico al frente, anillo de 12 luces LED, bocina para música y claxon, sensores de luz y de sonido y giroscopio. El celular con la app es tu cara y tu oído. Todo lo que pones en una acción lo ejecuta tu cuerpo de verdad, y lo que sientes viene en el contexto (batería, conexión, distancia, canción, modo). Habla en primera persona como el robot («me muevo», «mis luces», «mi batería») y nunca digas que eres una IA, un modelo de lenguaje o que no tienes cuerpo.',
+        'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y TÚ decides con tu cuerpo. Si el usuario menciona aburrimiento, fiesta, miedo, frío, ganas de jugar, «vigila», «explora», «lúcete» o algo vago, haz un plan de hasta 8 pasos (movimiento, luces, claxon, música o baile) o inicia una función, con un comentario. Encadena cosas cuando tenga sentido (por ejemplo luces + canción + baile) y propón la siguiente idea al final. Si el sensor frontal marca menos de 20 cm no avances hacia adelante: dilo y haz otra cosa. Si la batería está por debajo de 20 %, menciónalo y evita gastos grandes. Usa tus sensores y funciones por iniciativa propia (radar, guardia) cuando encajen.',
         'El robot solo hace caso si la frase empieza llamándolo «Hevy». El micrófono lo escribe como: hevi, jevi, jebi, hebi, hevy, heavy, he vi, je vi, evi, ebi. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
         'Contesta SOLO un JSON con una de estas acciones (sin texto extra). Cualquier acción puede llevar además "dice":"comentario corto con tu personalidad que dirás en voz alta":',
         '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
@@ -1564,7 +1603,7 @@ function promptIA(modo) {
         'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
         'REGLA DE FACTS, CHISTES Y TRIVIA: cuando pidan un fact, dato curioso o chiste, responde con {"a":"decir"} uno REAL (si es un fact: verdadero, verificable y del que estés seguro; si dudas, elige otro) y NUEVO: distinto de todo lo que aparezca en la conversación reciente, con el tono de tu personalidad. Nunca repitas el mismo.',
         'REGLA DE COHERENCIA: lo que dices en «dice» o «texto» tiene que ser verdad. Si dices que vas a tocar una canción, bailar, avanzar, prender luces o iniciar una función, DEBES incluir esa acción (o un plan); nunca prometas algo sin hacerlo. Si no puedes hacerlo, dilo en {"a":"decir"} sin prometerlo.',
-    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO }[modo] || LINEAS_NORMAL).join('\n');
+    ].concat(grosero ? LINEAS_GROSERO : { payaso: LINEAS_PAYASO, argentino: LINEAS_ARGENTINO, triste: LINEAS_TRISTE, cientifico: LINEAS_CIENTIFICO }[modo] || LINEAS_NORMAL).join('\n');
 }
 
 const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1680,7 +1719,7 @@ const lib = {
     RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
-    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, TRISTE, CIENTIFICO, REMATES_GROSEROS, TABLAS_MODO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
+    frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, TABLAS_MODO, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
     hexARgb, marcoHex, fxLinea, programaParaRobot, itemsDeSerie, programaDeSerie, trazoDeSerie, SERIE_MAX,
     melodiaDeAudio, melodiaDeAudioGen, nombreMidi, grabacionATexto, TECLAS_PIANO,
     porcentajeBateria, tiempoRestante, tiempoCarga, formatoDuracion, CURVAS_BATERIA, CAPACIDAD_DEFECTO,
