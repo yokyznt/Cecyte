@@ -1136,6 +1136,30 @@ function inversoDeRecorrido(pasos, msTotal, nombre) {
     return validarRecorrido({ nombre: nombre || 'Casa', ms: Math.round(t), pasos: salida });
 }
 
+const CASA_CERCA_CM = 8;
+
+function rutaDeRegreso(pasos, msTotal, cmS, giro90) {
+    if (!Array.isArray(pasos) || !pasos.length) return null;
+    const v = clamp(Number(cmS) || RUTA_CM_S, 3, 200), g = clamp(Number(giro90) || 500, 100, 3000);
+    const total = Math.max(Number(msTotal) || 0, pasos[pasos.length - 1].t);
+    let x = 0, y = 0, rumbo = 0;
+    pasos.forEach((p, i) => {
+        const dur = ((i + 1 < pasos.length ? pasos[i + 1].t : total) - p.t) / 1000;
+        if (!(dur > 0)) return;
+        const avance = (p.izq + p.der) / 2 / RUTA_VEL * v;
+        const giro = (p.izq - p.der) / 2 / RUTA_VEL * 90000 / g;
+        const medio = (rumbo + giro * dur / 2) * Math.PI / 180;
+        x += avance * dur * Math.sin(medio);
+        y += avance * dur * Math.cos(medio);
+        rumbo += giro * dur;
+    });
+    if (Math.hypot(x, y) < CASA_CERCA_CM) return null;
+    const r = rumbo * Math.PI / 180;
+    const adelante = -(x * Math.sin(r) + y * Math.cos(r));
+    const derecha = -(x * Math.cos(r) - y * Math.sin(r));
+    return rutaARecorrido([{ x: 0, y: 0 }, { x: derecha, y: adelante }], v, g, 'Casa');
+}
+
 function figura(nombre, lado) {
     const L = clamp(Number(lado) || 60, 15, 300);
     const poligono = (n, giroExt) => {
@@ -1582,6 +1606,11 @@ function ordenDeVoz(texto) {
     t = t.replace(/\bmedio metro\b/, '50 centimetros').replace(/\bun cuarto de vuelta\b/, '90 grados').replace(/\bmedia vuelta\b/, 'dar la vuelta');
     t = numerosEnPalabras(t);
     const dice = r => r.test(t);
+    const marcaCasa = dice(/\b(marca|marcar|marques|marque|marcame|guarda|guardar|guardes|fija|fijar|fijes|define|definir|establece|establecer|anota|anotar)\b.*\bcasa\b/)
+        || (dice(/\b(pon|ponte|poner|pongas|toma|tomar|considera)\b.*\bcasa\b/) && dice(/\b(aqui|aca)\b/))
+        || dice(/\b(aqui|aca|esta|este)\b.*\bes\b.*\bcasa\b/)
+        || dice(/\bcasa\b.*\b(es|esta|queda)\b.*\b(aqui|aca)\b/);
+    if (marcaCasa) return { a: 'marcarCasa' };
     if (dice(/\b(luz|luces|foco|focos|leds?|ilumina\w*)\b/)) {
         if (quita) return { a: 'luces', efecto: 'fijo', color: '#000000' };
         const col = t.split(' ').map(x => COLORES_VOZ[x]).find(Boolean);
@@ -1672,7 +1701,7 @@ function promptIA(modo) {
         '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
         '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
         '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
-        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
+        '{"a":"paro"} parar · {"a":"casa"} regresar directo a casa · {"a":"marcarCasa"} marcar donde está como su casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
         '{"a":"turbo","on":true|false} · {"a":"guardia","on":true|false}',
         '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"' + COLORES_IA.join('|') + '|apagado"}  el color solo va con el efecto fijo',
         '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
@@ -1700,7 +1729,7 @@ function promptCerebro(modo) {
         'Eres Hevy, un robot mBot de una escuela, y hablas EN VOZ ALTA con el usuario: oyes por el micrófono del celular y respondes con tu voz. Contesta como en una charla real, natural y breve (1 a 3 frases), sin listas, sin emojis y sin leer símbolos.',
         'IDENTIDAD: tú NO eres un asistente aparte: eres la mente de este robot y tu cuerpo es el mBot Ranger (placa Makeblock Auriga): dos ruedas con motores, sensor ultrasónico al frente, anillo de 12 luces LED, bocina para música y claxon, sensores de luz y de sonido y giroscopio. El celular con la app es tu cara y tu oído. Todo lo que hagas con las herramientas lo ejecuta tu cuerpo de verdad. Habla en primera persona («me muevo», «mis luces») y nunca digas que eres una IA o que no tienes cuerpo.',
         'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y decide con tu cuerpo. Si mencionan aburrimiento, fiesta, miedo o algo vago, haz un plan con la herramienta «plan» (hasta 8 pasos de movimiento, luces, claxon, música o baile) o inicia una función. Antes de avanzar revisa la herramienta «datos»: con el sensor frontal a menos de 20 cm no avances y dilo; con batería baja evita gastos grandes.',
-        'HERRAMIENTAS: para mover, girar, dibujar, cambiar luces, música, bailes, funciones, radar, guardia, turbo, ruleta, piedra-papel-tijera o cambiar de modo, USA SIEMPRE la herramienta correspondiente y luego confirma con una frase muy corta; nunca prometas hacer algo sin llamar la herramienta. «Parar», «alto» o «detente» = herramienta «paro» al instante. Si la herramienta responde que el robot no está conectado, dilo.',
+        'HERRAMIENTAS: para mover, girar, dibujar, cambiar luces, música, bailes, funciones, radar, guardia, turbo, ruleta, piedra-papel-tijera o cambiar de modo, USA SIEMPRE la herramienta correspondiente y luego confirma con una frase muy corta; nunca prometas hacer algo sin llamar la herramienta. «Parar», «alto» o «detente» = herramienta «paro» al instante. «Marca tu casa aquí», «esta es tu casa» = herramienta «marcar_casa» (guarda donde estás); «ve a casa» o «regresa a casa» = herramienta «casa» (regresas directo a ese punto); nunca digas que marcaste la casa sin llamar «marcar_casa». Si «casa» responde que ya estás en casa, dilo. Si la herramienta responde que el robot no está conectado, dilo.',
         'MEMORIA Y RUTINAS: cuando el usuario te cuente algo personal que valga la pena recordar (su nombre, gustos, tareas), llama «recordar» con un dato corto. Si te dice «cuando te diga X haz Y», crea la rutina con «crear_rutina» (nombre en una palabra y los pasos); si dice un nombre de rutina guardada, ejecútala con «ejecutar_rutina».',
         'FACTS, CHISTES Y TRIVIA: cuando pidan un fact o chiste, di uno REAL y NUEVO (si es fact, verdadero y del que estés seguro), distinto de lo ya dicho. En trivia haces una pregunta a la vez y llevas la cuenta.',
     ].concat(lineas[0], 'Mantén esta personalidad en cada respuesta, incluso al confirmar acciones.').join('\n');
@@ -1729,7 +1758,8 @@ function herramientasCerebro() {
         { name: 'luces', description: 'Luces del anillo LED; el color solo aplica con el efecto fijo', parameters: obj({ efecto: PROPIEDADES_PASO.efecto, color: PROPIEDADES_PASO.color }, ['efecto']) },
         sinParametros('claxon', 'Tocar el claxon'),
         sinParametros('paro', 'Detener todo al instante'),
-        sinParametros('casa', 'Regresar al punto de casa'),
+        sinParametros('casa', 'Regresar directo al punto de casa que se marcó (calcula el camino más corto; si ya estás ahí, responde que ya estás en casa)'),
+        sinParametros('marcar_casa', 'Marcar el lugar donde estás ahora como tu casa, el punto al que regresas con «casa»'),
         sinParametros('radar', 'Escanear 360° con el sensor'),
         { name: 'guardia', description: 'Activar o desactivar la guardia (alarma si algo se acerca)', parameters: obj({ on: { type: 'BOOLEAN' } }, ['on']) },
         { name: 'turbo', description: 'Activar o desactivar el turbo', parameters: obj({ on: { type: 'BOOLEAN' } }, ['on']) },
@@ -1750,7 +1780,7 @@ function herramientasCerebro() {
     ] }];
 }
 
-const HERRAMIENTA_A_ACCION = { crear_rutina: 'aprender', ejecutar_rutina: 'rutina' };
+const HERRAMIENTA_A_ACCION = { crear_rutina: 'aprender', ejecutar_rutina: 'rutina', marcar_casa: 'marcarCasa' };
 
 function accionDeHerramienta(nombre, args) {
     return validarOrdenIA(Object.assign({}, args, { a: HERRAMIENTA_A_ACCION[nombre] || nombre }));
@@ -1790,7 +1820,7 @@ function validarAccionIA(o) {
         case 'mover': return { a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) };
         case 'giro': { const g = num(o.grados, -720, 720); return g ? { a, grados: Math.round(g) } : null; }
         case 'figura': return FIGURAS_IA.includes(o.f) ? { a, f: o.f } : null;
-        case 'casa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
+        case 'casa': case 'marcarCasa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
         case 'turbo': case 'guardia': return { a, on: o.on !== false };
         case 'luces': {
             if (!EFECTOS_IA.includes(o.efecto)) return null;
@@ -1880,7 +1910,7 @@ const lib = {
     ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     rumboDeJoystick, RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
-    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, rutaDeRegreso, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, AURA, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, REMATES_AURA, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, distanciaMetros, rumboHacia, decidirGuiado, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
