@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, encolar: false };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, planId: 0, encolar: false, ultimoYo: null, espera: [], esperaTimer: 0 };
     const CLAVE_MODO = 'cecyte_yokis_modo';
     const MODOS = () => (raiz.Robot && raiz.Robot.MODOS_IA) || ['normal'];
     const personal = () => (raiz.Robot && raiz.Robot.MODO_PERSONAL) || null;
@@ -36,6 +36,10 @@
     }
 
     function historial(quien, texto) {
+        if (quien === 'yo') {
+            if (E.ultimoYo && E.ultimoYo.t === texto && Date.now() - E.ultimoYo.ts < 8000) return;
+            E.ultimoYo = { t: texto, ts: Date.now() };
+        }
         E.memoria.push((quien === 'yo' ? 'Usuario: ' : 'Hevy: ') + texto);
         if (E.memoria.length > 12) E.memoria.shift();
         const ol = $('rb-jarvis-hist');
@@ -989,9 +993,24 @@
         });
     }
 
+    function encolarHabla(texto, quieto) {
+        E.espera = E.espera.filter(x => x[0] !== texto).slice(-2);
+        E.espera.push([texto, quieto, Date.now()]);
+        if (E.esperaTimer) return;
+        E.esperaTimer = setInterval(() => {
+            if (cerebroHabla()) return;
+            clearInterval(E.esperaTimer);
+            E.esperaTimer = 0;
+            const vigentes = E.espera.filter(x => Date.now() - x[2] < 15000);
+            E.espera = [];
+            if (vigentes.length) hablar(vigentes[vigentes.length - 1][0], vigentes[vigentes.length - 1][1]);
+        }, 250);
+    }
+
     function hablar(texto, quieto) {
         texto = texto.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/\s{2,}/g, ' ').trim();
         if (!texto) return;
+        if (cerebroHabla()) { encolarHabla(texto, quieto); return; }
         aviso(texto);
         historial('yokis', texto);
         if (sinInternet()) { E.hablando = false; return; }
@@ -1071,6 +1090,11 @@
     function vaciarCola() {
         E.cola = [];
         clearTimeout(E.colaTimer);
+    }
+
+    function cancelarSecuencias() {
+        vaciarCola();
+        E.planId++;
     }
 
     function correr(recorrido, habla, datos, texto) {
@@ -1358,24 +1382,30 @@
         di(t, datos);
     }
 
-    function ejecutarPlan(o) {
+    function recorridoDePaso(p) {
+        const c = calibra(), R = raiz.Robot;
+        if (p.a === 'mover') return R.movimientoARecorrido(p.sentido, p.s ? p.s * 1000 : p.cm ? p.cm / c.vel * 1000 : 1500);
+        if (p.a === 'giro') return R.giroARecorrido(p.grados, c.giro);
+        if (p.a === 'figura') return figura(p.f);
+        if (p.a === 'ruedas') return R.ruedasARecorrido(p.izq, p.der, p.s * 1000);
+        return null;
+    }
+
+    async function ejecutarPlan(o) {
         if (!listo()) { di('sinRobot'); return; }
-        const c = calibra(), R = raiz.Robot, rec = [];
-        o.pasos.forEach(p => {
-            if (p.a === 'mover') rec.push(R.movimientoARecorrido(p.sentido, p.s ? p.s * 1000 : p.cm ? p.cm / c.vel * 1000 : 1500));
-            else if (p.a === 'giro') rec.push(R.giroARecorrido(p.grados, c.giro));
-            else if (p.a === 'figura') rec.push(figura(p.f));
-            else if (p.a === 'luces') enlace().luces(p.efecto, p.color || null);
-            else if (p.a === 'claxon') enlace().nota(440, 500);
-            else {
-                E.callado = true;
-                ejecutarAccion(p);
-                E.callado = false;
-            }
-        });
-        const ruta = rec.length ? R.unirRecorridos(rec, 'Plan') : null;
-        if (ruta) correr(ruta, 'mover');
-        else if (o.pasos.every(p => ['mover', 'giro', 'figura'].includes(p.a))) di('fallo');
+        const id = ++E.planId;
+        const MOVIMIENTOS = ['mover', 'giro', 'figura', 'ruedas'];
+        if (o.pasos.some(p => MOVIMIENTOS.includes(p.a))) di('mover');
+        for (const p of o.pasos) {
+            if (id !== E.planId || !listo()) return;
+            if (p.a === 'esperar') { await esperar(p.s * 1000); continue; }
+            if (!MOVIMIENTOS.includes(p.a)) { ejecutarSilencio(p); continue; }
+            const rec = recorridoDePaso(p);
+            if (!rec) continue;
+            while (E.corrida && id === E.planId) await esperar(60);
+            if (id !== E.planId || !correr(rec)) return;
+            while (E.corrida && id === E.planId) await esperar(60);
+        }
     }
 
     function resumenAccion(o) {
@@ -1445,7 +1475,7 @@
         }
         if (o.a === 'saludo') { di('saludo'); return; }
         if (o.a === 'marcarCasa') { marcarCasaAqui(); return; }
-        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); vaciarCola(); detener(false); detenerMeneo(); di('paro'); return; }
+        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); cancelarSecuencias(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -1461,12 +1491,22 @@
         else if (o.a === 'casa') regresarCasa();
         else if (o.a === 'radar') radar(false);
         else if (o.a === 'guardia') ponerGuardia(o.on, false);
-        else if (o.a === 'turbo') di('turbo');
+        else if (o.a === 'turbo') {
+            if (control() && control().turbo) control().turbo(o.on);
+            di('turbo');
+        }
+        else if (o.a === 'nota') enlace().nota(o.hz, o.ms);
+        else if (o.a === 'melodia') { if (!enlace().tocarNotas(o.notas, o.bpm)) di('fallo'); }
+        else if (o.a === 'volumen') enlace().volumen(o.nivel);
+        else if (o.a === 'ruedas') correr(raiz.Robot.ruedasARecorrido(o.izq, o.der, o.s * 1000), 'mover');
         else if (o.a === 'ruleta') {
             if (enlace().ruleta(r => di('ruletaFin', { num: r.num, color: r.color }))) di('ruleta'); else di('ocupado');
         }
         else if (o.a === 'claxon') { enlace().nota(440, 500); di('claxon'); }
-        else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); di(o.color === '#000000' ? 'lucesOff' : 'luces'); }
+        else if (o.a === 'luces') {
+            if (!enlace().ponerLuces(o)) di('fallo');
+            else di(o.color === '#000000' && !o.led && !o.anillo ? 'lucesOff' : 'luces');
+        }
         else if (o.a === 'baile') {
             const r = enlace().bailar(o.id, o.cancion);
             if (r) { if (!E.callado) hablar(raiz.Robot.frase('baile', null, undefined, modoF()) + ` Va con ${r.baile}${r.cancion ? ' y ' + r.cancion : ''}.`); }
@@ -1724,10 +1764,13 @@
     const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
     const CLAVE_EXIGE_NOMBRE = 'cecyte_yokis_exige_nombre';
     const exigeNombre = () => { try { return localStorage.getItem(CLAVE_EXIGE_NOMBRE) === '1'; } catch (e) { return false; } };
-    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false, vivoHevy: null, sesion: 0 };
+    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false, vivoHevy: null, sesion: 0, suenaHasta: 0, pasoLibreHasta: 0, picoRobot: 0 };
     const CLAVE_CEREBRO = 'cecyte_yokis_cerebro';
     const cerebroOn = () => { try { return localStorage.getItem(CLAVE_CEREBRO) !== '0'; } catch (e) { return true; } };
     const UMBRAL_INTERRUPCION = 0.14;
+    const UMBRAL_VOZ_ROBOT = 0.1;
+    const robotSuena = () => !!(enlace() && enlace().suena && enlace().suena());
+    const cerebroHabla = () => !!ESC.turno || Date.now() < ESC.suenaHasta;
 
     function hevyHablando() {
         return (E.hablando && Date.now() < E.hablaTope) || LIVE.fuentes.length > 0 || !!(LIVE.ctx && LIVE.proximo > LIVE.ctx.currentTime + 0.05);
@@ -1973,7 +2016,7 @@
     }
 
     const LIVE_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=';
-    const NECESITAN_ROBOT = ['mover', 'giro', 'figura', 'luces', 'claxon', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'plan'];
+    const NECESITAN_ROBOT = ['mover', 'giro', 'figura', 'luces', 'nota', 'melodia', 'volumen', 'ruedas', 'claxon', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'plan'];
 
     function datosRobot() {
         const ahora = new Date(), bat = $('rb-bat-pct');
@@ -2178,8 +2221,9 @@
             if (sc.modelTurn && sc.modelTurn.parts) {
                 sc.modelTurn.parts.forEach(p => {
                     if (!p.inlineData || ESC.ignorar) return;
-                    if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
+                    if (!ESC.turno) { callarIA(); ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
                     reproducirChunk(ESC.turno, p.inlineData.data);
+                    ESC.suenaHasta = Date.now() + Math.max(0, (LIVE.proximo - LIVE.ctx.currentTime) * 1000) + 150;
                     meneoCerebro();
                 });
             }
@@ -2314,6 +2358,21 @@
             if (ESC.nivelCrudo > 0.04) ESC.ultimoSonido = Date.now();
             ESC.nivel = Math.max(Math.min(1, ESC.nivelCrudo * 9), ESC.nivel * 0.85);
             boton.style.setProperty('--nivel', ESC.nivel.toFixed(2));
+            if (robotSuena() && Date.now() > ESC.pasoLibreHasta) {
+                if (ESC.nivelCrudo > UMBRAL_VOZ_ROBOT) {
+                    if (!ESC.picoRobot) ESC.picoRobot = Date.now();
+                    else if (Date.now() - ESC.picoRobot > 200) {
+                        ESC.pasoLibreHasta = Date.now() + 4000;
+                        ESC.picoRobot = 0;
+                        ESC.anillo.forEach(enviarAudio);
+                        ESC.anillo = [];
+                        registrarVoz('Escucha: tu voz se oyó sobre el sonido del robot; micrófono abierto');
+                    }
+                } else ESC.picoRobot = 0;
+            } else {
+                ESC.picoRobot = 0;
+                if (ESC.nivelCrudo > UMBRAL_VOZ_ROBOT && ESC.pasoLibreHasta > Date.now()) ESC.pasoLibreHasta = Math.max(ESC.pasoLibreHasta, Date.now() + 2500);
+            }
             if (hevyHablando()) {
                 ESC.ecoMax = Math.max(ESC.ecoMax, ESC.nivelCrudo);
                 if (ESC.nivelCrudo > (E.meneo ? UMBRAL_INTERRUPCION * 2 : UMBRAL_INTERRUPCION)) {
@@ -2334,7 +2393,8 @@
             const f = e.inputBuffer.getChannelData(0), b = new Uint8Array(f.length * 2), v = new DataView(b.buffer);
             for (let i = 0; i < f.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, f[i])) * 32767, true);
             const dato = JSON.stringify({ realtimeInput: { audio: { data: bytesABase64(b), mimeType: mime } } });
-            if (habla || E.escuchando || Date.now() < ESC.ultimaHabla + 500 || Date.now() < E.finHabla + 600) {
+            const ruidoRobot = robotSuena() && Date.now() > ESC.pasoLibreHasta;
+            if (habla || ruidoRobot || E.escuchando || Date.now() < ESC.ultimaHabla + 500 || Date.now() < E.finHabla + 600) {
                 ESC.bloqueados++;
                 ESC.anillo.push(dato);
                 if (ESC.anillo.length > 6) ESC.anillo.shift();
@@ -2459,7 +2519,7 @@
         $('rb-voz-probar').addEventListener('click', () => { hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {
-            vaciarCola();
+            cancelarSecuencias();
             detener(false);
             E.radarCancelado = true;
             if (E.guardia) ponerGuardia(false, true);

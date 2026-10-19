@@ -93,6 +93,9 @@
 .rb-herr__tarjeta .btn[aria-pressed="true"] { background: var(--green-700); border-color: var(--green-700); color: #fff; }
 .rb-lienzo { display: block; width: 100%; max-width: 360px; height: auto; border-radius: var(--r-md); touch-action: none; background: oklch(0.22 0.02 160); }
 .rb-lienzo[hidden] { display: none; }
+.rb-radar { max-width: 520px; aspect-ratio: 1 / 1; margin-inline: auto; }
+.rb-radar__ctl { justify-content: center; }
+.rb-radar__ctl .btn[aria-pressed="true"] { background: var(--green-100); border-color: var(--green-600); }
 
 .rb-figuras { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
 .rb-figura {
@@ -497,7 +500,9 @@
 .rb-turbo { width: 64px; height: 44px; border-radius: 14px; color: var(--m-naranja); box-shadow: 0 3px 0 var(--m-base), inset 0 1px 0 oklch(1 0 0 / 0.14); }
 .rb-turbo .icon { width: 24px; height: 24px; fill: currentColor; stroke-width: 1.6; }
 .rb-btn.rb-turbo[aria-pressed="true"] { background: var(--m-naranja); color: var(--m-base); }
-.rb-dir-cal { display: none; }
+.rb-dir-cal { display: none; position: relative; }
+.rb-dir-cal.is-perdido { animation: rb-latido 0.6s ease-in-out infinite; }
+.rb-dir-cal.is-perdido::after { content: ''; position: absolute; inset-block-start: 4px; inset-inline-end: 4px; inline-size: 10px; block-size: 10px; border-radius: 50%; background: var(--m-rojo); box-shadow: 0 0 0 2px var(--m-base); }
 .rb-mando.es-dir .rb-dir-cal { display: grid; }
 .rb-alerta { padding: 4px 10px; border-radius: 999px; background: oklch(0.55 0.2 27); color: oklch(0.98 0 0); font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 .rb-turbo.is-enfriando { animation: rb-latido 0.6s ease-in-out infinite; }

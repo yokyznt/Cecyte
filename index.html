@@ -36,6 +36,7 @@
         <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
         <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
         <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+        <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
         <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
         <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
         <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
@@ -1374,7 +1375,14 @@
                                         </details>
                                     </div>
                                     <span class="rb-fn-t">Teléfonos en la sala</span>
-                                    <canvas id="rb-tel-radar" class="rb-lienzo" width="300" height="300" aria-label="Radar de teléfonos"></canvas>
+                                    <canvas id="rb-tel-radar" class="rb-lienzo rb-radar" width="300" height="300" aria-label="Radar de teléfonos: pellizca o usa los botones para acercar"></canvas>
+                                    <div class="btn-row rb-radar__ctl">
+                                        <button type="button" id="rb-radar-mas" class="btn btn--secondary btn--sm" aria-label="Acercar el mapa"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+                                        <button type="button" id="rb-radar-menos" class="btn btn--secondary btn--sm" aria-label="Alejar el mapa"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+                                        <button type="button" id="rb-radar-auto" class="btn btn--secondary btn--sm" aria-pressed="true">Ajustar solo</button>
+                                    </div>
+                                    <p id="rb-radar-escala" class="hint" role="status"></p>
+                                    <p id="rb-radar-info" class="hint" role="status"></p>
                                     <ul id="rb-tel-lista" class="rb-mem"></ul>
                                     <div class="btn-row"><button type="button" id="rb-tel-parar" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar la búsqueda</button></div>
                                 </div>
