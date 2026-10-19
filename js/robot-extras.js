@@ -4,7 +4,7 @@
     const CM_PX = 0.5, SALIDA = { x: 150, y: 188 };
     const MS_PASO = 50, MS_LATIDO = 250, HIST_MAX = 6;
     const FIGURAS = { circulo: 'un círculo', cuadrado: 'un cuadrado', triangulo: 'un triángulo', estrella: 'una estrella' };
-    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, encolar: false };
+    const E = { puntos: [], dibujando: false, guardia: null, radar: false, radarCancelado: false, escuchando: false, corrida: null, meneo: null, memoria: [], dice: null, hablando: false, hablaTope: 0, nHabla: 0, finHabla: 0, procesando: false, cola: [], colaTimer: 0, planId: 0, encolar: false, ultima: null, ultimoRec: null, ultimoYo: null, espera: [], esperaTimer: 0 };
     const CLAVE_MODO = 'cecyte_yokis_modo';
     const MODOS = () => (raiz.Robot && raiz.Robot.MODOS_IA) || ['normal'];
     const personal = () => (raiz.Robot && raiz.Robot.MODO_PERSONAL) || null;
@@ -32,10 +32,18 @@
     const sinInternet = () => raiz.navigator.onLine === false;
 
     function aviso(t) {
-        ['rb-jarvis-msg', 'rb-dib-msg', 'rb-herr-msg'].forEach(id => { const el = $(id); if (el) el.textContent = t; });
+        ['rb-jarvis-msg', 'rb-dib-msg', 'rb-herr-msg', 'rb-ctl-dice'].forEach(id => { const el = $(id); if (el) el.textContent = t; });
     }
 
+    const botonesMic = () => ['rb-jarvis', 'rb-ctl-hablar'].map(id => $(id)).filter(Boolean);
+    const micClase = (clase, si) => botonesMic().forEach(b => b.classList.toggle(clase, si));
+    const micNivel = v => botonesMic().forEach(b => (v === null ? b.style.removeProperty('--nivel') : b.style.setProperty('--nivel', v)));
+
     function historial(quien, texto) {
+        if (quien === 'yo') {
+            if (E.ultimoYo && E.ultimoYo.t === texto && Date.now() - E.ultimoYo.ts < 8000) return;
+            E.ultimoYo = { t: texto, ts: Date.now() };
+        }
         E.memoria.push((quien === 'yo' ? 'Usuario: ' : 'Hevy: ') + texto);
         if (E.memoria.length > 12) E.memoria.shift();
         const ol = $('rb-jarvis-hist');
@@ -200,12 +208,11 @@
     function pintarVocesEntrenadas() {
         const ul = $('rb-vz-lista');
         if (!ul) return;
-        const fila = (nombre, detalle, uso, clonable) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
+        const fila = (nombre, detalle, uso) => `<li class="rb-vz-item${uso ? ' is-activa' : ''}" data-n="${nombre}"><span><b>${nombre}</b><small>${detalle}</small></span>`
             + (uso ? '<small>En uso</small>' : '')
-            + (clonable ? '<button type="button" class="btn btn--secondary btn--sm" data-acc="clonar">Clonar con IA</button>' : '')
             + '<button type="button" class="btn btn--secondary btn--sm" data-acc="borrar" aria-label="Borrar esta voz">Borrar</button></li>';
         ul.innerHTML = ENT.voces.length
-            ? ENT.voces.map(v => fila(v.nombre, `${v.n} frases${v.clon ? ' · clonada con IA' : ''}`, v.nombre === ENT.activa, !v.clon)).join('')
+            ? ENT.voces.map(v => fila(v.nombre, `${v.n} frases`, v.nombre === ENT.activa)).join('')
             : '<li class="hint">Aún no hay voces. Entrena una abajo.</li>';
         pintarSelectorVoz();
     }
@@ -393,15 +400,6 @@
 
     async function iniciarEntrena() {
         if (!$('rb-vz-lista') || !raiz.indexedDB) return;
-        const llaveG = $('rb-gradium-llave');
-        if (llaveG) {
-            llaveG.value = llaveGradium();
-            llaveG.addEventListener('change', () => {
-                VIA.gradiumHasta = 0;
-                try { localStorage.setItem(CLAVE_GRADIUM, llaveG.value.trim()); } catch (e) { return; }
-                estadoVoz(llaveG.value.trim() ? 'Llave de Gradium guardada.' : 'Llave de Gradium borrada.');
-            });
-        }
         $('rb-ent-abrir').addEventListener('click', abrirEntrenamiento);
         $('rb-ent-cerrar').addEventListener('click', () => (raiz.RobotUI ? raiz.RobotUI.cerrarSuave($('rb-ent-ventana')) : $('rb-ent-ventana').close()));
         $('rb-ent-ventana').addEventListener('close', limpiarGrabacion);
@@ -415,7 +413,6 @@
             const b = e.target.closest('[data-acc]');
             if (!b) return;
             const nombre = b.closest('.rb-vz-item').dataset.n;
-            if (b.dataset.acc === 'clonar') { b.disabled = true; await clonarVoz(nombre); return; }
             if (!b.dataset.seguro) { b.dataset.seguro = '1'; b.textContent = '¿Borrar?'; setTimeout(pintarVocesEntrenadas, 3000); return; }
             for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) await bdDel(k);
             await vzDel(nombre);
@@ -520,8 +517,6 @@
         };
     }
 
-    const LIMITE_ESPERA_MS = 2000;
-
     async function hablarGoogle(texto, turno) {
         const partes = texto.match(/.{1,170}(\s|$)/g) || [texto];
         try {
@@ -550,7 +545,6 @@
             const v = localStorage.getItem(CLAVE_VOZSEL) || '';
             const tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
             if (tipo === 'gemini' && VOCES_IA.some(x => x[0] === id)) return v;
-            if (tipo === 'gradium' && VOCES_GRADIUM.some(x => x[0] === id)) return v;
         } catch (e) { return 'gemini:' + vozIAElegida(); }
         return 'gemini:' + vozIAElegida();
     }
@@ -841,27 +835,10 @@
         LIVE.ultimo = 0;
     }, 30000);
 
-    function nivelGradium(texto, turno) {
-        const v = VOCES_GRADIUM.find(x => x[0] === vozGradiumElegida()) || ['', ''];
-        return hablarGradium(texto, v[0], 'IA de Gradium (' + v[1] + ')', turno);
-    }
-
-    const ETIQUETA_NIVEL = { live: 'la voz de Gemini en vivo', gradium: 'la voz de IA de Gradium' };
-
     async function hablarIA(texto) {
         const turno = ++VIA.turno;
         VIA.motivo = '';
-        const principal = valorSeleccion().split(':')[0] === 'gradium' ? 'gradium' : 'gemini';
-        const niveles = { live: nivelLive, gradium: nivelGradium };
-        const orden = principal === 'gradium' ? ['gradium', 'live'] : ['live'];
-        for (const nivel of orden) {
-            if (turno !== VIA.turno) return true;
-            if (VIA.motivo === 'red' || VIA.motivo === 'lenta') continue;
-            if (await niveles[nivel](texto, turno)) {
-                if (nivel !== orden[0]) estadoVoz((MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió') + ': hablo con ' + ETIQUETA_NIVEL[nivel] + '.');
-                return true;
-            }
-        }
+        if (await nivelLive(texto, turno)) return true;
         if (turno !== VIA.turno) return true;
         callarIA();
         const motivo = MOTIVOS_VOZ[VIA.motivo] || 'La voz elegida no respondió';
@@ -890,8 +867,7 @@
             sel.appendChild(g);
         };
         grupo('IA de Google (Gemini, en vivo)', VOCES_IA.map(v => ['gemini:' + v[0], v[1]]));
-        grupo('IA de Gradium', VOCES_GRADIUM.map(v => ['gradium:' + v[0], v[1]]));
-        grupo('Mis voces', ENT.voces.map(v => ['entrenada:' + v.nombre, v.nombre + (v.clon ? ' (clonada)' : ' (grabada)')]));
+        grupo('Mis voces', ENT.voces.map(v => ['entrenada:' + v.nombre, v.nombre + ' (grabada)']));
         sel.value = valorSeleccion();
     }
 
@@ -901,7 +877,6 @@
         pintarSelectorVoz();
         sel.addEventListener('change', async () => {
             const v = sel.value, tipo = v.split(':')[0], id = v.split(':').slice(1).join(':');
-            VIA.gradiumHasta = 0;
             VIA.liveHasta = 0;
             if (tipo === 'entrenada') {
                 await activarVoz(id);
@@ -909,8 +884,6 @@
                 try {
                     localStorage.setItem(CLAVE_VOZSEL, v);
                     if (tipo === 'gemini') localStorage.setItem(CLAVE_VOZIA, JSON.stringify({ voz: id }));
-                    if (tipo === 'gradium') localStorage.setItem(CLAVE_VOZGR, id);
-                    if (tipo === 'local') localStorage.setItem(CLAVE_LOCAL, JSON.stringify({ voz: id }));
                 } catch (e) { return; }
                 if (ENT.activa) await activarVoz('');
             }
@@ -924,9 +897,6 @@
         setTimeout(autopruebaEscucha, 9000);
     }
 
-    const CLAVE_GRADIUM = 'cecyte_yokis_gradium';
-    const llaveGradium = () => { try { return (localStorage.getItem(CLAVE_GRADIUM) || '').trim(); } catch (e) { return ''; } };
-
     function bytesABase64(b) {
         let s = '';
         for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
@@ -939,139 +909,9 @@
         return b;
     }
 
-    function aWav16(muestras, sr) {
-        const n = muestras.length, bytes = new Uint8Array(44 + 2 * n), v = new DataView(bytes.buffer);
-        const txt = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
-        txt(0, 'RIFF'); v.setUint32(4, 36 + 2 * n, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-        v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, 2 * n, true);
-        for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, muestras[i])) * 32767, true);
-        return bytes;
-    }
-
-    function recortarSilencio(x, sr) {
-        let a = 0, b = x.length - 1;
-        while (a < b && Math.abs(x[a]) < 0.02) a++;
-        while (b > a && Math.abs(x[b]) < 0.02) b--;
-        const margen = Math.round(sr * 0.1);
-        return x.slice(Math.max(0, a - margen), Math.min(x.length, b + margen));
-    }
-
-    async function muestraDeVoz(nombre) {
-        const Ctx = raiz.AudioContext || raiz.webkitAudioContext;
-        const ctx = new Ctx({ sampleRate: 24000 }), sr = ctx.sampleRate, trozos = [];
-        let total = 0;
-        try {
-            for (const k of (await bdClaves()).filter(k => k.startsWith(nombre + '|'))) {
-                if (total >= 24 * sr) break;
-                const blob = await bdGet(k);
-                if (!blob) continue;
-                try {
-                    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
-                    const t = recortarSilencio(buf.getChannelData(0), buf.sampleRate);
-                    trozos.push(t);
-                    total += t.length;
-                } catch (e) { continue; }
-            }
-        } finally {
-            ctx.close();
-        }
-        const todo = new Float32Array(total);
-        let o = 0;
-        trozos.forEach(t => { todo.set(t, o); o += t.length; });
-        return { segundos: total / sr, wav: aWav16(todo.subarray(0, Math.min(total, 25 * sr)), sr) };
-    }
-
-    async function clonarVoz(nombre) {
-        const P = raiz.Plataforma && raiz.Plataforma.plugin('ClonVoz');
-        if (!P) { mensajeEnt('Clonar la voz solo funciona en la app de Android.'); pintarVocesEntrenadas(); return; }
-        const llave = llaveGradium();
-        if (!llave) { mensajeEnt('Pega primero tu llave de Gradium (gratis).'); pintarVocesEntrenadas(); return; }
-        mensajeEnt('Preparando la muestra de «' + nombre + '»…');
-        try {
-            const m = await muestraDeVoz(nombre);
-            if (m.segundos < 8) { mensajeEnt('La muestra dura solo ' + Math.round(m.segundos) + ' s y hacen falta al menos 10. Graba la voz con más frases.'); pintarVocesEntrenadas(); return; }
-            mensajeEnt('Clonando la voz… tarda unos segundos.');
-            const r = await P.crear({ llave, nombre: 'Hevy ' + nombre, audio: bytesABase64(m.wav) });
-            let j = {};
-            try { j = JSON.parse(r.cuerpo); } catch (e) { j = {}; }
-            if (r.codigo === 401 || r.codigo === 403) { mensajeEnt('Gradium no aceptó la llave. Revísala.'); pintarVocesEntrenadas(); return; }
-            if (r.codigo === 402 || r.codigo === 429) { mensajeEnt('Se acabó el límite gratis de Gradium (5 clones).'); pintarVocesEntrenadas(); return; }
-            if (r.codigo >= 400 || !j.uid) { mensajeEnt('Gradium no pudo clonarla' + (j.error ? ': ' + j.error : ' (código ' + r.codigo + ').')); pintarVocesEntrenadas(); return; }
-            const meta = ENT.voces.find(v => v.nombre === nombre) || { nombre };
-            await vzPut(nombre, Object.assign({}, meta, { clon: j.uid }));
-            ENT.voces = (await vzTodas()) || [];
-            pintarVocesEntrenadas();
-            mensajeEnt('¡Listo! «' + nombre + '» ya está clonada: Hevy hablará con esa voz cuando la pongas en uso.');
-        } catch (e) {
-            pintarVocesEntrenadas();
-            mensajeEnt('No pude clonar la voz: ' + (e && e.message ? e.message : 'sin conexión') + '.');
-        }
-    }
-
-    const VOCES_GRADIUM = [['yPxeHKlCzaHeKd_V', 'Carlos'], ['Gijj_GPBfJVcP-FZ', 'Miguel'], ['aCWBiYUiQ4VwW8_b', 'Pablo'], ['xu7iJ_fn2ElcWp2s', 'Sergio (España)'], ['B36pbz5_UoWn4BDl', 'Valentina (México)'], ['s4CzgVHP5cEkB9LD', 'Sofía'], ['PqjKPYFyGNsg1YU-', 'Elena']];
-    const CLAVE_VOZGR = 'cecyte_yokis_vozgr';
-    VIA.gradiumHasta = 0;
-
-    function vozGradiumElegida() {
-        try {
-            const v = localStorage.getItem(CLAVE_VOZGR);
-            if (VOCES_GRADIUM.some(x => x[0] === v)) return v;
-        } catch (e) { return VOCES_GRADIUM[0][0]; }
-        return VOCES_GRADIUM[0][0];
-    }
-
-    async function hablarGradium(texto, voiceId, etiqueta, turnoDado) {
-        const llave = llaveGradium();
-        if (!llave || Date.now() < VIA.gradiumHasta) return false;
-        const turno = turnoDado || ++VIA.turno;
-        try {
-            const clave = 'gradium|' + voiceId + '|' + texto;
-            let datos = VIA.cache.get(clave) || await cacheGet(clave);
-            if (!datos) {
-                const peticion = fetch('https://api.gradium.ai/api/post/speech/tts', {
-                    method: 'POST', headers: { 'x-api-key': llave, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: texto, voice_id: voiceId, output_format: 'wav', only_audio: true }),
-                }).then(async r => (r.ok ? { datos: bytesABase64(new Uint8Array(await r.arrayBuffer())) } : { estado: r.status }));
-                const res = await Promise.race([peticion, esperar(LIMITE_ESPERA_MS).then(() => null)]);
-                if (res === null) {
-                    peticion.then(x => { if (x && x.datos) cachePut(clave, x.datos); }, () => null);
-                    VIA.motivo = 'lenta';
-                    return false;
-                }
-                if (!res.datos) {
-                    VIA.gradiumHasta = Date.now() + (res.estado === 401 || res.estado === 402 || res.estado === 429 ? 3600000 : 15000);
-                    return false;
-                }
-                datos = res.datos;
-                cachePut(clave, datos);
-            }
-            VIA.cache.set(clave, datos);
-            if (turno !== VIA.turno) return true;
-            callarIA();
-            const url = URL.createObjectURL(new Blob([base64ABytes(datos)], { type: 'audio/wav' }));
-            try {
-                await sonar(url);
-                estadoVoz('Voz: ' + etiqueta + '.');
-                return true;
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        } catch (e) {
-            VIA.gradiumHasta = Date.now() + 15000;
-            return false;
-        }
-    }
-
-    function hablarClon(texto) {
-        const m = ENT.activa && ENT.voces.find(v => v.nombre === ENT.activa);
-        if (!m || !m.clon) return Promise.resolve(false);
-        return hablarGradium(texto, m.clon, 'clon de «' + m.nombre + '»');
-    }
-
     async function voz(texto) {
         callarIA();
         if (ENT.activa && ENT.claves.has(texto) && await reproducirGrabada(texto)) return;
-        if (await hablarClon(texto)) return;
         if (await hablarIA(texto)) return;
         const TTS = raiz.Plataforma && raiz.Plataforma.plugin('TextToSpeech');
         const a = ajustesVoz();
@@ -1157,9 +997,24 @@
         });
     }
 
+    function encolarHabla(texto, quieto) {
+        E.espera = E.espera.filter(x => x[0] !== texto).slice(-2);
+        E.espera.push([texto, quieto, Date.now()]);
+        if (E.esperaTimer) return;
+        E.esperaTimer = setInterval(() => {
+            if (cerebroHabla()) return;
+            clearInterval(E.esperaTimer);
+            E.esperaTimer = 0;
+            const vigentes = E.espera.filter(x => Date.now() - x[2] < 15000);
+            E.espera = [];
+            if (vigentes.length) hablar(vigentes[vigentes.length - 1][0], vigentes[vigentes.length - 1][1]);
+        }, 250);
+    }
+
     function hablar(texto, quieto) {
         texto = texto.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/\s{2,}/g, ' ').trim();
         if (!texto) return;
+        if (cerebroHabla()) { encolarHabla(texto, quieto); return; }
         aviso(texto);
         historial('yokis', texto);
         if (sinInternet()) { E.hablando = false; return; }
@@ -1241,6 +1096,11 @@
         clearTimeout(E.colaTimer);
     }
 
+    function cancelarSecuencias() {
+        vaciarCola();
+        E.planId++;
+    }
+
     function correr(recorrido, habla, datos, texto) {
         if (!listo()) { di('sinRobot'); return false; }
         if (!recorrido) { di('fallo'); return false; }
@@ -1251,6 +1111,7 @@
         }
         detenerMeneo();
         E.corrida = { r: recorrido, t0: Date.now(), ult: '', envio: 0, timer: setInterval(pasoCorrida, MS_PASO) };
+        E.ultimoRec = recorrido;
         if (control() && control().pantalla) control().pantalla(true, 'ruta');
         pasoCorrida();
         if (habla) di(habla, datos);
@@ -1526,24 +1387,67 @@
         di(t, datos);
     }
 
-    function ejecutarPlan(o) {
+    function recorridoDePaso(p) {
+        const c = calibra(), R = raiz.Robot;
+        if (p.a === 'mover') return R.movimientoARecorrido(p.sentido, p.s ? p.s * 1000 : p.cm ? p.cm / (c.vel * (p.rapidez || 1)) * 1000 : 1500, p.rapidez);
+        if (p.a === 'giro') return R.giroARecorrido(p.grados, c.giro, p.rapidez);
+        if (p.a === 'figura') return figura(p.f);
+        if (p.a === 'ruedas') return R.ruedasARecorrido(p.izq, p.der, p.s * 1000);
+        return null;
+    }
+
+    async function ejecutarPlan(o) {
         if (!listo()) { di('sinRobot'); return; }
-        const c = calibra(), R = raiz.Robot, rec = [];
-        o.pasos.forEach(p => {
-            if (p.a === 'mover') rec.push(R.movimientoARecorrido(p.sentido, p.s ? p.s * 1000 : p.cm ? p.cm / c.vel * 1000 : 1500));
-            else if (p.a === 'giro') rec.push(R.giroARecorrido(p.grados, c.giro));
-            else if (p.a === 'figura') rec.push(figura(p.f));
-            else if (p.a === 'luces') enlace().luces(p.efecto, p.color || null);
-            else if (p.a === 'claxon') enlace().nota(440, 500);
-            else {
-                E.callado = true;
-                ejecutarAccion(p);
-                E.callado = false;
-            }
-        });
-        const ruta = rec.length ? R.unirRecorridos(rec, 'Plan') : null;
-        if (ruta) correr(ruta, 'mover');
-        else if (o.pasos.every(p => ['mover', 'giro', 'figura'].includes(p.a))) di('fallo');
+        const id = ++E.planId;
+        const MOVIMIENTOS = ['mover', 'giro', 'figura', 'ruedas'];
+        if (o.pasos.some(p => MOVIMIENTOS.includes(p.a))) di('mover');
+        for (const p of o.pasos) {
+            if (id !== E.planId || !listo()) return;
+            if (p.a === 'esperar') { await esperar(p.s * 1000); continue; }
+            if (!MOVIMIENTOS.includes(p.a)) { ejecutarSilencio(p); continue; }
+            const rec = recorridoDePaso(p);
+            if (!rec) continue;
+            while (E.corrida && id === E.planId) await esperar(60);
+            if (id !== E.planId || !correr(rec)) return;
+            while (E.corrida && id === E.planId) await esperar(60);
+        }
+    }
+
+    const SIN_REPETIR = ['repetir', 'deshacer', 'paro', 'charla', 'sinNombre', 'saludo', 'modo', 'ppt', 'recordar', 'aprender', 'rutina', 'distancia', 'bateria', 'buscar_telefono', 'marcarCasa', 'casa', 'decir'];
+
+    function recordarUltima(o) {
+        if (o && !SIN_REPETIR.includes(o.a)) E.ultima = o;
+    }
+
+    function repetirUltima() {
+        const u = E.ultima;
+        if (!u) { di('nadaQueRepetir'); return { ok: false, error: 'todavía no he hecho nada que repetir' }; }
+        if (u.a === 'plan') ejecutarPlan(u); else ejecutarAccion(u);
+        return { ok: true, repito: resumenAccion(u) };
+    }
+
+    function deshacerUltimo() {
+        if (!listo()) { di('sinRobot'); return { ok: false, error: 'el robot no está conectado' }; }
+        const u = E.ultimoRec;
+        const inverso = u ? raiz.Robot.inversoDeRecorrido(u.pasos, u.ms, 'Deshacer') : null;
+        if (!inverso) { di('nadaQueDeshacer'); return { ok: false, error: 'no hay ningún movimiento que deshacer' }; }
+        return correr(inverso, null, null, 'Deshaciendo el último movimiento.') ? { ok: true } : { ok: false, error: 'estoy ocupado con otra cosa' };
+    }
+
+    async function medirDistancia() {
+        const e = enlace();
+        if (!listo() || !e.soportaDistancia || !e.soportaDistancia()) return { ok: false, error: 'el sensor de distancia necesita el robot conectado con el firmware nuevo' };
+        e.pedirDistancia();
+        await esperar(600);
+        const cm = datosRobot().distancia_frontal_cm;
+        if (typeof cm !== 'number') return { ok: false, error: 'el sensor no dio lectura' };
+        return cm >= 400 ? { ok: true, libre: true } : { ok: true, cm: Math.round(cm) };
+    }
+
+    async function decirDistancia() {
+        const m = await medirDistancia();
+        if (!m.ok) { di('distanciaSin'); return; }
+        if (m.libre) di('distanciaLibre'); else di('distanciaVer', { cm: m.cm });
     }
 
     function resumenAccion(o) {
@@ -1584,6 +1488,7 @@
             E.callado = true;
             hablar(d, o.a === 'paro');
         }
+        recordarUltima(o);
         if (o && o.a === 'plan') ejecutarPlan(o);
         else ejecutarAccion(o);
         E.callado = false;
@@ -1613,7 +1518,7 @@
         }
         if (o.a === 'saludo') { di('saludo'); return; }
         if (o.a === 'marcarCasa') { marcarCasaAqui(); return; }
-        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); vaciarCola(); detener(false); detenerMeneo(); di('paro'); return; }
+        if (o.a === 'paro') { if (raiz.Telefonos) raiz.Telefonos.parar(); if (listo()) enlace().paro(); cancelarSecuencias(); detener(false); detenerMeneo(); di('paro'); return; }
         if (o.a === 'bateria') {
             const p = $('rb-bat-pct');
             if (p && /\d/.test(p.textContent)) di('bateria', { pct: p.textContent.replace(/\s*%/, ' por ciento') });
@@ -1622,19 +1527,32 @@
         }
         if (!listo()) { di('sinRobot'); return; }
         if (o.a === 'mover') {
-            const ms = o.s ? o.s * 1000 : o.cm ? o.cm / c.vel * 1000 : 1500;
-            correr(raiz.Robot.movimientoARecorrido(o.sentido, ms), o.sentido > 0 ? 'mover' : 'reversa');
-        } else if (o.a === 'giro') correr(raiz.Robot.giroARecorrido(o.grados, c.giro), 'giro');
+            const ms = o.s ? o.s * 1000 : o.cm ? o.cm / (c.vel * (o.rapidez || 1)) * 1000 : 1500;
+            correr(raiz.Robot.movimientoARecorrido(o.sentido, ms, o.rapidez), o.sentido > 0 ? 'mover' : 'reversa');
+        } else if (o.a === 'giro') correr(raiz.Robot.giroARecorrido(o.grados, c.giro, o.rapidez), 'giro');
+        else if (o.a === 'repetir') repetirUltima();
+        else if (o.a === 'deshacer') deshacerUltimo();
+        else if (o.a === 'distancia') decirDistancia();
         else if (o.a === 'figura') correr(figura(o.f), 'figura', { f: FIGURAS[o.f] || o.f });
         else if (o.a === 'casa') regresarCasa();
         else if (o.a === 'radar') radar(false);
         else if (o.a === 'guardia') ponerGuardia(o.on, false);
-        else if (o.a === 'turbo') di('turbo');
+        else if (o.a === 'turbo') {
+            if (control() && control().turbo) control().turbo(o.on);
+            di('turbo');
+        }
+        else if (o.a === 'nota') enlace().nota(o.hz, o.ms);
+        else if (o.a === 'melodia') { if (!enlace().tocarNotas(o.notas, o.bpm)) di('fallo'); }
+        else if (o.a === 'volumen') enlace().volumen(o.cambio !== undefined ? o.cambio : o.nivel, o.cambio !== undefined);
+        else if (o.a === 'ruedas') correr(raiz.Robot.ruedasARecorrido(o.izq, o.der, o.s * 1000), 'mover');
         else if (o.a === 'ruleta') {
             if (enlace().ruleta(r => di('ruletaFin', { num: r.num, color: r.color }))) di('ruleta'); else di('ocupado');
         }
         else if (o.a === 'claxon') { enlace().nota(440, 500); di('claxon'); }
-        else if (o.a === 'luces') { enlace().luces(o.efecto, o.color || null); di(o.color === '#000000' ? 'lucesOff' : 'luces'); }
+        else if (o.a === 'luces') {
+            if (!enlace().ponerLuces(o)) di('fallo');
+            else di(o.color === '#000000' && !o.led && !o.anillo ? 'lucesOff' : 'luces');
+        }
         else if (o.a === 'baile') {
             const r = enlace().bailar(o.id, o.cancion);
             if (r) { if (!E.callado) hablar(raiz.Robot.frase('baile', null, undefined, modoF()) + ` Va con ${r.baile}${r.cancion ? ' y ' + r.cancion : ''}.`); }
@@ -1800,9 +1718,8 @@
         precalentarLive();
         const SR = raiz.Plataforma && raiz.Plataforma.plugin('SpeechRecognition');
         const Web = raiz.SpeechRecognition || raiz.webkitSpeechRecognition;
-        const boton = $('rb-jarvis');
         E.escuchando = true;
-        boton.classList.add('is-activo');
+        micClase('is-activo', true);
         aviso('Escuchando…');
         try {
             let lista = [];
@@ -1827,7 +1744,7 @@
             di('fallo');
         } finally {
             E.escuchando = false;
-            boton.classList.remove('is-activo');
+            micClase('is-activo', false);
         }
     }
 
@@ -1892,10 +1809,13 @@
     const MODELO_TRANSCRIBE = 'gemini-3.5-transcribe-live';
     const CLAVE_EXIGE_NOMBRE = 'cecyte_yokis_exige_nombre';
     const exigeNombre = () => { try { return localStorage.getItem(CLAVE_EXIGE_NOMBRE) === '1'; } catch (e) { return false; } };
-    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false, vivoHevy: null, sesion: 0 };
+    const ESC = { on: false, unico: false, iniciando: false, ws: null, lista: false, ctx: null, flujo: null, proc: null, cola: [], vivo: null, texto: '', fallos: 0, ultimaVez: 0, reconectar: 0, espera: 0, sinVoz: 0, cerebro: false, oido: '', dijo: '', turno: null, anillo: [], ultimaHabla: 0, picoDesde: 0, ecoMax: 0, ignorar: false, saludar: '', nivelCrudo: 0, wsTexto: null, listaTexto: false, vivoFinal: '', vivoInterino: '', entradaCerrada: false, vivoHevy: null, sesion: 0, suenaHasta: 0, pasoLibreHasta: 0, picoRobot: 0, inicioEscucha: 0, primerTexto: 0 };
     const CLAVE_CEREBRO = 'cecyte_yokis_cerebro';
     const cerebroOn = () => { try { return localStorage.getItem(CLAVE_CEREBRO) !== '0'; } catch (e) { return true; } };
     const UMBRAL_INTERRUPCION = 0.14;
+    const UMBRAL_VOZ_ROBOT = 0.1;
+    const robotSuena = () => !!(enlace() && enlace().suena && enlace().suena());
+    const cerebroHabla = () => !!ESC.turno || Date.now() < ESC.suenaHasta;
 
     function hevyHablando() {
         return (E.hablando && Date.now() < E.hablaTope) || LIVE.fuentes.length > 0 || !!(LIVE.ctx && LIVE.proximo > LIVE.ctx.currentTime + 0.05);
@@ -1975,9 +1895,9 @@
         ESC.medidor = null;
         cancelAnimationFrame(ESC.cuadro);
         soltarTextoVivo();
-        const b = $('rb-jarvis');
-        b.classList.remove('is-escuchando', 'is-candado');
-        b.style.removeProperty('--nivel');
+        micClase('is-escuchando', false);
+        micClase('is-candado', false);
+        micNivel(null);
         registrarVoz('Escucha: terminaste de hablar, micrófono apagado');
     }
 
@@ -1992,13 +1912,42 @@
         }
     }
 
-    function armarSinVoz() {
+    function enviarFinEntrada() {
+        const dato = JSON.stringify({ realtimeInput: { audioStreamEnd: true } });
+        [ESC.ws, ESC.wsTexto].forEach(ws => {
+            try { if (ws && ws.readyState === 1) ws.send(dato); } catch (e) { /* conexión cerrada */ }
+        });
+    }
+
+    function enviarYa(motivo) {
+        if (!ESC.on || ESC.entradaCerrada) return;
+        registrarVoz('Escucha: ' + motivo);
+        ESC.anillo.forEach(enviarAudio);
+        ESC.anillo = [];
+        enviarFinEntrada();
+        if (!ESC.cerebro && ESC.texto) {
+            clearTimeout(ESC.espera);
+            despacharTexto();
+            return;
+        }
+        cerrarEntrada();
+        aviso('Enviando lo que dijiste…');
+        estadoEscucha('Enviando…');
+        clearTimeout(ESC.sinVoz);
+        ESC.sinVoz = setTimeout(() => { if (ESC.on && ESC.unico && !ESC.turno) apagarEscucha('No hubo respuesta. Vuelve a intentar.'); }, 25000);
+    }
+
+    function armarSinVoz(demora) {
         clearTimeout(ESC.sinVoz);
         ESC.sinVoz = setTimeout(() => {
             if (!ESC.on || !ESC.unico || ESC.texto || ESC.oido || ESC.turno) return;
-            if (Date.now() - ESC.ultimoSonido < 4000) { armarSinVoz(); return; }
+            if (Date.now() - ESC.ultimoSonido < 4000) {
+                if (Date.now() - ESC.inicioEscucha > 15000 && ESC.enviados > 8 && !ESC.entradaCerrada) enviarYa('15 s con ruido de fondo: se envía lo captado');
+                else armarSinVoz(6000);
+                return;
+            }
             apagarEscucha('No te oí. Toca el micrófono y habla.');
-        }, 10000);
+        }, demora || 10000);
     }
 
     function interrumpirPorVoz() {
@@ -2097,9 +2046,9 @@
         clearInterval(ESC.informe);
         const c = $('rb-escucha');
         if (c) c.checked = false;
-        const b = $('rb-jarvis');
-        b.classList.remove('is-candado', 'is-escuchando');
-        b.style.removeProperty('--nivel');
+        micClase('is-candado', false);
+        micClase('is-escuchando', false);
+        micNivel(null);
         estadoEscucha(motivo || '');
         const msg = $('rb-jarvis-msg');
         if (motivo) aviso(motivo);
@@ -2132,16 +2081,18 @@
 
     function juntarTranscripcion(t) {
         clearTimeout(ESC.sinVoz);
+        if (!ESC.texto) ESC.primerTexto = Date.now();
         ESC.texto = ((ESC.texto || '') + ' ' + normalizarOido(t)).trim();
         pintarVivo(ESC.texto);
         clearTimeout(ESC.espera);
         const o = raiz.Robot.ordenDeVoz(ESC.texto);
         const soloNombre = o && o.a === 'saludo' && ESC.texto.split(/\s+/).length <= 2;
-        ESC.espera = setTimeout(despacharTexto, soloNombre ? 2500 : 1100);
+        const tope = Date.now() - ESC.primerTexto > 6000;
+        ESC.espera = setTimeout(despacharTexto, tope ? 0 : soloNombre ? 2500 : 1100);
     }
 
     const LIVE_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=';
-    const NECESITAN_ROBOT = ['mover', 'giro', 'figura', 'luces', 'claxon', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'plan'];
+    const NECESITAN_ROBOT = ['mover', 'giro', 'figura', 'luces', 'nota', 'melodia', 'volumen', 'ruedas', 'claxon', 'casa', 'radar', 'guardia', 'turbo', 'baile', 'funcion', 'cancion', 'cancionParar', 'ruleta', 'plan', 'repetir', 'deshacer', 'distancia'];
 
     function datosRobot() {
         const ahora = new Date(), bat = $('rb-bat-pct');
@@ -2202,6 +2153,13 @@
             }
             return irACasa();
         }
+        if (o.a === 'distancia') return medirDistancia();
+        if (o.a === 'repetir' || o.a === 'deshacer') {
+            E.callado = true;
+            E.encolar = true;
+            try { return o.a === 'repetir' ? repetirUltima() : deshacerUltimo(); } finally { E.callado = false; E.encolar = false; }
+        }
+        recordarUltima(o);
         ejecutarSilencio(o);
         return { ok: true };
     }
@@ -2235,8 +2193,14 @@
     }
 
     function oidoMejor() {
-        const transcrito = normalizarOido((ESC.vivoFinal + ' ' + ESC.vivoInterino).trim());
-        return /\p{L}{2,}/u.test(transcrito) ? transcrito : normalizarOido(ESC.oido.trim());
+        const fichas = t => t.split(/\s+/).filter(Boolean);
+        const ajenas = t => fichas(t).filter(p => FUERA_DE_LATIN.test(p)).length;
+        const lista = [(ESC.vivoFinal + ' ' + ESC.vivoInterino).trim(), ESC.oido.trim()].filter(t => /\p{L}{2,}/u.test(t));
+        const limpio = lista.find(t => !ajenas(t));
+        if (limpio) return limpio;
+        const elegido = lista.sort((a, b) => ajenas(a) / fichas(a).length - ajenas(b) / fichas(b).length)[0] || '';
+        if (fichas(elegido).length > 1 && fichas(elegido).every(p => FUERA_DE_LATIN.test(p))) return '';
+        return normalizarOido(elegido);
     }
 
     function cerrarOido() {
@@ -2315,7 +2279,7 @@
                 if (ESC.saludar) { ws.send(JSON.stringify({ realtimeInput: { text: ESC.saludar } })); ESC.saludar = ''; }
                 registrarVoz('Escucha: conversación en vivo lista');
                 estadoEscucha('Conversación en vivo' + (ESC.unico ? '…' : '.'));
-                aviso('Te escucho…');
+                aviso('Te escucho…' + (ESC.unico ? ' Toca el micrófono cuando termines.' : ''));
                 return;
             }
             if (m.toolCall) { if (ESC.unico) cerrarEntrada(); llamadasCerebro(m.toolCall, ws); return; }
@@ -2340,8 +2304,9 @@
             if (sc.modelTurn && sc.modelTurn.parts) {
                 sc.modelTurn.parts.forEach(p => {
                     if (!p.inlineData || ESC.ignorar) return;
-                    if (!ESC.turno) { ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
+                    if (!ESC.turno) { callarIA(); ESC.turno = { cancelado: false, muda: false, finAudio: 0, pcm: [] }; if (ESC.unico) cerrarEntrada(); cerrarOido(); }
                     reproducirChunk(ESC.turno, p.inlineData.data);
+                    ESC.suenaHasta = Date.now() + Math.max(0, (LIVE.proximo - LIVE.ctx.currentTime) * 1000) + 150;
                     meneoCerebro();
                 });
             }
@@ -2387,7 +2352,7 @@
                 ESC.cola = [];
                 registrarVoz('Escucha: transcripción lista');
                 estadoEscucha(ESC.unico ? 'Escuchando…' : 'Escuchando' + (exigeNombre() ? ': empieza con «Hevy».' : '.'));
-                aviso('Escuchando…');
+                aviso('Escuchando…' + (ESC.unico ? ' Toca el micrófono cuando termines.' : ''));
                 return;
             }
             if (m.error || m.goAway) registrarVoz('Escucha: el servidor avisó ' + JSON.stringify(m.error || m.goAway).slice(0, 200));
@@ -2454,9 +2419,9 @@
         ESC.vivoFinal = '';
         ESC.vivoInterino = '';
         if (ESC.cerebro) { liveCtx(); abrirTextoVivo(); }
-        const boton = $('rb-jarvis');
-        boton.classList.add('is-escuchando');
-        if (!ESC.unico) boton.classList.add('is-candado');
+        ESC.inicioEscucha = Date.now();
+        micClase('is-escuchando', true);
+        if (!ESC.unico) micClase('is-candado', true);
         aviso('Conectando…');
         estadoEscucha('Conectando…');
         if (ESC.ctx.state !== 'running') await Promise.race([ESC.ctx.resume().catch(() => null), esperar(800)]);
@@ -2475,7 +2440,22 @@
             ESC.nivelCrudo = Math.sqrt(s / onda.length);
             if (ESC.nivelCrudo > 0.04) ESC.ultimoSonido = Date.now();
             ESC.nivel = Math.max(Math.min(1, ESC.nivelCrudo * 9), ESC.nivel * 0.85);
-            boton.style.setProperty('--nivel', ESC.nivel.toFixed(2));
+            micNivel(ESC.nivel.toFixed(2));
+            if (robotSuena() && Date.now() > ESC.pasoLibreHasta) {
+                if (ESC.nivelCrudo > UMBRAL_VOZ_ROBOT) {
+                    if (!ESC.picoRobot) ESC.picoRobot = Date.now();
+                    else if (Date.now() - ESC.picoRobot > 200) {
+                        ESC.pasoLibreHasta = Date.now() + 4000;
+                        ESC.picoRobot = 0;
+                        ESC.anillo.forEach(enviarAudio);
+                        ESC.anillo = [];
+                        registrarVoz('Escucha: tu voz se oyó sobre el sonido del robot; micrófono abierto');
+                    }
+                } else ESC.picoRobot = 0;
+            } else {
+                ESC.picoRobot = 0;
+                if (ESC.nivelCrudo > UMBRAL_VOZ_ROBOT && ESC.pasoLibreHasta > Date.now()) ESC.pasoLibreHasta = Math.max(ESC.pasoLibreHasta, Date.now() + 2500);
+            }
             if (hevyHablando()) {
                 ESC.ecoMax = Math.max(ESC.ecoMax, ESC.nivelCrudo);
                 if (ESC.nivelCrudo > (E.meneo ? UMBRAL_INTERRUPCION * 2 : UMBRAL_INTERRUPCION)) {
@@ -2496,7 +2476,8 @@
             const f = e.inputBuffer.getChannelData(0), b = new Uint8Array(f.length * 2), v = new DataView(b.buffer);
             for (let i = 0; i < f.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, f[i])) * 32767, true);
             const dato = JSON.stringify({ realtimeInput: { audio: { data: bytesABase64(b), mimeType: mime } } });
-            if (habla || E.escuchando || Date.now() < ESC.ultimaHabla + 500 || Date.now() < E.finHabla + 600) {
+            const ruidoRobot = robotSuena() && Date.now() > ESC.pasoLibreHasta;
+            if (habla || ruidoRobot || E.escuchando || Date.now() < ESC.ultimaHabla + 500 || Date.now() < E.finHabla + 600) {
                 ESC.bloqueados++;
                 ESC.anillo.push(dato);
                 if (ESC.anillo.length > 6) ESC.anillo.shift();
@@ -2529,42 +2510,44 @@
     }
 
     function iniciarMicrofono() {
-        const b = $('rb-jarvis');
-        let reloj = 0, largo = false, ox = 0, oy = 0, hablaba = false;
-        b.addEventListener('pointerdown', e => {
-            largo = false;
-            ox = e.clientX;
-            oy = e.clientY;
-            hablaba = hevyHablando();
-            callarIA();
-            callarCerebro();
-            if (ESC.cerebro) ESC.ignorar = hablaba;
-            detenerMeneo();
-            clearTimeout(reloj);
-            reloj = setTimeout(() => {
-                largo = true;
-                registrarVoz('Micrófono: pulsación larga, candado ' + (ESC.on && !ESC.unico ? 'se abre' : 'se cierra'));
-                if (ESC.on && ESC.unico) { ESC.unico = false; clearTimeout(ESC.sinVoz); b.classList.add('is-candado'); }
-                else if (ESC.on) apagarEscucha('Candado abierto.');
-                else { const c = $('rb-escucha'); if (c) c.checked = true; encenderEscucha(false); }
-            }, 450);
-        });
-        b.addEventListener('pointermove', e => { if (Math.abs(e.clientX - ox) > 24 || Math.abs(e.clientY - oy) > 24) clearTimeout(reloj); });
-        ['pointerup', 'pointerleave'].forEach(ev => b.addEventListener(ev, () => clearTimeout(reloj)));
-        b.addEventListener('contextmenu', e => e.preventDefault());
-        b.addEventListener('click', () => {
-            if (largo) { largo = false; return; }
-            if (ESC.on && !ESC.unico) {
-                if (!hablaba) apagarEscucha('Candado abierto.');
-                return;
-            }
-            if (ESC.on) {
-                const soloEscuchaba = !hablaba && !ESC.entradaCerrada && !ESC.turno && !ESC.oido && !ESC.texto;
-                apagarEscucha('');
-                if (!soloEscuchaba) encenderEscucha(true);
-            }
-            else if (llaveIA() && !sinInternet()) encenderEscucha(true);
-            else escuchar();
+        botonesMic().forEach(b => {
+            let reloj = 0, largo = false, ox = 0, oy = 0, hablaba = false;
+            b.addEventListener('pointerdown', e => {
+                largo = false;
+                ox = e.clientX;
+                oy = e.clientY;
+                hablaba = hevyHablando();
+                callarIA();
+                callarCerebro();
+                if (ESC.cerebro) ESC.ignorar = hablaba;
+                detenerMeneo();
+                clearTimeout(reloj);
+                reloj = setTimeout(() => {
+                    largo = true;
+                    registrarVoz('Micrófono: pulsación larga, candado ' + (ESC.on && !ESC.unico ? 'se abre' : 'se cierra'));
+                    if (ESC.on && ESC.unico) { ESC.unico = false; clearTimeout(ESC.sinVoz); micClase('is-candado', true); }
+                    else if (ESC.on) apagarEscucha('Candado abierto.');
+                    else { const c = $('rb-escucha'); if (c) c.checked = true; encenderEscucha(false); }
+                }, 450);
+            });
+            b.addEventListener('pointermove', e => { if (Math.abs(e.clientX - ox) > 24 || Math.abs(e.clientY - oy) > 24) clearTimeout(reloj); });
+            ['pointerup', 'pointerleave'].forEach(ev => b.addEventListener(ev, () => clearTimeout(reloj)));
+            b.addEventListener('contextmenu', e => e.preventDefault());
+            b.addEventListener('click', () => {
+                if (largo) { largo = false; return; }
+                if (ESC.on && !ESC.unico) {
+                    if (!hablaba) apagarEscucha('Candado abierto.');
+                    return;
+                }
+                if (ESC.on) {
+                    const escuchando = !hablaba && !ESC.entradaCerrada && !ESC.turno;
+                    if (escuchando && (ESC.enviados > 3 || ESC.texto)) { enviarYa('un toque: se envía lo dicho'); return; }
+                    apagarEscucha('');
+                    if (!escuchando) encenderEscucha(true);
+                }
+                else if (llaveIA() && !sinInternet()) encenderEscucha(true);
+                else escuchar();
+            });
         });
     }
 
@@ -2621,7 +2604,7 @@
         $('rb-voz-probar').addEventListener('click', () => { hablar('¡Qué onda, we! Así suena tu amigo Hevy. ¡Listo pa lo que sea!'); });
         iniciarEntrena();
         document.addEventListener('robot-paro', () => {
-            vaciarCola();
+            cancelarSecuencias();
             detener(false);
             E.radarCancelado = true;
             if (E.guardia) ponerGuardia(false, true);

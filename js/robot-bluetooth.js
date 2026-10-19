@@ -111,7 +111,7 @@
         const conRespuesta = !eleccion.escritura.properties.writeWithoutResponse;
         const pieza = Math.max(20, mtu - 3);
         informar([
-            'Aparato: ' + (dispositivo.name || '(sin nombre)') + '  ' + id,
+            'Hevy · módulo ' + (dispositivo.name || '(sin nombre)') + '  ' + id,
             'Servicio ' + corto(eleccion.servicio) + ' · escribe ' + corto(eleccion.escritura.uuid) +
                 (conRespuesta ? ' (con respuesta)' : ' (sin respuesta)') + ' · avisa ' + corto(eleccion.aviso.uuid),
             'MTU ' + mtu + ' · trozos de ' + pieza + ' bytes',
@@ -143,7 +143,7 @@
 
         return {
             tipo: 'ble',
-            nombre: dispositivo.name || 'Robot',
+            nombre: 'Hevy',
             escribir(texto) {
                 if (cerrado) return Promise.reject(new Error('Bluetooth cerrado'));
                 const trozos = [];

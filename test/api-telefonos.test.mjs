@@ -15,7 +15,7 @@ const vivo = k => !vence.has(k) || vence.get(k) > ahora;
 globalThis.__kv = {
     get: async k => (store.has(k) && vivo(k) ? structuredClone(store.get(k)) : null),
     mget: async (...ks) => ks.map(k => (store.has(k) && vivo(k) ? structuredClone(store.get(k)) : null)),
-    set: async (k, v, o) => { store.set(k, structuredClone(v)); if (o && o.ex) vence.set(k, ahora + o.ex * 1000); else vence.delete(k); return 'OK'; },
+    set: async (k, v, o) => { if (o && o.nx && store.has(k) && vivo(k)) return null; store.set(k, structuredClone(v)); if (o && o.ex) vence.set(k, ahora + o.ex * 1000); else vence.delete(k); return 'OK'; },
     del: async k => { store.delete(k); vence.delete(k); },
     incr: async k => { const n = (Number(store.get(k)) || 0) + 1; store.set(k, n); return n; },
     expire: async () => 1,
@@ -149,7 +149,35 @@ for (let i = 0; i < 20; i++) await unir('Spam', '3.3.3.3');
 r = await call({ body: { accion: 'unirse', sala: SALA, nombre: 'Spam' }, headers: desde('3.3.3.3') });
 assert.strictEqual(r.status, 429, 'demasiados intentos de unirse desde una IP');
 
-// 8) CORS de la app y métodos
+// 8) dueño y expulsión
+const SALA2 = 'ZED789';
+const unirSala = async (nombre, crear, ip) => (await call({ body: { accion: 'unirse', sala: SALA2, nombre, crear }, headers: desde(ip) })).body;
+const ubic2 = t => call({ body: { accion: 'ubicacion', sala: SALA2, id: t.id, token: t.token, nombre: t.nombre, lat: 19.4326, lon: -99.1332, p: 6 } });
+const lista2 = t => call({ method: 'GET', query: { sala: SALA2, id: t.id, token: t.token } });
+const jefe = await unirSala('Jefe', true, '21.0.0.1'); jefe.nombre = 'Jefe';
+const visita = await unirSala('Visita', false, '21.0.0.2'); visita.nombre = 'Visita';
+const intruso = await unirSala('Intruso', true, '21.0.0.3'); intruso.nombre = 'Intruso';
+await ubic2(jefe); await ubic2(visita); await ubic2(intruso);
+assert.strictEqual((await lista2(jefe)).body.dueno, true, 'quien crea la sala es el dueño');
+assert.strictEqual((await lista2(visita)).body.dueno, false, 'los demás no');
+assert.strictEqual((await lista2(intruso)).body.dueno, false, 'crear:true en una sala con dueño no le quita el dueño');
+const expulsar = (quien, objetivo) => call({ body: { accion: 'expulsar', sala: SALA2, id: quien.id, token: quien.token, objetivo: objetivo.id } });
+assert.strictEqual((await expulsar(visita, jefe)).status, 403, 'solo el dueño expulsa');
+assert.strictEqual((await expulsar(jefe, jefe)).status, 400, 'el dueño no se expulsa a sí mismo');
+assert.strictEqual((await expulsar(jefe, visita)).status, 200, 'el dueño expulsa');
+assert.strictEqual((await lista2(jefe)).body.telefonos.some(x => x.id === visita.id), false, 'el expulsado desaparece de la sala');
+r = await ubic2(visita);
+assert.strictEqual(r.status, 403, 'el expulsado no puede seguir');
+assert(r.body.expulsado && /10 minutos/.test(r.body.error), 'avisa que fueron 10 minutos');
+r = await call({ body: { accion: 'unirse', sala: SALA2, nombre: 'visita' }, headers: desde('21.0.0.9') });
+assert.strictEqual(r.status, 403, 'tampoco con otro registro y el mismo nombre');
+r = await call({ body: { accion: 'unirse', sala: SALA2, nombre: 'Otra' }, headers: desde('21.0.0.2') });
+assert.strictEqual(r.status, 200, 'otro nombre desde su mismo internet sí pasa');
+ahora += 601_000;
+r = await call({ body: { accion: 'unirse', sala: SALA2, nombre: 'Visita' }, headers: desde('21.0.0.9') });
+assert.strictEqual(r.status, 200, 'pasados 10 minutos puede volver');
+
+// 9) CORS de la app y métodos
 r = await call({ method: 'OPTIONS', headers: { origin: 'https://localhost' } });
 assert.strictEqual(r.status, 204);
 assert.strictEqual(r.headers['access-control-allow-origin'], 'https://localhost');

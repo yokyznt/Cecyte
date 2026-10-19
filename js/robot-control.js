@@ -20,7 +20,7 @@
         teclas: new Map(),                // teclado: tecla -> [x, y]
         vmax: 60,
         movido: false, ultimo: '', ultimoEnvio: 0,
-        dirModo: false, dirListoEn: 0,     // modo dirección: la palanca marca un rumbo respecto al teléfono y el robot gira hacia él y avanza
+        dirModo: false, dirListoEn: 0, dirT: 0, dirPerdido: false, saltoDesde: 0,     // modo dirección: la palanca marca un rumbo respecto al teléfono y el robot gira hacia él y avanza
         estilo: 'palanca', pad: new Map(), px: 0, py: 0,   // estilo de control (palanca, flechas o pedales): botones sostenidos y su aceleración gradual
         sIzq: 0, sDer: 0,                  // salida suavizada de las ruedas
         fi: 0, fiF: 0, fi0: 0, brujulaT: 0,   // fiF: el rumbo del teléfono sin temblor (solo se mueve cuando cambia más de 5°)        // hacia dónde apunta el teléfono (brújula, siempre al día), y hacia dónde apuntaba al alinear
@@ -133,14 +133,19 @@
     // Modo dirección: se manda el rumbo de la palanca (redondeado, para no saturar el enlace) y la velocidad
     function revisarRumbo(f, ahora, turbo) {
         $('rb-incl-on').classList.toggle('is-sin-brujula', !hayBrujula());
-        if (ahora < C.dirListoEn) return;
+        if (ahora < C.dirListoEn || C.dirPerdido) return;
         const r = raiz.Robot.rumboDeJoystick(f.x, f.y, C.vmax, turbo ? raiz.Robot.VEL_TURBO : undefined);
         if (C.repro) { if (!r.v) return; pararRepro(false); }
         if (!r.v) {
             if (C.movido) { enlace().rumbo(0, 0); C.movido = false; C.ultimo = ''; C.ultimoEnvio = ahora; }
             return;
         }
-        const g = Math.round(raiz.Robot.rumboRelativo(hayBrujula() ? C.fiF : C.fi0, r.grados, C.fi0) / 2) * 2, v = Math.round(r.v / 5) * 5;
+        const g = Math.round(raiz.Robot.rumboRelativo(hayBrujula() ? C.fiF : C.fi0, r.grados, C.fi0) / 2) * 2;
+        let v = Math.round(r.v / 5) * 5;
+        if (C.freno && enlace().distancias) {
+            const d = enlace().distancias();
+            if (raiz.Robot.frenoPorDistancia(1, 1, d.lecturas, ahora - d.t, turbo).cerca) v = 1;
+        }
         if (C.turbo) guardaCalor({ izq: v, der: v }, ahora);
         C.movido = true;
         const clave = g + ',' + v;
@@ -161,6 +166,11 @@
             const fi = raiz.Robot.rumboDeOrientacion(e.alpha, e.beta, e.gamma, ang);
             if (fi === null) return;
             const primera = !hayBrujula();
+            if (!primera && Math.abs((fi - C.fi + 540) % 360 - 180) > 100) {
+                if (!C.saltoDesde) C.saltoDesde = Date.now();
+                if (Date.now() - C.saltoDesde < 300) return;
+            }
+            C.saltoDesde = 0;
             C.fi = primera ? fi : (C.fi + ((fi - C.fi + 540) % 360 - 180) * 0.3 + 360) % 360;
             if (primera) C.fiF = C.fi;
             else {
@@ -172,12 +182,31 @@
         }, true);
     }
 
+    function pintarDirPerdido() {
+        const b = $('rb-dir-cal');
+        if (!b) return;
+        b.classList.toggle('is-perdido', C.dirPerdido);
+        b.title = C.dirPerdido ? 'Perdí la alineación: apunta el teléfono hacia donde mira el robot y toca Alinear' : 'Alinear';
+    }
+
+    function programarAlineacion() {
+        clearTimeout(C.dirT);
+        C.dirListoEn = Date.now() + 1800;
+        C.dirPerdido = false;
+        pintarDirPerdido();
+        C.dirT = setTimeout(() => {
+            if (!C.dirModo || !listo()) return;
+            enlace().rumboIniciar(true);
+            C.dirListoEn = Date.now() + 700;
+            vibrar([20, 30, 20]);
+        }, 700);
+    }
+
     function alinearRumbo() {
         frenar(false);
         C.fi0 = hayBrujula() ? C.fiF : 0;
-        C.dirListoEn = Date.now() + 900;
-        if (listo()) enlace().rumboIniciar(true);
-        vibrar([20, 30, 20]);
+        programarAlineacion();
+        vibrar(14);
     }
 
     function ponerRumbo(si) {
@@ -189,10 +218,17 @@
         frenar(false);
         C.dirModo = si;
         $('rb-mando').classList.toggle('es-dir', si);
-        C.dirListoEn = si ? Date.now() + 900 : 0;
-        if (si) C.fi0 = hayBrujula() ? C.fiF : 0;
-        if (listo()) e.rumboIniciar(si);
-        vibrar(si ? [20, 30, 20] : 14);
+        if (si) {
+            C.fi0 = hayBrujula() ? C.fiF : 0;
+            programarAlineacion();
+        } else {
+            clearTimeout(C.dirT);
+            C.dirListoEn = 0;
+            C.dirPerdido = false;
+            pintarDirPerdido();
+            if (listo()) e.rumboIniciar(false);
+        }
+        vibrar(14);
         pintarCel();
     }
 
@@ -621,6 +657,13 @@
         try { guardado = localStorage.getItem(CLAVE_ESTILO); } catch (e) { /* sin guardado */ }
         aplicarEstilo(guardado);
         $('rb-dir-cal').addEventListener('click', alinearRumbo);
+        document.addEventListener('robot-rumbo-perdido', () => {
+            if (!C.dirModo || C.dirPerdido || Date.now() < C.dirListoEn) return;
+            C.dirPerdido = true;
+            frenar(false);
+            vibrar([80, 60, 80]);
+            pintarDirPerdido();
+        });
         iniciarBrujula();
     }
 
@@ -851,7 +894,7 @@
         for (const k of ['listo', 'conectando', 'sinprograma']) sec.classList.toggle('is-' + k, e === k);
         sec.classList.toggle('is-sin-enlace', e !== 'listo');
         pintarDistancia();
-        if (e !== 'listo') { C.dirModo = false; C.dirListoEn = 0; $('rb-mando').classList.remove('es-dir'); pintarCel(); pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
+        if (e !== 'listo') { clearTimeout(C.dirT); C.dirPerdido = false; pintarDirPerdido(); C.dirModo = false; C.dirListoEn = 0; $('rb-mando').classList.remove('es-dir'); pintarCel(); pararRepro(false); pararGrabacion(true); C.movido = false; C.ultimo = ''; C.jx = 0; C.jy = 0; C.joyActivo = false; C.teclas.clear(); C.tilt = { x: 0, y: 0 }; pintarPalanca(); }
     }
 
     function iniciar() {

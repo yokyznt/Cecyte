@@ -1075,6 +1075,7 @@ function pasoEn(r, t) {
 }
 
 const RUTA_VEL = 110, RUTA_CM_S = 22, RUTA_PAUSA_MS = 120;
+const RAPIDEZ_MIN = 0.5, RAPIDEZ_MAX = 1.6;
 
 function rutaARecorrido(puntos, cmS, giro90, nombre) {
     if (!Array.isArray(puntos) || puntos.length < 2) return null;
@@ -1110,17 +1111,26 @@ function unirRecorridos(lista, nombre) {
     return validarRecorrido({ nombre, ms: t0, pasos });
 }
 
-function giroARecorrido(grados, giro90) {
+const rapidezDe = v => clamp(Number(v) || 1, RAPIDEZ_MIN, RAPIDEZ_MAX);
+
+function giroARecorrido(grados, giro90, rapidez) {
+    const k = rapidezDe(rapidez), vel = Math.round(RUTA_VEL * k);
     const g = clamp(Number(giro90) || 500, 100, 3000), a = clamp(Number(grados) || 0, -720, 720);
     if (!a) return null;
-    const ms = Math.round(Math.abs(a) / 90 * g);
-    return validarRecorrido({ nombre: 'Giro', ms, pasos: [{ t: 0, izq: a > 0 ? RUTA_VEL : -RUTA_VEL, der: a > 0 ? -RUTA_VEL : RUTA_VEL }, { t: ms, izq: 0, der: 0 }] });
+    const ms = Math.round(Math.abs(a) / 90 * g / k);
+    return validarRecorrido({ nombre: 'Giro', ms, pasos: [{ t: 0, izq: a > 0 ? vel : -vel, der: a > 0 ? -vel : vel }, { t: ms, izq: 0, der: 0 }] });
 }
 
-function movimientoARecorrido(sentido, ms) {
+function movimientoARecorrido(sentido, ms, rapidez) {
     const d = clamp(Math.round(Number(ms) || 0), 200, 20000);
-    const v = sentido < 0 ? -RUTA_VEL : RUTA_VEL;
+    const v = (sentido < 0 ? -1 : 1) * Math.round(RUTA_VEL * rapidezDe(rapidez));
     return validarRecorrido({ nombre: 'Mover', ms: d, pasos: [{ t: 0, izq: v, der: v }, { t: d, izq: 0, der: 0 }] });
+}
+
+function ruedasARecorrido(izq, der, ms) {
+    const d = clamp(Math.round(Number(ms) || 0), 200, 15000);
+    const rueda = v => Math.round(clamp(Number(v) || 0, -VEL_TURBO, VEL_TURBO));
+    return validarRecorrido({ nombre: 'Ruedas', ms: d, pasos: [{ t: 0, izq: rueda(izq), der: rueda(der) }, { t: d, izq: 0, der: 0 }] });
 }
 
 function inversoDeRecorrido(pasos, msTotal, nombre) {
@@ -1222,6 +1232,11 @@ const FRASES = {
     baile: ['¡Eso! A bailar, we.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
     luces: ['¡Luces listas, mira qué chidas!', 'Va, a iluminar el cuarto.'],
     lucesOff: ['Listo, luces apagadas.'],
+    nadaQueRepetir: ['Todavía no he hecho nada que repetir, we.'],
+    nadaQueDeshacer: ['No tengo ningún movimiento que deshacer, we.'],
+    distanciaVer: ['Tengo algo a {cm} centímetros al frente.', 'Veo algo a {cm} centímetros enfrente, we.'],
+    distanciaLibre: ['No veo nada cerca al frente, está libre.', 'Todo despejado enfrente, we.'],
+    distanciaSin: ['No me llega lectura del sensor, we. Intenta otra vez.'],
     casa: ['Va, me regreso a casa.', 'Órale, de vuelta a casa.'],
     radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, we.'],
     guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
@@ -1458,6 +1473,17 @@ const COLORES_VOZ = {
     rojo: '#ff2a2a', roja: '#ff2a2a', rojas: '#ff2a2a', rojos: '#ff2a2a', naranja: '#ff9d00', naranjas: '#ff9d00', amarillo: '#ffe600', amarilla: '#ffe600', amarillas: '#ffe600',
     verde: '#22d05a', verdes: '#22d05a', azul: '#2a6bff', azules: '#2a6bff', morado: '#a64dff', morada: '#a64dff', moradas: '#a64dff', rosa: '#ff5fb0', rosas: '#ff5fb0', blanco: '#ffffff', blanca: '#ffffff', blancas: '#ffffff',
 };
+const COLORES_EXTRA = { cian: '#00e5ff', turquesa: '#00e5ff', celeste: '#66ccff', lila: '#c8a2ff', dorado: '#ffc400', gris: '#808080', negro: '#000000', apagado: '#000000' };
+
+function colorIA(v) {
+    const crudo = String(v == null ? '' : v).toLowerCase().trim();
+    if (/^#?[0-9a-f]{6}$/.test(crudo)) return '#' + crudo.replace('#', '');
+    if (/^#[0-9a-f]{3}$/.test(crudo)) return '#' + crudo.slice(1).split('').map(x => x + x).join('');
+    const c = sinAcentos(crudo);
+    if (Object.prototype.hasOwnProperty.call(COLORES_VOZ, c)) return COLORES_VOZ[c];
+    return Object.prototype.hasOwnProperty.call(COLORES_EXTRA, c) ? COLORES_EXTRA[c] : null;
+}
+
 const FUNCIONES_VOZ = [
     ['linea', /\b(linea|lineas|seguidor)\b|sigue ?lineas/], ['esquivar', /esquiv|obstaculos|evita/], ['mano', /\bmano\b|sigueme|seguirme/],
     ['idavuelta', /ida y vuelta/], ['vigilante', /vigilante/], ['trompo', /trompo/], ['zigzag', /zig ?zag|\beses\b/], ['arrancon', /arrancon/],
@@ -1548,6 +1574,11 @@ function ordenDeVoz(texto) {
     const limpio = resto
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
         .replace(/\s+/g, ' ').trim();
+    const notaVoz = limpio.match(/\bnota\s+(do|re|mi|fa|sol|la|si)(?:\s+(sostenido|sostenida))?(?:\s+(aguda|alta|grave|baja))?\b/);
+    if (notaVoz) {
+        const base = { do: 261.63, re: 293.66, mi: 329.63, fa: 349.23, sol: 392, la: 440, si: 493.88 }[notaVoz[1]];
+        return { a: 'nota', hz: Math.round(base * (notaVoz[2] ? 1.0595 : 1) * (/aguda|alta/.test(notaVoz[3] || '') ? 2 : /grave|baja/.test(notaVoz[3] || '') ? 0.5 : 1)), ms: 600 };
+    }
     t = corregirVocabulario(limpio);
     if (!t) return { a: 'saludo' };
     const pedidoModo = t.match(RE_PEDIDO_MODO);
@@ -1599,15 +1630,32 @@ function ordenDeVoz(texto) {
     t = t.replace(/\bmedio metro\b/, '50 centimetros').replace(/\bun cuarto de vuelta\b/, '90 grados').replace(/\bmedia vuelta\b/, 'dar la vuelta');
     t = numerosEnPalabras(t);
     const dice = r => r.test(t);
+    const rapidez = dice(/\b(despacio|lento|lenta|lentamente|con calma|suavecito)\b/) ? 0.55 : dice(/\b(rapido|rapida|rapidamente|veloz|volando|de prisa|aprisa|a toda velocidad|a todo gas)\b/) ? 1.5 : null;
+    const conRapidez = o => (rapidez ? Object.assign(o, { rapidez }) : o);
     const marcaCasa = dice(/\b(marca|marcar|marques|marque|marcame|guarda|guardar|guardes|fija|fijar|fijes|define|definir|establece|establecer|anota|anotar)\b.*\bcasa\b/)
         || (dice(/\b(pon|ponte|poner|pongas|toma|tomar|considera)\b.*\bcasa\b/) && dice(/\b(aqui|aca)\b/))
         || dice(/\b(aqui|aca|esta|este)\b.*\bes\b.*\bcasa\b/)
         || dice(/\bcasa\b.*\b(es|esta|queda)\b.*\b(aqui|aca)\b/);
     if (marcaCasa) return { a: 'marcarCasa' };
+    if (dice(/\b(repite|repetir|repitelo|repitela|otra vez|de nuevo|una vez mas)\b/)) return { a: 'repetir' };
+    if (dice(/\b(deshaz|deshacer|deshazlo|deshacelo|desanda|desandar|anula lo ultimo|echa para atras lo ultimo)\b/)) return { a: 'deshacer' };
+    if (dice(/\b(que ves|que ve|que hay adelante|que hay enfrente|que tienes enfrente|que tienes adelante|a que distancia|que distancia|que tan cerca|ves algo|hay algo adelante|hay algo enfrente)\b/)) return { a: 'distancia' };
+    const nivelVoz = (t.match(/\b(\d{1,3})\b/) || [])[1];
+    if (dice(/\bbrillo\b/) && nivelVoz !== undefined) return { a: 'luces', efecto: null, brillo: clamp(Number(nivelVoz), 0, 100) };
+    if (dice(/\b(silencio|mute|mutea|silencia|silenciate|sin sonido)\b/)) return { a: 'volumen', nivel: 0 };
+    if (dice(/\b(volumen|bocina|sonido)\b/) || dice(/^(mas fuerte|mas bajito|mas bajo)$/)) {
+        if (dice(/\b(maximo|a tope|al maximo)\b/)) return { a: 'volumen', nivel: 100 };
+        if (dice(/\b(minimo|al minimo)\b/)) return { a: 'volumen', nivel: 0 };
+        if (nivelVoz !== undefined) return { a: 'volumen', nivel: clamp(Number(nivelVoz), 0, 100) };
+        if (dice(/\b(sube|subir|subele|aumenta|aumentar|alza|mas fuerte|mas alto)\b/)) return { a: 'volumen', cambio: 20 };
+        if (dice(/\b(baja|bajar|bajale|disminuye|reduce|mas bajo|mas bajito|bajito)\b/)) return { a: 'volumen', cambio: -20 };
+    }
     if (dice(/\b(luz|luces|foco|focos|leds?|ilumina\w*)\b/)) {
-        if (quita) return { a: 'luces', efecto: 'fijo', color: '#000000' };
-        const col = t.split(' ').map(x => COLORES_VOZ[x]).find(Boolean);
-        if (col) return { a: 'luces', efecto: 'fijo', color: col };
+        const ledVoz = Number((t.match(/\bleds?\s*(?:numero\s*|n\s*)?(\d{1,2})\b/) || [])[1]);
+        const unLed = ledVoz >= 1 && ledVoz <= LEDS ? { led: ledVoz } : {};
+        if (quita) return Object.assign({ a: 'luces', efecto: 'fijo', color: '#000000' }, unLed);
+        const col = t.split(' ').map(x => COLORES_VOZ[x] || COLORES_EXTRA[x]).find(Boolean);
+        if (col) return Object.assign({ a: 'luces', efecto: 'fijo', color: col }, unLed);
         if (dice(/respira|respirar|pulso|latido/)) return { a: 'luces', efecto: 'respirar' };
         if (dice(/persecucion|persigue|corriendo|carrera/)) return { a: 'luces', efecto: 'persecucion' };
         return { a: 'luces', efecto: 'arcoiris' };
@@ -1624,16 +1672,16 @@ function ordenDeVoz(texto) {
     if (fig) return { a: 'figura', f: fig };
     const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
     const n = num ? parseFloat(num.replace(',', '.')) : null;
-    if (dice(/\b(da la vuelta|dar la vuelta|date la vuelta|date vuelta)\b/)) return { a: 'giro', grados: 180 };
-    if (dice(/\b(vuelta completa|giro completo|360)\b/)) return { a: 'giro', grados: 360 };
+    if (dice(/\b(da la vuelta|dar la vuelta|date la vuelta|date vuelta)\b/)) return conRapidez({ a: 'giro', grados: 180 });
+    if (dice(/\b(vuelta completa|giro completo|360)\b/)) return conRapidez({ a: 'giro', grados: 360 });
     const lado = dice(/izquierda|izquierdo/) ? -1 : dice(/derecha/) ? 1 : 0;
     if (dice(/\b(gira|girar|gire|giro|voltea|voltear|dobla|doblar|rota|rotar|vira|virar|vuelta)\b/) || (lado && !dice(/\b(avanza|ve|camina|anda|adelante|atras|reversa)\b/))) {
-        return { a: 'giro', grados: (lado || 1) * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) };
+        return conRapidez({ a: 'giro', grados: (lado || 1) * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) });
     }
     const sentido = dice(/\b(atras|reversa|retrocede|retroceder|marcha atras|hacia atras)\b/) ? -1 : dice(/\b(avanza|avanzar|adelante|ve|camina|caminar|anda|andar|sigue|seguir|derecho|recto|muevete|mover|moverte|hacia adelante)\b/) ? 1 : 0;
     if (sentido) {
         const metros = dice(/\bmetros?\b/), seg = dice(/segundo/), cm = dice(/centimetro|\bcm\b/);
-        return { a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && cm ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null };
+        return conRapidez({ a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && cm ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null });
     }
     return null;
 }
@@ -1643,7 +1691,7 @@ const CHARLAS_IA = ['gracias', 'estado', 'hora', 'fecha', 'quien', 'ayuda', 'adi
 const MODOS_IA = ['normal', 'payaso', 'grosero', 'argentino', 'aura', 'triste', 'cientifico'];
 if (MODO_PERSONAL) MODOS_IA.push(MODO_PERSONAL.id);
 const JUGADAS_PPT = ['piedra', 'papel', 'tijera'];
-const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion'];
+const EFECTOS_IA = ['fijo', 'arcoiris', 'respirar', 'persecucion', 'musica'];
 const FIGURAS_IA = ['circulo', 'cuadrado', 'triangulo', 'estrella'];
 
 const LINEAS_NORMAL = [
@@ -1691,12 +1739,13 @@ function promptIA(modo) {
         'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y TÚ decides con tu cuerpo. Si el usuario menciona aburrimiento, fiesta, miedo, frío, ganas de jugar, «vigila», «explora», «lúcete» o algo vago, haz un plan de hasta 8 pasos (movimiento, luces, claxon, música o baile) o inicia una función, con un comentario. Encadena cosas cuando tenga sentido (por ejemplo luces + canción + baile) y propón la siguiente idea al final. Si el sensor frontal marca menos de 20 cm no avances hacia adelante: dilo y haz otra cosa. Si la batería está por debajo de 20 %, menciónalo y evita gastos grandes. Usa tus sensores y funciones por iniciativa propia (radar, guardia) cuando encajen.',
         'El robot solo hace caso si la frase empieza llamándolo «Hevy». El micrófono lo escribe como: hevi, jevi, jebi, hebi, hevy, heavy, he vi, je vi, evi, ebi. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
         'Contesta SOLO un JSON con una de estas acciones (sin texto extra). Cualquier acción puede llevar además "dice":"comentario corto con tu personalidad que dirás en voz alta":',
-        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
-        '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
+        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional,"rapidez":0.5 a 1.6 opcional}  avanzar (1) o retroceder (-1); rapidez 0.5 despacio, 1.6 rápido',
+        '{"a":"giro","grados":número,"rapidez":0.5 a 1.6 opcional}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
         '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
-        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"marcarCasa"} marcar donde está como su casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
+        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"marcarCasa"} marcar donde está como su casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"} · {"a":"repetir"} repetir lo último que hiciste · {"a":"deshacer"} deshacer el último movimiento · {"a":"distancia"} decir qué tan cerca está lo de enfrente',
         '{"a":"turbo","on":true|false} · {"a":"guardia","on":true|false}',
-        '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"' + COLORES_IA.join('|') + '|apagado"}  el color solo va con el efecto fijo',
+        '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"nombre o #rrggbb","led":1 a 12 opcional,"anillo":["12 colores opcionales"],"brillo":0 a 100,"velocidad":20 a 300}  todo opcional: color de todos o de un LED, cada LED distinto con «anillo», brillo y velocidad',
+        '{"a":"nota","hz":40 a 8000,"ms":duración} · {"a":"melodia","notas":"C4/8 E4/8 G4/4 R/4","bpm":120}  melodía propia con el zumbador · {"a":"volumen","nivel":0 a 100 o "cambio":-100 a 100 relativo} · {"a":"ruedas","izq":-255 a 255,"der":-255 a 255,"s":segundos}  cada rueda por separado',
         '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
         '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
         '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
@@ -1707,7 +1756,7 @@ function promptIA(modo) {
         '{"a":"buscar_telefono","nombre":"persona"}  ir hacia el teléfono de una persona de la sala de teléfonos (solo al aire libre y si esa persona comparte su ubicación)',
         'JUEGOS: trivia y adivinanzas los llevas tú con {"a":"decir"}: haces UNA pregunta o adivinanza real y corta; cuando el usuario responda (revisa la conversación reciente) dices si acertó, la respuesta correcta y llevas la cuenta. Jamás repitas una pregunta.',
         '{"a":"decir","texto":"tu respuesta, 1 o 2 frases"}  conversar sin mover el robot: opiniones, preguntas, bromas, saludos, o cuando te niegas',
-        '{"a":"plan","pasos":[acciones mover, giro, figura, luces o claxon, hasta 8],"dice":"comentario"}  una secuencia de pasos',
+        '{"a":"plan","pasos":[acciones mover, giro, figura, ruedas, luces, claxon, nota, melodia, volumen, cancion, baile o {"a":"esperar","s":segundos}, hasta ' + MAX_PASOS_PLAN + '],"dice":"comentario"}  una secuencia de pasos que se ejecutan uno tras otro en orden',
         'Si la frase tiene el nombre pero no pide nada y tampoco conversa, contesta {"a":"noEntendi"}.',
         'Funciones que el robot sabe hacer (úsalas con {"a":"funcion","id":...}):\n' + FUNCIONES.map(f => '- ' + f.id + ': ' + f.nombre + ' — ' + f.desc.split('.')[0].slice(0, 80)).join('\n'),
         'También sabes bailar, tocar canciones, dibujar figuras, hacer un radar, cuidar con la guardia, regresar a casa y girar una ruleta. En el contexto te pasan las canciones guardadas del usuario y lo último que hiciste: si es una guardada, usa {"a":"cancion","id":null,"q":"nombre"}.',
@@ -1722,7 +1771,7 @@ function promptCerebro(modo) {
         'Eres Hevy, un robot mBot de una escuela, y hablas EN VOZ ALTA con el usuario: oyes por el micrófono del celular y respondes con tu voz. Contesta como en una charla real, natural y breve (1 a 3 frases), sin listas, sin emojis y sin leer símbolos.',
         'IDENTIDAD: tú NO eres un asistente aparte: eres la mente de este robot y tu cuerpo es el mBot Ranger (placa Makeblock Auriga): dos ruedas con motores, sensor ultrasónico al frente, anillo de 12 luces LED, bocina para música y claxon, sensores de luz y de sonido y giroscopio. El celular con la app es tu cara y tu oído. Todo lo que hagas con las herramientas lo ejecuta tu cuerpo de verdad. Habla en primera persona («me muevo», «mis luces») y nunca digas que eres una IA o que no tienes cuerpo.',
         'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y decide con tu cuerpo. Si mencionan aburrimiento, fiesta, miedo o algo vago, haz un plan con la herramienta «plan» (hasta 8 pasos de movimiento, luces, claxon, música o baile) o inicia una función. Antes de avanzar revisa la herramienta «datos»: con el sensor frontal a menos de 20 cm no avances y dilo; con batería baja evita gastos grandes.',
-        'HERRAMIENTAS: para mover, girar, dibujar, cambiar luces, música, bailes, funciones, radar, guardia, turbo, ruleta, piedra-papel-tijera o cambiar de modo, USA SIEMPRE la herramienta correspondiente y luego confirma con una frase muy corta; nunca prometas hacer algo sin llamar la herramienta. «Parar», «alto» o «detente» = herramienta «paro» al instante. «Marca tu casa aquí», «esta es tu casa» = herramienta «marcar_casa» (guarda donde estás); «ve a casa» o «regresa a casa» = herramienta «casa» (repites al revés lo andado hasta ese punto); nunca digas que marcaste la casa sin llamar «marcar_casa». Si «casa» responde que ya estás en casa, dilo. Si piden varias acciones seguidas («retrocede, luego gira y avanza»), llama cada herramienta en el orden pedido, TODAS en la misma respuesta (o usa «plan»): el cuerpo las ejecuta una tras otra, así que no esperes a que termine una para llamar la siguiente. Si la herramienta responde que el robot no está conectado, dilo.',
+        'HERRAMIENTAS: para mover, girar, dibujar, cambiar luces, música, bailes, funciones, radar, guardia, turbo, ruleta, piedra-papel-tijera o cambiar de modo, USA SIEMPRE la herramienta correspondiente y luego confirma con una frase muy corta; nunca prometas hacer algo sin llamar la herramienta. «Parar», «alto» o «detente» = herramienta «paro» al instante. «Marca tu casa aquí», «esta es tu casa» = herramienta «marcar_casa» (guarda donde estás); «ve a casa» o «regresa a casa» = herramienta «casa» (repites al revés lo andado hasta ese punto); nunca digas que marcaste la casa sin llamar «marcar_casa». Si «casa» responde que ya estás en casa, dilo. CONTROL TOTAL: tienes herramientas para todo tu cuerpo: luces (todas, un LED suelto o cada LED distinto, cualquier color, brillo, velocidad y efectos), notas y melodías propias, volumen, claxon, cada rueda por separado, funciones, bailes, canciones, ruleta, radar, guardia y turbo. Cuando el usuario pida algo que cabe en ellas, HAZLO siempre con la herramienta y confírmalo en una frase corta; nunca digas que no puedes ni que no tienes esa función. Si piden varias acciones seguidas («retrocede, luego gira y avanza»), llama cada herramienta en el orden pedido, TODAS en la misma respuesta (o usa «plan»): el cuerpo las ejecuta una tras otra, así que no esperes a que termine una para llamar la siguiente. RUIDO: si lo que oyes es ruido, música, la matraca de la ruleta, un claxon, tu propia voz o algo que no se entiende, NO respondas ni llames herramientas: guarda silencio total hasta que el usuario te hable claro. Si la herramienta responde que el robot no está conectado, dilo.',
         'MEMORIA Y RUTINAS: cuando el usuario te cuente algo personal que valga la pena recordar (su nombre, gustos, tareas), llama «recordar» con un dato corto. Si te dice «cuando te diga X haz Y», crea la rutina con «crear_rutina» (nombre en una palabra y los pasos); si dice un nombre de rutina guardada, ejecútala con «ejecutar_rutina».',
         'FACTS, CHISTES Y TRIVIA: cuando pidan un fact o chiste, di uno REAL y NUEVO (si es fact, verdadero y del que estés seguro), distinto de lo ya dicho. En trivia haces una pregunta a la vez y llevas la cuenta.',
     ].concat(lineas[0], 'Mantén esta personalidad en cada respuesta, incluso al confirmar acciones.').join('\n');
@@ -1737,20 +1786,41 @@ function herramientasCerebro() {
         grados: { type: 'NUMBER', description: 'positivo derecha, negativo izquierda' },
         f: { type: 'STRING', enum: FIGURAS_IA },
         efecto: { type: 'STRING', enum: EFECTOS_IA },
-        color: { type: 'STRING', enum: COLORES_IA.concat('apagado') },
+        color: { type: 'STRING', description: 'nombre (rojo, naranja, amarillo, verde, cian, azul, morado, rosa, blanco, negro o apagado) o cualquier color en hexadecimal #rrggbb' },
+        led: { type: 'INTEGER', description: 'número de LED de 1 a 12 (0 u omitido = todos)' },
+        anillo: { type: 'ARRAY', description: 'hasta 12 colores, uno por LED en orden; vacío = no cambiar ese LED', items: { type: 'STRING' } },
+        brillo: { type: 'INTEGER', description: 'brillo de 0 a 100' },
+        velocidad: { type: 'INTEGER', description: 'velocidad del efecto de 20 a 300 (100 normal)' },
+        hz: { type: 'NUMBER', description: 'frecuencia en Hz, de 40 a 8000' },
+        ms: { type: 'NUMBER', description: 'duración en milisegundos' },
+        notas: { type: 'STRING', description: 'notas como «C4/8 E4/8 G4/4 R/4»: letra, # o b, octava y duración (/4 un tiempo, /8 medio, /2 dos, R silencio); también «A5:120» con milisegundos' },
+        bpm: { type: 'INTEGER', description: 'tiempos por minuto, de 30 a 300' },
+        nivel: { type: 'INTEGER', description: 'volumen del zumbador de 0 a 100' },
+        cambio: { type: 'INTEGER', description: 'cuánto subir (positivo) o bajar (negativo) el volumen actual, de -100 a 100' },
+        rapidez: { type: 'NUMBER', description: 'qué tan rápido va: 0.5 despacio, 1 normal, 1.6 rápido' },
+        izq: { type: 'INTEGER', description: 'velocidad de la rueda izquierda, de -255 a 255 (positivo adelante)' },
+        der: { type: 'INTEGER', description: 'velocidad de la rueda derecha, de -255 a 255 (positivo adelante)' },
         id: { type: 'STRING' },
         cancion: { type: 'STRING' },
     };
     const obj = (propiedades, requeridas) => ({ type: 'OBJECT', properties: propiedades, required: requeridas || [] });
     const sinParametros = (name, description) => ({ name, description });
-    const pasos = { type: 'ARRAY', description: 'pasos en orden, hasta 8', items: obj(PROPIEDADES_PASO, ['a']) };
+    const pasos = { type: 'ARRAY', description: 'pasos en orden, hasta ' + MAX_PASOS_PLAN, items: obj(PROPIEDADES_PASO, ['a']) };
+    const P = PROPIEDADES_PASO;
     return [{ functionDeclarations: [
-        { name: 'mover', description: 'Avanzar (1) o retroceder (-1), por distancia o por tiempo', parameters: obj({ sentido: PROPIEDADES_PASO.sentido, cm: PROPIEDADES_PASO.cm, s: PROPIEDADES_PASO.s }, ['sentido']) },
-        { name: 'giro', description: 'Girar sobre su eje; 180 es dar la vuelta', parameters: obj({ grados: PROPIEDADES_PASO.grados }, ['grados']) },
+        { name: 'mover', description: 'Avanzar (1) o retroceder (-1), por distancia o por tiempo, y con «rapidez» opcional (despacio o rápido)', parameters: obj({ sentido: PROPIEDADES_PASO.sentido, cm: PROPIEDADES_PASO.cm, s: PROPIEDADES_PASO.s, rapidez: P.rapidez }, ['sentido']) },
+        { name: 'giro', description: 'Girar sobre su eje; 180 es dar la vuelta; «rapidez» opcional', parameters: obj({ grados: PROPIEDADES_PASO.grados, rapidez: P.rapidez }, ['grados']) },
         { name: 'figura', description: 'Dibujar una figura recorriéndola', parameters: obj({ f: PROPIEDADES_PASO.f }, ['f']) },
-        { name: 'luces', description: 'Luces del anillo LED; el color solo aplica con el efecto fijo', parameters: obj({ efecto: PROPIEDADES_PASO.efecto, color: PROPIEDADES_PASO.color }, ['efecto']) },
+        { name: 'luces', description: 'Control total del anillo de 12 LED: pon todos de un color o un LED suelto (led 1 a 12), pinta cada LED distinto con «anillo», cambia brillo, velocidad y efecto (fijo, arcoiris, respirar, persecucion, musica). Cualquier color sirve, por nombre o hexadecimal.', parameters: obj({ efecto: P.efecto, color: P.color, led: P.led, anillo: P.anillo, brillo: P.brillo, velocidad: P.velocidad }) },
+        { name: 'nota', description: 'Hacer sonar una sola nota del zumbador por frecuencia y duración', parameters: obj({ hz: P.hz, ms: P.ms }, ['hz']) },
+        { name: 'melodia', description: 'Tocar una melodía propia con el zumbador (por ejemplo la que el usuario pida o una que inventes)', parameters: obj({ notas: P.notas, bpm: P.bpm }, ['notas']) },
+        { name: 'volumen', description: 'Poner el volumen del zumbador en un nivel exacto con «nivel» (0 lo calla por completo) o subirlo y bajarlo con «cambio» (por ejemplo 20 o -20)', parameters: obj({ nivel: P.nivel, cambio: P.cambio }) },
+        { name: 'ruedas', description: 'Mover cada rueda por separado durante unos segundos: sirve para curvas, giros cerrados y maniobras que mover y giro no cubren', parameters: obj({ izq: P.izq, der: P.der, s: P.s }, ['izq', 'der']) },
         sinParametros('claxon', 'Tocar el claxon'),
         sinParametros('paro', 'Detener todo al instante'),
+        sinParametros('repetir', 'Repetir exactamente lo último que hiciste con el cuerpo («otra vez», «repite»)'),
+        sinParametros('deshacer', 'Deshacer el último movimiento haciéndolo al revés («deshaz eso»)'),
+        sinParametros('distancia', 'Medir con el sensor frontal y decir qué tan cerca está lo que tienes enfrente («qué ves»)'),
         sinParametros('casa', 'Regresar al punto de casa que se marcó, repitiendo al revés lo que se movió desde entonces (si no te has movido, responde que ya estás en casa)'),
         sinParametros('marcar_casa', 'Marcar el lugar donde estás ahora como tu casa, el punto al que regresas con «casa»'),
         sinParametros('radar', 'Escanear 360° con el sensor'),
@@ -1763,7 +1833,7 @@ function herramientasCerebro() {
         sinParametros('ruleta', 'Girar la ruleta'),
         { name: 'modo', description: 'Cambiar tu personalidad', parameters: obj({ modo: { type: 'STRING', enum: MODOS_IA } }, ['modo']) },
         { name: 'ppt', description: 'Jugar piedra, papel o tijera: el sistema sortea tu jugada y te dice quién ganó', parameters: obj({ usuario: { type: 'STRING', enum: JUGADAS_PPT } }, ['usuario']) },
-        { name: 'plan', description: 'Secuencia de pasos (mover, giro, figura, luces, claxon, cancion, baile)', parameters: obj({ pasos }, ['pasos']) },
+        { name: 'plan', description: 'Secuencia de pasos que se ejecutan uno tras otro y en orden (mover, giro, figura, ruedas, luces, claxon, nota, melodia, volumen, cancion, baile y esperar con «s» segundos entre pasos)', parameters: obj({ pasos }, ['pasos']) },
         sinParametros('datos', 'Consultar batería, conexión, distancia del sensor frontal, hora, fecha y modo actual'),
         { name: 'buscar_telefono', description: 'Ir hacia el teléfono de una persona de la sala de teléfonos (solo funciona al aire libre y si esa persona comparte su ubicación)', parameters: obj({ nombre: { type: 'STRING', description: 'nombre de la persona' } }, ['nombre']) },
         sinParametros('listar_telefonos', 'Ver qué teléfonos de la sala están compartiendo su ubicación, con su distancia'),
@@ -1786,7 +1856,8 @@ function rutinaEnTexto(texto, rutinas) {
 }
 
 const limpiarTexto = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
-const PASOS_PLAN = ['mover', 'giro', 'figura', 'luces', 'claxon', 'cancion', 'baile', 'cancionParar'];
+const PASOS_PLAN = ['mover', 'giro', 'figura', 'luces', 'claxon', 'cancion', 'baile', 'cancionParar', 'ruedas', 'nota', 'melodia', 'volumen', 'esperar'];
+const MAX_PASOS_PLAN = 20;
 
 function validarOrdenIA(o, anidada) {
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -1796,7 +1867,7 @@ function validarOrdenIA(o, anidada) {
     }
     if (o.a === 'plan') {
         if (anidada || !Array.isArray(o.pasos)) return null;
-        const pasos = o.pasos.slice(0, 8).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a));
+        const pasos = o.pasos.slice(0, MAX_PASOS_PLAN).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a));
         if (!pasos.length) return null;
         const dice = limpiarTexto(o.dice, 200);
         return dice ? { a: 'plan', pasos, dice } : { a: 'plan', pasos };
@@ -1809,18 +1880,57 @@ function validarOrdenIA(o, anidada) {
 function validarAccionIA(o) {
     const a = String(o.a);
     const num = (v, lo, hi) => { const n = Number(v); return v !== null && v !== undefined && Number.isFinite(n) ? clamp(n, lo, hi) : null; };
+    const conRapidezIA = (r, fuente) => { const k = num(fuente.rapidez, RAPIDEZ_MIN, RAPIDEZ_MAX); return k !== null && k !== 1 ? Object.assign(r, { rapidez: Math.round(k * 100) / 100 }) : r; };
     switch (a) {
-        case 'mover': return { a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) };
-        case 'giro': { const g = num(o.grados, -720, 720); return g ? { a, grados: Math.round(g) } : null; }
+        case 'mover': return conRapidezIA({ a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) }, o);
+        case 'giro': { const g = num(o.grados, -720, 720); return g ? conRapidezIA({ a, grados: Math.round(g) }, o) : null; }
         case 'figura': return FIGURAS_IA.includes(o.f) ? { a, f: o.f } : null;
-        case 'casa': case 'marcarCasa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
+        case 'casa': case 'marcarCasa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': case 'repetir': case 'deshacer': case 'distancia': return { a };
         case 'turbo': case 'guardia': return { a, on: o.on !== false };
         case 'luces': {
-            if (!EFECTOS_IA.includes(o.efecto)) return null;
-            if (o.efecto !== 'fijo') return { a, efecto: o.efecto };
-            const c = sinAcentos(o.color);
-            const color = c === 'apagado' ? '#000000' : Object.prototype.hasOwnProperty.call(COLORES_VOZ, c) ? COLORES_VOZ[c] : null;
-            return color ? { a, efecto: 'fijo', color } : null;
+            const hay = v => v !== undefined && v !== null && v !== '';
+            if (hay(o.efecto) && !EFECTOS_IA.includes(o.efecto)) return null;
+            const color = hay(o.color) ? colorIA(o.color) : null;
+            if (hay(o.color) && !color) return null;
+            const anillo = Array.isArray(o.anillo) ? o.anillo.slice(0, LEDS).map(c => (hay(c) ? colorIA(c) : null)) : null;
+            if (anillo && anillo.some((c, i) => hay(o.anillo[i]) && !c)) return null;
+            const led = hay(o.led) ? Math.round(num(o.led, 0, LEDS)) : 0;
+            const brillo = num(o.brillo, 0, 100), velocidad = num(o.velocidad, 20, 300);
+            const efecto = hay(o.efecto) ? o.efecto : (color || anillo ? 'fijo' : null);
+            if (!efecto && brillo === null && velocidad === null) return null;
+            if (efecto === 'fijo' && !color && !anillo && !led && brillo === null && velocidad === null) return null;
+            const r = { a, efecto };
+            if (color) r.color = color;
+            if (led > 0) r.led = led;
+            if (anillo && anillo.some(Boolean)) r.anillo = anillo;
+            if (brillo !== null) r.brillo = Math.round(brillo);
+            if (velocidad !== null) r.velocidad = Math.round(velocidad);
+            return r;
+        }
+        case 'nota': {
+            const hz = num(o.hz, 40, 8000), ms = num(o.ms, 20, 5000);
+            return hz === null ? null : { a, hz: Math.round(hz), ms: Math.round(ms === null ? 300 : ms) };
+        }
+        case 'melodia': {
+            const notas = limpiarTexto(o.notas, 700);
+            if (!leerNotas(notas).notas.length) return null;
+            const bpm = num(o.bpm, 30, 300);
+            return { a, notas, bpm: bpm === null ? null : Math.round(bpm) };
+        }
+        case 'volumen': {
+            const nivel = num(o.nivel, 0, 100), cambio = num(o.cambio, -100, 100);
+            if (nivel !== null) return { a, nivel: Math.round(nivel) };
+            return cambio === null ? null : { a, cambio: Math.round(cambio) };
+        }
+        case 'ruedas': {
+            const izq = num(o.izq, -VEL_TURBO, VEL_TURBO), der = num(o.der, -VEL_TURBO, VEL_TURBO);
+            if (izq === null || der === null || (!Math.round(izq) && !Math.round(der))) return null;
+            const s = num(o.s, 0.2, 15);
+            return { a, izq: Math.round(izq), der: Math.round(der), s: s === null ? 1 : s };
+        }
+        case 'esperar': {
+            const s = num(o.s, 0.1, 30);
+            return s === null ? null : { a, s };
         }
         case 'baile': return { a, id: BAILES_VOZ.some(b => b[0] === o.id) ? o.id : null, cancion: CANCIONES_VOZ.some(c => c[0] === o.cancion) ? o.cancion : null };
         case 'funcion': return FUNCIONES.some(f => f.id === o.id) ? { a, id: o.id } : null;
@@ -1835,7 +1945,7 @@ function validarAccionIA(o) {
         case 'recordar': { const dato = limpiarTexto(o.dato, 120); return dato ? { a, dato } : null; }
         case 'aprender': {
             const nombre = sinAcentos(limpiarTexto(o.nombre, 30));
-            const pasos = Array.isArray(o.pasos) ? o.pasos.slice(0, 8).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a)) : [];
+            const pasos = Array.isArray(o.pasos) ? o.pasos.slice(0, MAX_PASOS_PLAN).map(p => validarOrdenIA(p, true)).filter(p => p && PASOS_PLAN.includes(p.a)) : [];
             return nombre && pasos.length ? { a, nombre, pasos } : null;
         }
         case 'rutina': { const nombre = sinAcentos(limpiarTexto(o.nombre, 30)); return nombre ? { a, nombre } : null; }
@@ -1903,7 +2013,7 @@ const lib = {
     ruletaColor, ruletaPlan, ruletaPosEn, ruletaColores, RULETA_N,
     DIST_FRENO, DIST_FRENO_TURBO, frenoPorDistancia,
     rumboDeJoystick, RECORRIDO_MAX, RECORRIDO_MS, validarRecorrido, compactarRecorrido, pasoEn,
-    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, inversoDeRecorrido, regresoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
+    RUTA_CM_S, rutaARecorrido, giroARecorrido, movimientoARecorrido, ruedasARecorrido, inversoDeRecorrido, regresoDeRecorrido, figura, ordenDeVoz, sinAcentos, frase, FRASES,
     VEL_MAX, VEL_TURBO, ARTICULACION, LEDS, CANCIONES, BAILES, EFECTOS, PALETA, COLOR_INICIAL, MODOS_FX,
     PGM_MAX, VARIANTES, FUNCIONES, GRUPOS_FN, pasosDeFuncion, realzarNotas,
     frecuencia, leerNotas, leerBaile, compilar, crearCola, crearLector, mezclaJoystick, rumboDeJoystick, rumboDeOrientacion, rumboRelativo, fonetica, distancia, quitarNombre, corregirVocabulario, promptIA, validarOrdenIA, GROSERAS, PAYASO, ARGENTINO, AURA, TRISTE, CIENTIFICO, REMATES_GROSEROS, REMATES_ARGENTINOS, REMATES_AURA, TABLAS_MODO, MODOS_IA, MODO_PERSONAL, promptCerebro, herramientasCerebro, accionDeHerramienta, rutinaEnTexto, distanciaMetros, rumboHacia, decidirGuiado, CHISTES_RANCIOS, RISAS, unirRecorridos, senalesDeMovimiento,
@@ -1950,6 +2060,7 @@ const S = {
     linea: { vel: 120, giro: 55, buscar: 4, color: 0 },   // ajustes del seguidor: velocidad, fuerza de curvas, segundos buscando, color (0 negra)
     sensores: null, verSensores: null,
     ruleta: null, modoRuleta: false, ruletaSonido: true,
+    sonidoHasta: 0,
     distancias: [], distanciaT: 0,   // últimas 2 lecturas de DIST (cm) y cuándo llegó la última
     ultimaActividad: 0, ultimoBat: 0, ultimoVolt: null, ultimoNivel: 'ok',
 };
@@ -2071,7 +2182,10 @@ function ponEstado(est) {
 function crudo(texto) {
     if (S.transporte) S.transporte.escribir(texto).catch(() => { /* se cerró */ });
 }
-const escribirLinea = l => crudo(l + '\n');
+const escribirLinea = l => {
+    if (l.charAt(0) === 'T' && l.charAt(1) === ' ') S.sonidoHasta = Math.max(S.sonidoHasta, Date.now() + (parseInt(l.split(' ')[2], 10) || 0) + 600);
+    crudo(l + '\n');
+};
 const entregar = texto => { if (S.juntar) S.juntar(texto); };
 
 function alLinea(l) {
@@ -2079,6 +2193,7 @@ function alLinea(l) {
         const err = /^ERR/.test(l);
         const reintento = S.cola.ack(err);
         if (err && !reintento) mensaje('El robot no entendió una orden (' + l + ').', 'err');
+        if (/^ERR rumbo/.test(l)) document.dispatchEvent(new CustomEvent('robot-rumbo-perdido'));
     } else if (/^BAT /.test(l)) {
         S.cola.ack();                      // BAT contesta con su propia línea, sin OK
         bateriaLeida(parseFloat(l.slice(4)));
@@ -2228,7 +2343,7 @@ async function conectarBluetooth(recordado) {
         let t = null;
         const dispositivo = recordado ? BT.recordado() : await BT.elegir();
         if (!dispositivo) return;
-        mensaje('Conectando con ' + (dispositivo.name || 'el robot') + '…');
+        mensaje('Conectando con Hevy…');
         t = await BT.conectar(dispositivo, {
             alDatos: entregar,
             alCerrar: () => { if (S.transporte === t) cerrar(); },
@@ -2769,7 +2884,7 @@ function girarRuleta(vueltas, alTerminar) {
             R.ult = pos;
             toque(5);
             if (!S.cola.ocupado()) S.cola.ultimo('RL', frame(pos, true));
-            if (S.ruletaSonido) S.cola.ultimo('T', 'T 1800 10');
+            if (S.ruletaSonido) S.cola.ultimo('T', 'T 2400 24');
             return;
         }
         clearInterval(R.timer);
@@ -3739,6 +3854,7 @@ function iniciar() {
         listo: () => S.estado === 'listo',
         mover(izq, der) { S.ultimaActividad = Date.now(); S.cola.mover('M ' + izq + ' ' + der); },
         libre: () => S.estado === 'listo' && !S.actuando && !S.corriendoFuncion && !S.serieOn && !S.ruleta,
+        suena: () => S.estado === 'listo' && Date.now() < S.sonidoHasta,
         soportaRumbo: () => S.estado === 'listo' && S.fwGiro,
         rumboIniciar(si) { if (S.estado === 'listo' && S.fwGiro) S.cola.enviar([{ l: si ? 'H0' : 'H1', ex: true }]); },
         rumbo(grados, v) { if (S.estado === 'listo' && S.fwGiro) { S.ultimaActividad = Date.now(); S.cola.ultimo('H', 'H ' + grados + ' ' + v); } },
@@ -3819,6 +3935,55 @@ function iniciar() {
             S.actuando = false;
             S.cola.abortar();
             progreso(0);
+        },
+        ponerLuces(o) {
+            if (S.estado !== 'listo' || !o) return false;
+            const hay = v => v !== undefined && v !== null;
+            if (o.efecto) S.efecto = o.efecto;
+            if (Array.isArray(o.anillo)) o.anillo.forEach((x, i) => { if (x) S.leds[i] = x; });
+            else if (o.color && o.led) S.leds[o.led - 1] = o.color;
+            else if (o.color) S.leds = S.leds.map(() => o.color);
+            if (hay(o.brillo)) {
+                S.brillo = clamp(o.brillo, 0, 100);
+                $('rb-brillo').value = S.brillo;
+                $('rb-brillo-v').textContent = S.brillo + ' %';
+            }
+            if (hay(o.velocidad)) {
+                S.velFx = clamp(o.velocidad, 20, 300);
+                $('rb-fxvel').value = S.velFx;
+                $('rb-fxvel-v').textContent = S.velFx + ' %';
+            }
+            $('rb-efecto').value = S.efecto;
+            pintarAnillo();
+            S.sucio = true;
+            guardar();
+            return true;
+        },
+        volumen(nivel, relativo) {
+            if (S.estado !== 'listo') return false;
+            S.vol = clamp(Math.round((relativo ? S.vol : 0) + (Number(nivel) || 0)), 0, 100);
+            $('rb-vol').value = S.vol;
+            $('rb-vol-v').textContent = S.vol + ' %';
+            S.sucio = true;
+            guardar();
+            if (!S.cola.ocupado()) S.cola.ultimo('V', 'VOL ' + S.vol);
+            return true;
+        },
+        tocarNotas(texto, bpm) {
+            if (S.estado !== 'listo') return false;
+            const notas = String(texto || '').slice(0, 1500);
+            if (!leerNotas(notas).notas.length) return false;
+            const sonaba = !!S.actuando;
+            S.notas = notas;
+            if (bpm) S.bpm = clamp(Math.round(bpm), 30, 300);
+            S.actuando = false;
+            S.corriendoFuncion = false;
+            S.autonomo = 0;
+            pintarTodo();
+            guardar();
+            if (sonaba) S.cola.abortar();
+            esperarYTocar({ conCancion: true, conBaile: false });
+            return true;
         },
         luces(efecto, color) {
             if (S.estado !== 'listo') return;
