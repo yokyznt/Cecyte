@@ -4,7 +4,7 @@
     const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const MOVIDO_M = 15, CADA_MS = 45000, CADA_BUSCADO_MS = 10000, LISTA_MS = 10000, LISTA_GUIA_MS = 4000, MAX_GUIA_MS = 360000;
     const RUMBOS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-    const T = { reg: null, watch: null, pos: null, recientes: [], ultimo: null, ultimoEnvio: 0, lista: [], recibidoEn: 0, ahoraServidor: 0, buscado: null, compartiendo: false, activa: false, guia: null, ultimaLista: 0 };
+    const T = { reg: null, watch: null, pos: null, recientes: [], ultimo: null, ultimoEnvio: 0, lista: [], recibidoEn: 0, ahoraServidor: 0, buscado: null, dueno: false, salaNueva: null, compartiendo: false, activa: false, guia: null, ultimaLista: 0 };
 
     const enlace = () => raiz.RobotEnlace || null;
     const listoRobot = () => !!(enlace() && enlace().listo());
@@ -30,6 +30,13 @@
         return { ok: r.ok, estado: r.status, datos: j || {} };
     }
 
+    async function expulsado(texto) {
+        T.reg = null;
+        guardarReg(null);
+        mensaje(texto || 'Te expulsaron de la sala por 10 minutos.');
+        await dejar();
+    }
+
     function mensaje(t) {
         const el = $('rb-tel-estado');
         if (el) el.textContent = t || '';
@@ -46,7 +53,7 @@
             if (T.reg.nombre !== nombre) { T.reg.nombre = nombre; guardarReg(T.reg); }
             return true;
         }
-        const r = await api('POST', { accion: 'unirse', sala, nombre });
+        const r = await api('POST', { accion: 'unirse', sala, nombre, crear: T.salaNueva === sala });
         if (!r.ok || !r.datos.token) { mensaje(r.datos.error || 'No me pude unir a la sala.'); return false; }
         T.reg = { sala, nombre, id: r.datos.id, token: r.datos.token };
         guardarReg(T.reg);
@@ -78,7 +85,35 @@
     const PASOS_RADIO = [5, 10, 20, 30, 50, 100, 200, 300, 500, 1000, 2000, 5000];
     const PASOS_ANILLO = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
     const RADIO_MIN = 3, RADIO_MAX = 8000;
-    const Z = { auto: true, radio: 50, sel: null, dedos: new Map(), dist0: 0, radio0: 0, puntos: [] };
+    const RASTRO_MS = 300000;
+    const Z = { auto: true, radio: 50, sel: null, dedos: new Map(), dist0: 0, radio0: 0, puntos: [], rumboArriba: false, rastros: new Map() };
+
+    function anotarRastro(clave, p) {
+        const ahora = Date.now(), lista = Z.rastros.get(clave) || [];
+        const ultimo = lista[lista.length - 1];
+        if (!ultimo || raiz.Robot.distanciaMetros(ultimo, p) > 2 || ahora - ultimo.t > 8000) lista.push({ lat: p.lat, lon: p.lon, t: ahora });
+        while (lista.length && ahora - lista[0].t > RASTRO_MS) lista.shift();
+        Z.rastros.set(clave, lista);
+    }
+
+    function pintarRastros(c, yo, rot, cx, cy, esc, W, color) {
+        const ahora = Date.now(), tope = W / 2;
+        c.lineWidth = 2;
+        Z.rastros.forEach(lista => {
+            const pts = lista.map(q => {
+                const d = raiz.Robot.distanciaMetros(yo, q), a = (raiz.Robot.rumboHacia(yo, q) - rot) * Math.PI / 180;
+                return { x: cx + Math.sin(a) * d * esc, y: cy - Math.cos(a) * d * esc, t: q.t };
+            });
+            for (let i = 1; i < pts.length; i++) {
+                if (Math.hypot(pts[i].x - cx, pts[i].y - cy) > tope) continue;
+                c.globalAlpha = 0.12 + 0.5 * (1 - Math.min(1, (ahora - pts[i].t) / RASTRO_MS));
+                c.strokeStyle = color;
+                c.beginPath(); c.moveTo(pts[i - 1].x, pts[i - 1].y); c.lineTo(pts[i].x, pts[i].y); c.stroke();
+            }
+        });
+        c.globalAlpha = 1;
+        c.lineWidth = 1;
+    }
 
     const miPos = () => {
         const s = posSuavizada();
@@ -153,6 +188,8 @@
         const medida = ajustarLienzo(cv);
         if (!medida) return;
         const { lado: W, dpr } = medida, H = W, cx = W / 2, cy = H / 2, margen = 22;
+        const brujula = raiz.RobotControl && raiz.RobotControl.rumbo ? raiz.RobotControl.rumbo() : null;
+        const rot = Z.rumboArriba && brujula !== null ? brujula : 0;
         const c = cv.getContext('2d');
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         const otros = T.lista.filter(t => !T.reg || t.id !== T.reg.id);
@@ -181,15 +218,15 @@
         c.stroke();
         c.globalAlpha = 0.85;
         c.textAlign = 'center';
-        c.fillText('N', cx, 10);
-        c.fillText('S', cx, H - 9);
-        c.fillText('E', W - 9, cy);
-        c.fillText('O', 9, cy);
+        [['N', 0], ['E', 90], ['S', 180], ['O', 270]].forEach(([letra, g]) => {
+            const a = (g - rot) * Math.PI / 180;
+            c.fillText(letra, cx + Math.sin(a) * (W / 2 - 9), cy - Math.cos(a) * (H / 2 - 9));
+        });
         c.globalAlpha = 1;
 
+        pintarRastros(c, yo, rot, cx, cy, esc, W, verde);
         halo(c, cx, cy, yo.p || 0, esc, W, verde);
-        const brujula = raiz.RobotControl && raiz.RobotControl.rumbo ? raiz.RobotControl.rumbo() : null;
-        if (brujula !== null) flechaRumbo(c, cx, cy, brujula, verde);
+        if (brujula !== null) flechaRumbo(c, cx, cy, brujula - rot, verde);
         c.fillStyle = verde;
         c.beginPath(); c.arc(cx, cy, 6, 0, 7); c.fill();
         c.fillStyle = tinta;
@@ -198,7 +235,7 @@
 
         Z.puntos = [];
         otros.forEach(t => {
-            const d = raiz.Robot.distanciaMetros(yo, t), rum = raiz.Robot.rumboHacia(yo, t) * Math.PI / 180;
+            const d = raiz.Robot.distanciaMetros(yo, t), rum = (raiz.Robot.rumboHacia(yo, t) - rot) * Math.PI / 180;
             const fuera = d * esc > W / 2 - margen;
             const rr = fuera ? W / 2 - margen : d * esc;
             const x = cx + Math.sin(rum) * rr, y = cy - Math.cos(rum) * rr;
@@ -237,6 +274,10 @@
         if (auto) auto.setAttribute('aria-pressed', String(Z.auto));
         const info = $('rb-radar-info');
         const elegido = otros.find(t => t.id === Z.sel);
+        const ir = $('rb-radar-ir');
+        if (ir) ir.disabled = !elegido || !!T.guia;
+        const rb = $('rb-radar-rumbo');
+        if (rb) rb.setAttribute('aria-pressed', String(Z.rumboArriba));
         if (info) info.textContent = elegido ? elegido.n + ': ' + bonito(raiz.Robot.distanciaMetros(yo, elegido)) + ' al ' + RUMBOS[Math.round(raiz.Robot.rumboHacia(yo, elegido) / 45) % 8] + ' · hace ' + hace(elegido) + ' · GPS ±' + Math.round(elegido.p || 0) + ' m' : '';
     }
 
@@ -246,6 +287,27 @@
         $('rb-radar-mas').addEventListener('click', () => zoom(0.5));
         $('rb-radar-menos').addEventListener('click', () => zoom(2));
         $('rb-radar-auto').addEventListener('click', () => { Z.auto = true; pintarRadar(); });
+        $('rb-radar-rumbo').addEventListener('click', () => {
+            const hay = raiz.RobotControl && raiz.RobotControl.rumbo && raiz.RobotControl.rumbo() !== null;
+            if (!Z.rumboArriba && !hay) { mensaje('El celular no tiene brújula activa, no puedo girar el mapa.'); return; }
+            Z.rumboArriba = !Z.rumboArriba;
+            pintarRadar();
+        });
+        const caja = $('rb-radar-caja'), pleno = $('rb-radar-full');
+        const pantallaCompleta = si => {
+            caja.classList.toggle('is-full', si);
+            pleno.setAttribute('aria-pressed', String(si));
+            pleno.textContent = si ? 'Cerrar pantalla completa' : 'Pantalla completa';
+            requestAnimationFrame(pintarRadar);
+        };
+        pleno.addEventListener('click', () => pantallaCompleta(!caja.classList.contains('is-full')));
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && caja.classList.contains('is-full')) pantallaCompleta(false); });
+        $('rb-radar-ir').addEventListener('click', () => {
+            const q = T.lista.find(x => x.id === Z.sel);
+            if (!q) return;
+            pantallaCompleta(false);
+            buscar(q.n, q.id);
+        });
         cv.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY < 0 ? 0.5 : 2); }, { passive: false });
         cv.addEventListener('dblclick', () => { Z.auto = true; pintarRadar(); });
         cv.addEventListener('pointerdown', e => {
@@ -285,7 +347,7 @@
         const ul = $('rb-tel-lista');
         if (!ul) return;
         ul.textContent = '';
-        const otros = T.lista.filter(t => !T.reg || t.id !== T.reg.id);
+        const otros = T.lista.filter(t => !T.reg || t.id !== T.reg.id).sort((a, b) => (distanciaA(a) || 0) - (distanciaA(b) || 0));
         if (!T.compartiendo || !otros.length) {
             const li = document.createElement('li');
             li.className = 'rb-mem__vacio';
@@ -305,8 +367,23 @@
             b.disabled = !!T.guia;
             b.addEventListener('click', () => buscar(t.n));
             li.append(s, b);
+            if (T.dueno) {
+                const x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'btn btn--secondary btn--sm';
+                x.textContent = 'Expulsar';
+                x.addEventListener('click', () => expulsar(t));
+                li.appendChild(x);
+            }
             ul.appendChild(li);
         });
+    }
+
+    async function expulsar(t) {
+        if (!T.reg || !T.dueno || !raiz.confirm('¿Expulsar a ' + t.n + ' de la sala por 10 minutos?')) return;
+        const r = await api('POST', { accion: 'expulsar', sala: T.reg.sala, id: T.reg.id, token: T.reg.token, objetivo: t.id });
+        mensaje(r.ok ? t.n + ' ya no está en la sala.' : r.datos.error || 'No se pudo expulsar.');
+        await refrescar();
     }
 
     async function refrescar() {
@@ -315,8 +392,11 @@
         let r;
         try { r = await api('GET', { sala: T.reg.sala, id: T.reg.id, token: T.reg.token }); } catch (e) { return; }
         if (r.estado === 401) { T.reg = null; guardarReg(null); mensaje('Se perdió tu registro, vuelve a encender Compartir.'); await dejar(); return; }
+        if (r.estado === 403 && r.datos.expulsado) { await expulsado(r.datos.error); return; }
         if (!r.ok) return;
+        T.dueno = !!r.datos.dueno;
         T.lista = r.datos.telefonos || [];
+        T.lista.forEach(q => { if (!T.reg || q.id !== T.reg.id) anotarRastro(q.id, q); });
         T.ahoraServidor = r.datos.ahora || Date.now();
         T.recibidoEn = Date.now();
         pintarLista();
@@ -337,6 +417,7 @@
         let r;
         try { r = await api('POST', { accion: 'ubicacion', sala: T.reg.sala, id: T.reg.id, token: T.reg.token, nombre: T.reg.nombre, lat: p.lat, lon: p.lon, p: Math.round(p.p) }); } catch (e) { return; }
         if (r.estado === 401) { T.reg = null; guardarReg(null); mensaje('Se perdió tu registro, vuelve a encender Compartir.'); await dejar(); return; }
+        if (r.estado === 403 && r.datos.expulsado) { await expulsado(r.datos.error); return; }
         if (r.estado === 429) { mensaje(r.datos.error || 'La sala está llena.'); await dejar(); return; }
         if (!r.ok) return;
         T.ultimo = { lat: p.lat, lon: p.lon };
@@ -349,7 +430,7 @@
 
     function alPosicion(p) {
         T.pos = p;
-        if (p.p <= 35) { T.recientes.push(p); if (T.recientes.length > 3) T.recientes.shift(); }
+        if (p.p <= 35) { T.recientes.push(p); if (T.recientes.length > 3) T.recientes.shift(); const s = posSuavizada(); if (s) anotarRastro('yo', s); }
         if (T.activa) pintarRadar();
         if (debeEnviar()) enviar();
     }
@@ -383,6 +464,7 @@
         T.recientes = [];
         T.ultimo = null;
         T.buscado = null;
+        T.dueno = false;
         T.lista = [];
         const c = $('rb-tel-compartir');
         if (c) c.checked = false;
@@ -422,11 +504,18 @@
         if (motivo) decir(motivo, { nombre: g.nombre });
     }
 
+    function motivoEspera(motivo, g, dest) {
+        if (motivo === 'gps-malo') return 'Tu GPS está impreciso (±' + Math.round(T.pos ? T.pos.p : 0) + ' m): sal a un lugar abierto y espera.';
+        if (!posSuavizada()) return 'Esperando tu ubicación del GPS…';
+        if (!dest) return 'Esperando la ubicación de ' + g.nombre + '…';
+        return 'Falta la brújula del celular para orientar a Hevy.';
+    }
+
     function pasoGuia() {
         const g = T.guia;
         if (!g) return;
         const e = enlace();
-        if (!listoRobot()) { pararGuia(null); return; }
+        if (!listoRobot()) { pararGuia(null); mensaje('Hevy se desconectó y la búsqueda se paró.'); return; }
         if (document.hidden || Date.now() - g.desde > MAX_GUIA_MS) { pararGuia('telTiempo'); return; }
         const bat = $('rb-bat-pct');
         if (bat && /\d/.test(bat.textContent) && parseInt(bat.textContent, 10) < 15) { pararGuia('telBateria'); return; }
@@ -438,6 +527,7 @@
         if (d.accion === 'perdido') { pararGuia('telPerdido'); return; }
         if (d.accion === 'esperar') {
             e.mover(0, 0);
+            mensaje(motivoEspera(d.motivo, g, dest));
             g.espera = g.espera || Date.now();
             if (Date.now() - g.espera > 20000) pararGuia(d.motivo === 'gps-malo' ? 'telGps' : 'telSinUbicacion');
             return;
@@ -449,6 +539,7 @@
         if (f.bloqueado) {
             e.rumbo(d.rumboRelativo, 0);
             g.bloqueadoDesde = g.bloqueadoDesde || Date.now();
+            mensaje('Hay algo adelante de Hevy; espero a que se despeje.');
             if (Date.now() - g.bloqueadoDesde > 3000) pararGuia('telBloqueo');
             return;
         }
@@ -458,8 +549,8 @@
         pintarRadar();
     }
 
-    async function buscar(nombre) {
-        const fallo = (tipo, error, datos) => { decir(tipo, datos || { nombre }); return { ok: false, error }; };
+    async function buscar(nombre, idExacto) {
+        const fallo = (tipo, error, datos) => { decir(tipo, datos || { nombre }); mensaje(error.charAt(0).toUpperCase() + error.slice(1) + '.'); return { ok: false, error }; };
         if (T.guia) return { ok: false, error: 'ya estoy buscando a ' + T.guia.nombre };
         if (!T.compartiendo || !T.reg) return fallo('telSinUbicacion', 'primero hay que encender «Compartir mi ubicación» en la pestaña Teléfono');
         if (!listoRobot()) return fallo('sinRobot', 'el robot no está conectado');
@@ -469,7 +560,7 @@
         if (fi0 === null) return fallo('telSinBrujula', 'el celular no tiene brújula activa');
         await refrescar();
         const q = norm(nombre);
-        const candidatos = T.lista.filter(t => t.id !== T.reg.id && norm(t.n).includes(q)).sort((a, b) => (distanciaA(a) || 0) - (distanciaA(b) || 0));
+        const candidatos = T.lista.filter(t => t.id !== T.reg.id && (idExacto ? t.id === idExacto : norm(t.n).includes(q))).sort((a, b) => (distanciaA(a) || 0) - (distanciaA(b) || 0));
         if (!candidatos.length) return fallo('telSinCompartir', 'no encuentro a «' + nombre + '» compartiendo su ubicación');
         const dest = candidatos[0];
         api('POST', { accion: 'buscar', sala: T.reg.sala, id: T.reg.id, token: T.reg.token, objetivo: dest.id }).catch(() => null);
@@ -493,7 +584,7 @@
         T.reg = leerReg();
         if (T.reg) { $('rb-tel-nombre').value = T.reg.nombre; $('rb-tel-sala').value = T.reg.sala; }
         $('rb-tel-compartir').addEventListener('change', e => compartir(e.target.checked));
-        $('rb-tel-crear').addEventListener('click', () => { $('rb-tel-sala').value = codigoNuevo(); mensaje('Sala nueva: pásales el código a tus amigos.'); });
+        $('rb-tel-crear').addEventListener('click', () => { $('rb-tel-sala').value = codigoNuevo(); T.salaNueva = $('rb-tel-sala').value; mensaje('Sala nueva: pásales el código a tus amigos.'); });
         $('rb-tel-borrar').addEventListener('click', () => dejar().then(() => mensaje('Se borró tu punto de la sala.')));
         $('rb-tel-parar').addEventListener('click', () => pararGuia(null));
         iniciarRadar();
@@ -505,7 +596,7 @@
         pintarLista();
     }
 
-    raiz.Telefonos = { buscar, parar: () => pararGuia(null), resumen, compartiendo: () => T.compartiendo, buscando: () => !!T.guia };
+    raiz.Telefonos = { buscar, rumboArriba: () => Z.rumboArriba, parar: () => pararGuia(null), resumen, compartiendo: () => T.compartiendo, buscando: () => !!T.guia };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
     else iniciar();

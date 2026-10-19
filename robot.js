@@ -1075,6 +1075,7 @@ function pasoEn(r, t) {
 }
 
 const RUTA_VEL = 110, RUTA_CM_S = 22, RUTA_PAUSA_MS = 120;
+const RAPIDEZ_MIN = 0.5, RAPIDEZ_MAX = 1.6;
 
 function rutaARecorrido(puntos, cmS, giro90, nombre) {
     if (!Array.isArray(puntos) || puntos.length < 2) return null;
@@ -1110,16 +1111,19 @@ function unirRecorridos(lista, nombre) {
     return validarRecorrido({ nombre, ms: t0, pasos });
 }
 
-function giroARecorrido(grados, giro90) {
+const rapidezDe = v => clamp(Number(v) || 1, RAPIDEZ_MIN, RAPIDEZ_MAX);
+
+function giroARecorrido(grados, giro90, rapidez) {
+    const k = rapidezDe(rapidez), vel = Math.round(RUTA_VEL * k);
     const g = clamp(Number(giro90) || 500, 100, 3000), a = clamp(Number(grados) || 0, -720, 720);
     if (!a) return null;
-    const ms = Math.round(Math.abs(a) / 90 * g);
-    return validarRecorrido({ nombre: 'Giro', ms, pasos: [{ t: 0, izq: a > 0 ? RUTA_VEL : -RUTA_VEL, der: a > 0 ? -RUTA_VEL : RUTA_VEL }, { t: ms, izq: 0, der: 0 }] });
+    const ms = Math.round(Math.abs(a) / 90 * g / k);
+    return validarRecorrido({ nombre: 'Giro', ms, pasos: [{ t: 0, izq: a > 0 ? vel : -vel, der: a > 0 ? -vel : vel }, { t: ms, izq: 0, der: 0 }] });
 }
 
-function movimientoARecorrido(sentido, ms) {
+function movimientoARecorrido(sentido, ms, rapidez) {
     const d = clamp(Math.round(Number(ms) || 0), 200, 20000);
-    const v = sentido < 0 ? -RUTA_VEL : RUTA_VEL;
+    const v = (sentido < 0 ? -1 : 1) * Math.round(RUTA_VEL * rapidezDe(rapidez));
     return validarRecorrido({ nombre: 'Mover', ms: d, pasos: [{ t: 0, izq: v, der: v }, { t: d, izq: 0, der: 0 }] });
 }
 
@@ -1228,6 +1232,11 @@ const FRASES = {
     baile: ['¡Eso! A bailar, we.', 'Ponte guapo, que ahí voy con mi baile.', '¡Dale, que se arme el baile!'],
     luces: ['¡Luces listas, mira qué chidas!', 'Va, a iluminar el cuarto.'],
     lucesOff: ['Listo, luces apagadas.'],
+    nadaQueRepetir: ['Todavía no he hecho nada que repetir, we.'],
+    nadaQueDeshacer: ['No tengo ningún movimiento que deshacer, we.'],
+    distanciaVer: ['Tengo algo a {cm} centímetros al frente.', 'Veo algo a {cm} centímetros enfrente, we.'],
+    distanciaLibre: ['No veo nada cerca al frente, está libre.', 'Todo despejado enfrente, we.'],
+    distanciaSin: ['No me llega lectura del sensor, we. Intenta otra vez.'],
     casa: ['Va, me regreso a casa.', 'Órale, de vuelta a casa.'],
     radar: ['Va, a mirar a mi alrededor.', 'Radar prendido, we.'],
     guardiaOn: ['Va, yo cuido. Nadie se acerca sin que yo diga.', 'Modo guardia activado. Yo vigilo, tú relájate.'],
@@ -1565,6 +1574,11 @@ function ordenDeVoz(texto) {
     const limpio = resto
         .replace(/\b(por favor|porfa|porfis|ahora|quiero que|necesito que|puedes|podrias|podria|dime|me)\b/g, ' ')
         .replace(/\s+/g, ' ').trim();
+    const notaVoz = limpio.match(/\bnota\s+(do|re|mi|fa|sol|la|si)(?:\s+(sostenido|sostenida))?(?:\s+(aguda|alta|grave|baja))?\b/);
+    if (notaVoz) {
+        const base = { do: 261.63, re: 293.66, mi: 329.63, fa: 349.23, sol: 392, la: 440, si: 493.88 }[notaVoz[1]];
+        return { a: 'nota', hz: Math.round(base * (notaVoz[2] ? 1.0595 : 1) * (/aguda|alta/.test(notaVoz[3] || '') ? 2 : /grave|baja/.test(notaVoz[3] || '') ? 0.5 : 1)), ms: 600 };
+    }
     t = corregirVocabulario(limpio);
     if (!t) return { a: 'saludo' };
     const pedidoModo = t.match(RE_PEDIDO_MODO);
@@ -1616,15 +1630,32 @@ function ordenDeVoz(texto) {
     t = t.replace(/\bmedio metro\b/, '50 centimetros').replace(/\bun cuarto de vuelta\b/, '90 grados').replace(/\bmedia vuelta\b/, 'dar la vuelta');
     t = numerosEnPalabras(t);
     const dice = r => r.test(t);
+    const rapidez = dice(/\b(despacio|lento|lenta|lentamente|con calma|suavecito)\b/) ? 0.55 : dice(/\b(rapido|rapida|rapidamente|veloz|volando|de prisa|aprisa|a toda velocidad|a todo gas)\b/) ? 1.5 : null;
+    const conRapidez = o => (rapidez ? Object.assign(o, { rapidez }) : o);
     const marcaCasa = dice(/\b(marca|marcar|marques|marque|marcame|guarda|guardar|guardes|fija|fijar|fijes|define|definir|establece|establecer|anota|anotar)\b.*\bcasa\b/)
         || (dice(/\b(pon|ponte|poner|pongas|toma|tomar|considera)\b.*\bcasa\b/) && dice(/\b(aqui|aca)\b/))
         || dice(/\b(aqui|aca|esta|este)\b.*\bes\b.*\bcasa\b/)
         || dice(/\bcasa\b.*\b(es|esta|queda)\b.*\b(aqui|aca)\b/);
     if (marcaCasa) return { a: 'marcarCasa' };
+    if (dice(/\b(repite|repetir|repitelo|repitela|otra vez|de nuevo|una vez mas)\b/)) return { a: 'repetir' };
+    if (dice(/\b(deshaz|deshacer|deshazlo|deshacelo|desanda|desandar|anula lo ultimo|echa para atras lo ultimo)\b/)) return { a: 'deshacer' };
+    if (dice(/\b(que ves|que ve|que hay adelante|que hay enfrente|que tienes enfrente|que tienes adelante|a que distancia|que distancia|que tan cerca|ves algo|hay algo adelante|hay algo enfrente)\b/)) return { a: 'distancia' };
+    const nivelVoz = (t.match(/\b(\d{1,3})\b/) || [])[1];
+    if (dice(/\bbrillo\b/) && nivelVoz !== undefined) return { a: 'luces', efecto: null, brillo: clamp(Number(nivelVoz), 0, 100) };
+    if (dice(/\b(silencio|mute|mutea|silencia|silenciate|sin sonido)\b/)) return { a: 'volumen', nivel: 0 };
+    if (dice(/\b(volumen|bocina|sonido)\b/) || dice(/^(mas fuerte|mas bajito|mas bajo)$/)) {
+        if (dice(/\b(maximo|a tope|al maximo)\b/)) return { a: 'volumen', nivel: 100 };
+        if (dice(/\b(minimo|al minimo)\b/)) return { a: 'volumen', nivel: 0 };
+        if (nivelVoz !== undefined) return { a: 'volumen', nivel: clamp(Number(nivelVoz), 0, 100) };
+        if (dice(/\b(sube|subir|subele|aumenta|aumentar|alza|mas fuerte|mas alto)\b/)) return { a: 'volumen', cambio: 20 };
+        if (dice(/\b(baja|bajar|bajale|disminuye|reduce|mas bajo|mas bajito|bajito)\b/)) return { a: 'volumen', cambio: -20 };
+    }
     if (dice(/\b(luz|luces|foco|focos|leds?|ilumina\w*)\b/)) {
-        if (quita) return { a: 'luces', efecto: 'fijo', color: '#000000' };
-        const col = t.split(' ').map(x => COLORES_VOZ[x]).find(Boolean);
-        if (col) return { a: 'luces', efecto: 'fijo', color: col };
+        const ledVoz = Number((t.match(/\bleds?\s*(?:numero\s*|n\s*)?(\d{1,2})\b/) || [])[1]);
+        const unLed = ledVoz >= 1 && ledVoz <= LEDS ? { led: ledVoz } : {};
+        if (quita) return Object.assign({ a: 'luces', efecto: 'fijo', color: '#000000' }, unLed);
+        const col = t.split(' ').map(x => COLORES_VOZ[x] || COLORES_EXTRA[x]).find(Boolean);
+        if (col) return Object.assign({ a: 'luces', efecto: 'fijo', color: col }, unLed);
         if (dice(/respira|respirar|pulso|latido/)) return { a: 'luces', efecto: 'respirar' };
         if (dice(/persecucion|persigue|corriendo|carrera/)) return { a: 'luces', efecto: 'persecucion' };
         return { a: 'luces', efecto: 'arcoiris' };
@@ -1641,16 +1672,16 @@ function ordenDeVoz(texto) {
     if (fig) return { a: 'figura', f: fig };
     const num = (t.match(/(\d+(?:[.,]\d+)?)/) || [])[1];
     const n = num ? parseFloat(num.replace(',', '.')) : null;
-    if (dice(/\b(da la vuelta|dar la vuelta|date la vuelta|date vuelta)\b/)) return { a: 'giro', grados: 180 };
-    if (dice(/\b(vuelta completa|giro completo|360)\b/)) return { a: 'giro', grados: 360 };
+    if (dice(/\b(da la vuelta|dar la vuelta|date la vuelta|date vuelta)\b/)) return conRapidez({ a: 'giro', grados: 180 });
+    if (dice(/\b(vuelta completa|giro completo|360)\b/)) return conRapidez({ a: 'giro', grados: 360 });
     const lado = dice(/izquierda|izquierdo/) ? -1 : dice(/derecha/) ? 1 : 0;
     if (dice(/\b(gira|girar|gire|giro|voltea|voltear|dobla|doblar|rota|rotar|vira|virar|vuelta)\b/) || (lado && !dice(/\b(avanza|ve|camina|anda|adelante|atras|reversa)\b/))) {
-        return { a: 'giro', grados: (lado || 1) * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) };
+        return conRapidez({ a: 'giro', grados: (lado || 1) * (n && dice(/grado/) ? clamp(n, 5, 720) : 90) });
     }
     const sentido = dice(/\b(atras|reversa|retrocede|retroceder|marcha atras|hacia atras)\b/) ? -1 : dice(/\b(avanza|avanzar|adelante|ve|camina|caminar|anda|andar|sigue|seguir|derecho|recto|muevete|mover|moverte|hacia adelante)\b/) ? 1 : 0;
     if (sentido) {
         const metros = dice(/\bmetros?\b/), seg = dice(/segundo/), cm = dice(/centimetro|\bcm\b/);
-        return { a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && cm ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null };
+        return conRapidez({ a: 'mover', sentido, cm: n && metros ? clamp(n * 100, 5, 500) : n && cm ? clamp(n, 5, 500) : null, s: n && seg ? clamp(n, 0.3, 15) : null });
     }
     return null;
 }
@@ -1708,13 +1739,13 @@ function promptIA(modo) {
         'AUTONOMÍA: no esperas órdenes exactas; interpreta la intención y TÚ decides con tu cuerpo. Si el usuario menciona aburrimiento, fiesta, miedo, frío, ganas de jugar, «vigila», «explora», «lúcete» o algo vago, haz un plan de hasta 8 pasos (movimiento, luces, claxon, música o baile) o inicia una función, con un comentario. Encadena cosas cuando tenga sentido (por ejemplo luces + canción + baile) y propón la siguiente idea al final. Si el sensor frontal marca menos de 20 cm no avances hacia adelante: dilo y haz otra cosa. Si la batería está por debajo de 20 %, menciónalo y evita gastos grandes. Usa tus sensores y funciones por iniciativa propia (radar, guardia) cuando encajen.',
         'El robot solo hace caso si la frase empieza llamándolo «Hevy». El micrófono lo escribe como: hevi, jevi, jebi, hebi, hevy, heavy, he vi, je vi, evi, ebi. Si NO hay nada parecido a ese nombre al inicio, contesta {"a":"sinNombre"}.',
         'Contesta SOLO un JSON con una de estas acciones (sin texto extra). Cualquier acción puede llevar además "dice":"comentario corto con tu personalidad que dirás en voz alta":',
-        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional}  avanzar (1) o retroceder (-1)',
-        '{"a":"giro","grados":número}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
+        '{"a":"mover","sentido":1|-1,"cm":número opcional,"s":segundos opcional,"rapidez":0.5 a 1.6 opcional}  avanzar (1) o retroceder (-1); rapidez 0.5 despacio, 1.6 rápido',
+        '{"a":"giro","grados":número,"rapidez":0.5 a 1.6 opcional}  positivo = derecha, negativo = izquierda; dar la vuelta = 180',
         '{"a":"figura","f":"' + FIGURAS_IA.join('|') + '"}  dibujar una figura',
-        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"marcarCasa"} marcar donde está como su casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"}',
+        '{"a":"paro"} parar · {"a":"casa"} regresar a casa · {"a":"marcarCasa"} marcar donde está como su casa · {"a":"radar"} · {"a":"bateria"} · {"a":"claxon"} · {"a":"saludo"} · {"a":"ruleta"} · {"a":"cancionParar"} · {"a":"repetir"} repetir lo último que hiciste · {"a":"deshacer"} deshacer el último movimiento · {"a":"distancia"} decir qué tan cerca está lo de enfrente',
         '{"a":"turbo","on":true|false} · {"a":"guardia","on":true|false}',
         '{"a":"luces","efecto":"' + EFECTOS_IA.join('|') + '","color":"nombre o #rrggbb","led":1 a 12 opcional,"anillo":["12 colores opcionales"],"brillo":0 a 100,"velocidad":20 a 300}  todo opcional: color de todos o de un LED, cada LED distinto con «anillo», brillo y velocidad',
-        '{"a":"nota","hz":40 a 8000,"ms":duración} · {"a":"melodia","notas":"C4/8 E4/8 G4/4 R/4","bpm":120}  melodía propia con el zumbador · {"a":"volumen","nivel":0 a 100} · {"a":"ruedas","izq":-255 a 255,"der":-255 a 255,"s":segundos}  cada rueda por separado',
+        '{"a":"nota","hz":40 a 8000,"ms":duración} · {"a":"melodia","notas":"C4/8 E4/8 G4/4 R/4","bpm":120}  melodía propia con el zumbador · {"a":"volumen","nivel":0 a 100 o "cambio":-100 a 100 relativo} · {"a":"ruedas","izq":-255 a 255,"der":-255 a 255,"s":segundos}  cada rueda por separado',
         '{"a":"baile","id":"' + BAILES_VOZ.map(b => b[0]).join('|') + '"|null,"cancion":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null}',
         '{"a":"funcion","id":"' + FUNCIONES.map(f => f.id).join('|') + '"}  iniciar una función',
         '{"a":"cancion","id":"' + CANCIONES_VOZ.map(c => c[0]).join('|') + '"|null,"q":"nombre si no está en la lista"}',
@@ -1765,6 +1796,8 @@ function herramientasCerebro() {
         notas: { type: 'STRING', description: 'notas como «C4/8 E4/8 G4/4 R/4»: letra, # o b, octava y duración (/4 un tiempo, /8 medio, /2 dos, R silencio); también «A5:120» con milisegundos' },
         bpm: { type: 'INTEGER', description: 'tiempos por minuto, de 30 a 300' },
         nivel: { type: 'INTEGER', description: 'volumen del zumbador de 0 a 100' },
+        cambio: { type: 'INTEGER', description: 'cuánto subir (positivo) o bajar (negativo) el volumen actual, de -100 a 100' },
+        rapidez: { type: 'NUMBER', description: 'qué tan rápido va: 0.5 despacio, 1 normal, 1.6 rápido' },
         izq: { type: 'INTEGER', description: 'velocidad de la rueda izquierda, de -255 a 255 (positivo adelante)' },
         der: { type: 'INTEGER', description: 'velocidad de la rueda derecha, de -255 a 255 (positivo adelante)' },
         id: { type: 'STRING' },
@@ -1775,16 +1808,19 @@ function herramientasCerebro() {
     const pasos = { type: 'ARRAY', description: 'pasos en orden, hasta ' + MAX_PASOS_PLAN, items: obj(PROPIEDADES_PASO, ['a']) };
     const P = PROPIEDADES_PASO;
     return [{ functionDeclarations: [
-        { name: 'mover', description: 'Avanzar (1) o retroceder (-1), por distancia o por tiempo', parameters: obj({ sentido: PROPIEDADES_PASO.sentido, cm: PROPIEDADES_PASO.cm, s: PROPIEDADES_PASO.s }, ['sentido']) },
-        { name: 'giro', description: 'Girar sobre su eje; 180 es dar la vuelta', parameters: obj({ grados: PROPIEDADES_PASO.grados }, ['grados']) },
+        { name: 'mover', description: 'Avanzar (1) o retroceder (-1), por distancia o por tiempo, y con «rapidez» opcional (despacio o rápido)', parameters: obj({ sentido: PROPIEDADES_PASO.sentido, cm: PROPIEDADES_PASO.cm, s: PROPIEDADES_PASO.s, rapidez: P.rapidez }, ['sentido']) },
+        { name: 'giro', description: 'Girar sobre su eje; 180 es dar la vuelta; «rapidez» opcional', parameters: obj({ grados: PROPIEDADES_PASO.grados, rapidez: P.rapidez }, ['grados']) },
         { name: 'figura', description: 'Dibujar una figura recorriéndola', parameters: obj({ f: PROPIEDADES_PASO.f }, ['f']) },
         { name: 'luces', description: 'Control total del anillo de 12 LED: pon todos de un color o un LED suelto (led 1 a 12), pinta cada LED distinto con «anillo», cambia brillo, velocidad y efecto (fijo, arcoiris, respirar, persecucion, musica). Cualquier color sirve, por nombre o hexadecimal.', parameters: obj({ efecto: P.efecto, color: P.color, led: P.led, anillo: P.anillo, brillo: P.brillo, velocidad: P.velocidad }) },
         { name: 'nota', description: 'Hacer sonar una sola nota del zumbador por frecuencia y duración', parameters: obj({ hz: P.hz, ms: P.ms }, ['hz']) },
         { name: 'melodia', description: 'Tocar una melodía propia con el zumbador (por ejemplo la que el usuario pida o una que inventes)', parameters: obj({ notas: P.notas, bpm: P.bpm }, ['notas']) },
-        { name: 'volumen', description: 'Subir o bajar el volumen del zumbador (0 lo calla por completo)', parameters: obj({ nivel: P.nivel }, ['nivel']) },
+        { name: 'volumen', description: 'Poner el volumen del zumbador en un nivel exacto con «nivel» (0 lo calla por completo) o subirlo y bajarlo con «cambio» (por ejemplo 20 o -20)', parameters: obj({ nivel: P.nivel, cambio: P.cambio }) },
         { name: 'ruedas', description: 'Mover cada rueda por separado durante unos segundos: sirve para curvas, giros cerrados y maniobras que mover y giro no cubren', parameters: obj({ izq: P.izq, der: P.der, s: P.s }, ['izq', 'der']) },
         sinParametros('claxon', 'Tocar el claxon'),
         sinParametros('paro', 'Detener todo al instante'),
+        sinParametros('repetir', 'Repetir exactamente lo último que hiciste con el cuerpo («otra vez», «repite»)'),
+        sinParametros('deshacer', 'Deshacer el último movimiento haciéndolo al revés («deshaz eso»)'),
+        sinParametros('distancia', 'Medir con el sensor frontal y decir qué tan cerca está lo que tienes enfrente («qué ves»)'),
         sinParametros('casa', 'Regresar al punto de casa que se marcó, repitiendo al revés lo que se movió desde entonces (si no te has movido, responde que ya estás en casa)'),
         sinParametros('marcar_casa', 'Marcar el lugar donde estás ahora como tu casa, el punto al que regresas con «casa»'),
         sinParametros('radar', 'Escanear 360° con el sensor'),
@@ -1844,11 +1880,12 @@ function validarOrdenIA(o, anidada) {
 function validarAccionIA(o) {
     const a = String(o.a);
     const num = (v, lo, hi) => { const n = Number(v); return v !== null && v !== undefined && Number.isFinite(n) ? clamp(n, lo, hi) : null; };
+    const conRapidezIA = (r, fuente) => { const k = num(fuente.rapidez, RAPIDEZ_MIN, RAPIDEZ_MAX); return k !== null && k !== 1 ? Object.assign(r, { rapidez: Math.round(k * 100) / 100 }) : r; };
     switch (a) {
-        case 'mover': return { a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) };
-        case 'giro': { const g = num(o.grados, -720, 720); return g ? { a, grados: Math.round(g) } : null; }
+        case 'mover': return conRapidezIA({ a, sentido: Number(o.sentido) < 0 ? -1 : 1, cm: num(o.cm, 5, 500), s: num(o.s, 0.3, 15) }, o);
+        case 'giro': { const g = num(o.grados, -720, 720); return g ? conRapidezIA({ a, grados: Math.round(g) }, o) : null; }
         case 'figura': return FIGURAS_IA.includes(o.f) ? { a, f: o.f } : null;
-        case 'casa': case 'marcarCasa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': return { a };
+        case 'casa': case 'marcarCasa': case 'radar': case 'paro': case 'bateria': case 'claxon': case 'saludo': case 'ruleta': case 'cancionParar': case 'sinNombre': case 'repetir': case 'deshacer': case 'distancia': return { a };
         case 'turbo': case 'guardia': return { a, on: o.on !== false };
         case 'luces': {
             const hay = v => v !== undefined && v !== null && v !== '';
@@ -1881,8 +1918,9 @@ function validarAccionIA(o) {
             return { a, notas, bpm: bpm === null ? null : Math.round(bpm) };
         }
         case 'volumen': {
-            const nivel = num(o.nivel, 0, 100);
-            return nivel === null ? null : { a, nivel: Math.round(nivel) };
+            const nivel = num(o.nivel, 0, 100), cambio = num(o.cambio, -100, 100);
+            if (nivel !== null) return { a, nivel: Math.round(nivel) };
+            return cambio === null ? null : { a, cambio: Math.round(cambio) };
         }
         case 'ruedas': {
             const izq = num(o.izq, -VEL_TURBO, VEL_TURBO), der = num(o.der, -VEL_TURBO, VEL_TURBO);
@@ -2305,7 +2343,7 @@ async function conectarBluetooth(recordado) {
         let t = null;
         const dispositivo = recordado ? BT.recordado() : await BT.elegir();
         if (!dispositivo) return;
-        mensaje('Conectando con ' + (dispositivo.name || 'el robot') + '…');
+        mensaje('Conectando con Hevy…');
         t = await BT.conectar(dispositivo, {
             alDatos: entregar,
             alCerrar: () => { if (S.transporte === t) cerrar(); },
@@ -3921,9 +3959,9 @@ function iniciar() {
             guardar();
             return true;
         },
-        volumen(nivel) {
+        volumen(nivel, relativo) {
             if (S.estado !== 'listo') return false;
-            S.vol = clamp(Math.round(Number(nivel) || 0), 0, 100);
+            S.vol = clamp(Math.round((relativo ? S.vol : 0) + (Number(nivel) || 0)), 0, 100);
             $('rb-vol').value = S.vol;
             $('rb-vol-v').textContent = S.vol + ' %';
             S.sucio = true;

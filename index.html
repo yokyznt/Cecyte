@@ -763,6 +763,8 @@
                                     <div class="rb-grupo rb-grupo--info">
                                         <button type="button" id="rb-freno" class="rb-btn rb-freno" aria-pressed="true" aria-label="Freno automático ante obstáculos: activado" title="Distancia al obstáculo y freno automático" hidden><span id="rb-dist">-- cm</span></button>
                                         <span id="rb-alerta" class="rb-alerta" role="alert" hidden></span>
+                                        <button type="button" id="rb-ctl-hablar" class="rb-btn rb-btn--chico rb-ctl-hablar" aria-label="Hablarle a Hevy: un toque escucha, otro toque envía; mantén pulsado para dejarlo abierto" title="Hablarle a Hevy"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg></button>
+                                        <span id="rb-ctl-dice" class="rb-ctl-dice" role="status" aria-live="polite"></span>
                                     </div>
                                     <div class="rb-grupo rb-grupo--herr">
                                         <button type="button" id="rb-ctl-ruta" class="rb-btn rb-btn--chico" data-abre="rb-menu-recorridos" aria-expanded="false" aria-label="Recorridos: grabar y repetir"><svg class="icon" aria-hidden="true"><use href="#i-ruta"/></svg></button>
@@ -1375,14 +1377,19 @@
                                         </details>
                                     </div>
                                     <span class="rb-fn-t">Teléfonos en la sala</span>
+                                    <div id="rb-radar-caja" class="rb-radar-caja">
                                     <canvas id="rb-tel-radar" class="rb-lienzo rb-radar" width="300" height="300" aria-label="Radar de teléfonos: pellizca o usa los botones para acercar"></canvas>
                                     <div class="btn-row rb-radar__ctl">
                                         <button type="button" id="rb-radar-mas" class="btn btn--secondary btn--sm" aria-label="Acercar el mapa"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
                                         <button type="button" id="rb-radar-menos" class="btn btn--secondary btn--sm" aria-label="Alejar el mapa"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
                                         <button type="button" id="rb-radar-auto" class="btn btn--secondary btn--sm" aria-pressed="true">Ajustar solo</button>
+                                        <button type="button" id="rb-radar-rumbo" class="btn btn--secondary btn--sm" aria-pressed="false">Rumbo arriba</button>
+                                        <button type="button" id="rb-radar-full" class="btn btn--secondary btn--sm" aria-pressed="false">Pantalla completa</button>
+                                        <button type="button" id="rb-radar-ir" class="btn btn--primary btn--sm" disabled>Ir hacia allá</button>
                                     </div>
                                     <p id="rb-radar-escala" class="hint" role="status"></p>
                                     <p id="rb-radar-info" class="hint" role="status"></p>
+                                    </div>
                                     <ul id="rb-tel-lista" class="rb-mem"></ul>
                                     <div class="btn-row"><button type="button" id="rb-tel-parar" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Parar la búsqueda</button></div>
                                 </div>
@@ -1393,7 +1400,7 @@
                             <div class="panel__body">
                                 <div class="rb-card rb-card--ancho">
                                     <h4 class="panel__sub">Conexión</h4>
-                                    <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (se llama «Makeblock_LE…»). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
+                                    <p class="hint" data-solo="android">Enciende el robot y pulsa <b>Conectar el robot</b>: la app lo busca por Bluetooth (en la lista de Bluetooth aparece como «Makeblock_LE…»; dentro de la app es Hevy). No lo conectes desde Ajustes de Android: lo conecta la app. Solo un aparato a la vez puede estar enlazado (cierra mBlock y otras apps del robot). Si el robot se aleja o se apaga, los motores se frenan solos.</p>
                                     <div class="btn-row">
                                     <button type="button" id="rb-conectar" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-robot"/></svg> Conectar el robot</button>
                                     <button type="button" id="rb-paro" class="btn btn--secondary rb-paro"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg> Paro</button>
