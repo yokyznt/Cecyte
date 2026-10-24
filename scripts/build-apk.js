@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Compila el APK de release firmado con Gradle (JDK 21 de ~/.jdks) y lo copia a la carpeta de entrega.
 // Antes hay que correr `npm run android:sync` (lo hace `npm run android:apk`).
-// Llave: Desktop\CECyTE-APK\llaves\keystore.properties (fuera del repo). Si no existe, usa --debug.
+// Llave: Trabajos\APKs\CECyTE-APK\llaves\keystore.properties (fuera del repo). Si no existe, usa --debug.
 
 const fs = require('fs');
 const os = require('os');
@@ -10,7 +10,7 @@ const { spawnSync } = require('child_process');
 
 const RAIZ = path.join(__dirname, '..');
 const APK = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'apk.json'), 'utf8'));
-const ENTREGA = path.join(os.homedir(), 'Desktop', 'CECyTE-APK');
+const ENTREGA = path.join(os.homedir(), 'Trabajos', 'APKs', 'CECyTE-APK');
 const PROPS = path.join(ENTREGA, 'llaves', 'keystore.properties');
 const debug = process.argv.includes('--debug');
 
