@@ -109,6 +109,7 @@
         <symbol id="i-luna" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
         <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
         <symbol id="i-rayo" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+        <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/></symbol>
         <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
     </svg>
 
@@ -699,6 +700,24 @@
                             </div>
                             <div class="panel__body">
                                 <ul id="esp-info" class="plain-list"></ul>
+
+                                <hr class="divider">
+
+                                <div class="stack">
+                                    <h4 class="panel__sub">Redes WiFi del timbre</h4>
+                                    <p class="hint">El ESP32 las guarda en su memoria y se conecta a la que encuentre con mejor señal. Si se cae una, prueba las demás.</p>
+                                    <div id="wifi-list" class="chips"></div>
+                                    <div class="grid-2">
+                                        <div class="field"><label class="field__label" for="wifi-ssid">Nombre de la red</label>
+                                            <input type="text" id="wifi-ssid" maxlength="32" autocomplete="off" class="input"></div>
+                                        <div class="field"><label class="field__label" for="wifi-pass">Contraseña</label>
+                                            <input type="password" id="wifi-pass" maxlength="63" autocomplete="new-password" class="input" placeholder="Vacía si es abierta"></div>
+                                    </div>
+                                    <div class="row-between">
+                                        <p id="wifi-msg" class="msg" role="status"></p>
+                                        <button type="button" onclick="addWifi()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg> Agregar red</button>
+                                    </div>
+                                </div>
 
                                 <div class="stack">
                                     <h4 class="panel__sub">Últimos toques</h4>

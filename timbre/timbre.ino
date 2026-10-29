@@ -41,7 +41,7 @@
 #include "secretos.h"   // REDES (WiFi) y DEVICE_KEY: están en su propio archivo para no subirlos a GitHub
 
 // ====== CONFIGURACIÓN ======
-const int FW_VERSION = 1;   // sube este número cada vez que publiques un firmware nuevo
+const int FW_VERSION = 2;   // sube este número cada vez que publiques un firmware nuevo
 
 // Tu página (la llave DEVICE_KEY y las redes WiFi están en secretos.h)
 const char* SERVER_URL   = "https://cecyteo.vercel.app/api/bell";
@@ -376,6 +376,29 @@ void actualizarFirmware(int version, const String& md5, long tam) {
   Update.abort();
 }
 
+String redesTexto = "";
+
+String deHex(const String& h) {
+  String s;
+  for (int i = 0; i + 1 < (int)h.length(); i += 2) s += (char)strtol(h.substring(i, i + 2).c_str(), NULL, 16);
+  return s;
+}
+
+void cargarRedes() {
+  prefs.begin("timbre", true);
+  redesTexto = prefs.getString("redes", "");
+  prefs.end();
+}
+
+void guardarRedes(const String& r) {
+  if (r == redesTexto) return;
+  prefs.begin("timbre", false);
+  prefs.putString("redes", r);
+  prefs.end();
+  redesTexto = r;
+  Serial.println("La página mandó redes WiFi nuevas: guardadas");
+}
+
 // ----- consulta a la página -----
 void consultarServidor() {
   static unsigned long vez = 0;
@@ -443,6 +466,10 @@ void consultarServidor() {
     Serial.println("Orden manual desde la página: tocar timbre");
   }
 
+  int lineas = 1;
+  for (char c : cuerpo) if (c == '\n') lineas++;
+  if (lineas >= 10) guardarRedes(linea(cuerpo, 9));
+
   // firmware nuevo: "versión|md5|bytes"
   String fw = linea(cuerpo, 8);
   int b1 = fw.indexOf('|'), b2 = fw.indexOf('|', b1 + 1);
@@ -464,11 +491,27 @@ unsigned long intervaloConsulta() {
 }
 
 void tareaInternet(void*) {
-  WiFiMulti wifiMulti;
-  for (auto& red : REDES) wifiMulti.addAP(red[0], red[1]);
+  WiFiMulti* wifiMulti = nullptr;
+  String usadas = "-";
 
   for (;;) {
-    if (wifiMulti.run(8000, true) == WL_CONNECTED) {   // true = también prueba redes ocultas
+    if (redesTexto != usadas) {
+      usadas = redesTexto;
+      delete wifiMulti;
+      wifiMulti = new WiFiMulti();
+      for (auto& red : REDES) wifiMulti->addAP(red[0], red[1]);
+      int pos = 0, total = 0;
+      String par;
+      while (siguiente(usadas, pos, ',', par)) {
+        int dp = par.indexOf(':');
+        if (dp <= 0) continue;
+        String ssid = deHex(par.substring(0, dp)), clave = deHex(par.substring(dp + 1));
+        wifiMulti->addAP(ssid.c_str(), clave.length() ? clave.c_str() : NULL);
+        total++;
+      }
+      Serial.printf("Redes WiFi: %d de secretos.h + %d de la página\n", (int)(sizeof(REDES) / sizeof(REDES[0])), total);
+    }
+    if (wifiMulti->run(8000, true) == WL_CONNECTED) {   // true = también prueba redes ocultas
       static bool avisado = false;
       if (!avisado) { avisado = true; Serial.print("WiFi conectado, IP: "); Serial.println(WiFi.localIP()); }
       consultarServidor();
@@ -529,6 +572,7 @@ void setup() {
   candado = xSemaphoreCreateMutex();
 
   cargarConfig();                          // usa lo último guardado, aunque no haya Internet
+  cargarRedes();
   memcpy(&recibida, &cfg, sizeof(Config));
 
   WiFi.mode(WIFI_STA);

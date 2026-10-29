@@ -65,7 +65,7 @@ assert.strictEqual((await call(bell, { query: { key: 'mala' } })).status, 401);
 // 2) el ESP32 recibe 9 líneas; con la config de fábrica el ritmo normal está en la línea 5
 let r = await call(bell, { query: { key: 'llave-de-prueba' } });
 let lines = r.body.split('\n');
-assert.strictEqual(lines.length, 9);
+assert.strictEqual(lines.length, 10);
 assert.strictEqual(lines[2], '12345');
 assert.strictEqual(lines[4], '220,160,200,190,200,210,140,100,140,230,100,80,130,250,160,210,200');
 
@@ -91,6 +91,18 @@ assert.strictEqual((await save({ offDates: ['2026-02-31'] })).status, 400);
 assert.strictEqual((await save({ rhythms: { '09:15': new Array(41).fill(100) } })).status, 400);
 assert.strictEqual((await save({ specials: { '2026-10-20': ['25:00'] } })).status, 400);
 assert.strictEqual((await call(bell, { method: 'POST', body: { action: 'save' } })).status, 401);
+
+const wifi = networks => call(bell, { method: 'POST', headers: adminCookie, body: { action: 'wifi', networks } });
+assert.strictEqual((await call(bell, { method: 'POST', body: { action: 'wifi', networks: [] } })).status, 401);
+assert.strictEqual((await wifi([{ ssid: 'Casa', pass: 'corta' }])).status, 400);
+r = await wifi([{ ssid: 'Escuela ñ', pass: 'clave-secreta' }, { ssid: 'Abierta' }]);
+assert.strictEqual(r.status, 200);
+assert.deepStrictEqual(r.body.wifi, [{ ssid: 'Escuela ñ', hasPass: true }, { ssid: 'Abierta', hasPass: false }]);
+assert.ok(!JSON.stringify(r.body).includes('clave-secreta'));
+r = await wifi([{ ssid: 'Escuela ñ' }]);
+lines = (await call(bell, { query: { key: 'llave-de-prueba' } })).body.split('\n');
+assert.strictEqual(lines[9], Buffer.from('Escuela ñ').toString('hex') + ':' + Buffer.from('clave-secreta').toString('hex'));
+assert.ok(!JSON.stringify((await call(bell, { headers: adminCookie })).body).includes('clave-secreta'));
 
 // 5) latido del ESP32 + historial de toques (sin duplicar) + lo que ve el admin
 await call(bell, { query: { key: 'llave-de-prueba', s: '1', v: '3', rs: '-61', t: String(Math.floor(Date.now() / 1000) - 20), ev: '1760000000:P,1760000300:M' } });
