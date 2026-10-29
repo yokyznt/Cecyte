@@ -40,6 +40,9 @@ const MAX_SPECIAL_TIMES = 16;
 const MIN_STEP_MS = 20;      // menos que esto el relé ni alcanza a cerrar
 const MAX_STEP_MS = 5000;    // tope por paso: un relé trabado prendido no dura más de 5 s
 const MAX_TOTAL_MS = 30000;
+const MAX_WIFI = 8;
+const hex = s => Buffer.from(s, 'utf8').toString('hex');
+const sinClaves = bell => ({ ...bell, wifi: (bell.wifi || []).map(w => ({ ssid: w.ssid, hasPass: !!w.pass })) });
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const DEFAULT_BELL = {
@@ -87,7 +90,8 @@ function deviceText(bell, fw) {
         rhythms,
         (bell.offDates || []).map(compact).join(','),
         specials,
-        fw ? `${fw.version}|${fw.md5}|${fw.size}` : ''
+        fw ? `${fw.version}|${fw.md5}|${fw.size}` : '',
+        (bell.wifi || []).map(w => `${hex(w.ssid)}:${hex(w.pass || '')}`).join(',')
     ].join('\n');
 }
 
@@ -132,7 +136,7 @@ export default async function handler(req, res) {
             const log = (await kv.zrange(LOG_KEY, 0, 19, { rev: true })) || [];
             res.setHeader('Cache-Control', 'no-store');
             return res.status(200).json({
-                ...bell,
+                ...sinClaves(bell),
                 lastSeen: seen.t || null,
                 espFw: seen.fw || 0,
                 espRssi: seen.rssi || 0,
@@ -158,6 +162,27 @@ export default async function handler(req, res) {
                 bell.ringId = String(Date.now());
                 await kv.set(BELL_KEY, bell);
                 return res.status(200).json({ ok: true, ringId: bell.ringId });
+            }
+
+            if (body.action === 'wifi') {
+                const nets = body.networks;
+                const viejas = Object.fromEntries((bell.wifi || []).map(w => [w.ssid, w.pass]));
+                const bytes = s => Buffer.byteLength(s, 'utf8');
+                if (!Array.isArray(nets) || nets.length > MAX_WIFI) {
+                    return res.status(400).json({ error: `Máximo ${MAX_WIFI} redes.` });
+                }
+                const limpias = [];
+                for (const n of nets) {
+                    const ssid = typeof n?.ssid === 'string' ? n.ssid.trim() : '';
+                    if (!ssid || bytes(ssid) > 32) return res.status(400).json({ error: 'Nombre de red inválido (1 a 32 caracteres).' });
+                    if (limpias.some(w => w.ssid === ssid)) continue;
+                    const pass = typeof n.pass === 'string' ? n.pass : (viejas[ssid] ?? '');
+                    if (pass && (bytes(pass) < 8 || bytes(pass) > 63)) return res.status(400).json({ error: `La contraseña de "${ssid}" debe tener de 8 a 63 caracteres (o vacía si la red es abierta).` });
+                    limpias.push({ ssid, pass });
+                }
+                bell.wifi = limpias;
+                await kv.set(BELL_KEY, bell);
+                return res.status(200).json({ ok: true, ...sinClaves(bell) });
             }
 
             if (body.action === 'save') {
@@ -212,7 +237,7 @@ export default async function handler(req, res) {
                 }
                 bell.days = [...new Set(days)].sort();
                 await kv.set(BELL_KEY, bell);
-                return res.status(200).json({ ok: true, ...bell });
+                return res.status(200).json({ ok: true, ...sinClaves(bell) });
             }
 
             return res.status(400).json({ error: 'Acción desconocida.' });

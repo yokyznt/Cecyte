@@ -125,6 +125,7 @@ function renderBellExtras() {
 }
 
 function renderEstado() {
+    renderWifi();
     const info = $r('esp-info');
     if (!info) return;
     const edad = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
@@ -203,4 +204,58 @@ async function publicarFirmware() {
     } finally {
         btn.disabled = false;
     }
+}
+
+function wMsg(texto, tipo = '') {
+    const m = $r('wifi-msg');
+    if (!m) return;
+    m.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+    m.innerText = texto;
+}
+
+function renderWifi() {
+    const lista = $r('wifi-list');
+    if (!lista) return;
+    const redes = bellConfig.wifi || [];
+    lista.innerHTML = chipList(redes.map(w => w.ssid), 'removeWifi', s => `${icon('wifi')} ${esc(s)}${redes.find(w => w.ssid === s)?.hasPass ? '' : ' (abierta)'}`)
+        || '<p class="hint">Sin redes guardadas desde la página (usa las de secretos.h).</p>';
+}
+
+async function enviarWifi(networks, ok) {
+    wMsg('Guardando...');
+    try {
+        const res = await API.fetch('/api/bell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'wifi', networks })
+        });
+        if (res.status === 401) { isAdminLoggedIn = false; showAdminLogin(); return false; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar');
+        bellConfig.wifi = data.wifi;
+        renderWifi();
+        wMsg(ok, 'ok');
+        return true;
+    } catch (err) {
+        wMsg(err.message, 'err');
+        return false;
+    }
+}
+
+async function addWifi() {
+    const ssid = $r('wifi-ssid').value.trim();
+    const pass = $r('wifi-pass').value;
+    if (!ssid) { wMsg('Escribe el nombre de la red.', 'err'); return; }
+    if (pass && pass.length < 8) { wMsg('La contraseña WiFi debe tener al menos 8 caracteres.', 'err'); return; }
+    const resto = (bellConfig.wifi || []).filter(w => w.ssid !== ssid).map(w => ({ ssid: w.ssid }));
+    if (await enviarWifi([...resto, { ssid, pass }], `Red "${ssid}" guardada. El ESP32 la recibe en ~5 segundos.`)) {
+        $r('wifi-ssid').value = '';
+        $r('wifi-pass').value = '';
+    }
+}
+
+function removeWifi(ssid) {
+    if (!confirm(`¿Quitar la red "${ssid}" del timbre?`)) return;
+    enviarWifi((bellConfig.wifi || []).filter(w => w.ssid !== ssid).map(w => ({ ssid: w.ssid })), `Red "${ssid}" quitada.`);
 }
