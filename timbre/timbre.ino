@@ -38,10 +38,11 @@
 #include <Update.h>
 #include <time.h>
 #include <Preferences.h>
+#include <WebServer.h>
 #include "secretos.h"   // REDES (WiFi) y DEVICE_KEY: están en su propio archivo para no subirlos a GitHub
 
 // ====== CONFIGURACIÓN ======
-const int FW_VERSION = 2;   // sube este número cada vez que publiques un firmware nuevo
+const int FW_VERSION = 3;   // sube este número cada vez que publiques un firmware nuevo
 
 // Tu página (la llave DEVICE_KEY y las redes WiFi están en secretos.h)
 const char* SERVER_URL   = "https://cecyteo.vercel.app/api/bell";
@@ -384,10 +385,20 @@ String deHex(const String& h) {
   return s;
 }
 
+String redesLocal = "";
+
 void cargarRedes() {
   prefs.begin("timbre", true);
   redesTexto = prefs.getString("redes", "");
+  redesLocal = prefs.getString("redesL", "");
   prefs.end();
+}
+
+String aHex(const String& s) {
+  String h;
+  char b[3];
+  for (int i = 0; i < (int)s.length(); i++) { sprintf(b, "%02x", (uint8_t)s[i]); h += b; }
+  return h;
 }
 
 void guardarRedes(const String& r) {
@@ -490,13 +501,97 @@ unsigned long intervaloConsulta() {
   return escolar ? INTERVALO_ESCOLAR_MS : INTERVALO_LENTO_MS;
 }
 
+const char* AP_NOMBRE = "Timbre-CECyTE";
+const char* AP_CLAVE = "timbre123";
+WebServer portal(80);
+bool portalActivo = false;
+String opcionesRedes = "";
+
+String htmlEsc(const String& s) {
+  String o = s;
+  o.replace("&", "&amp;"); o.replace("<", "&lt;"); o.replace(">", "&gt;"); o.replace("\"", "&quot;");
+  return o;
+}
+
+void paginaPortal() {
+  String h = "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Timbre</title>"
+             "<style>body{font-family:sans-serif;max-width:420px;margin:24px auto;padding:0 16px}input,button{width:100%;padding:12px;margin:6px 0;font-size:16px;box-sizing:border-box}</style>"
+             "<h2>Timbre CECyTE: WiFi</h2><p>No encuentro ninguna red conocida. Escribe una:</p>"
+             "<form method=post action=/guardar><input name=s list=r placeholder='Nombre de la red' required maxlength=32>"
+             "<datalist id=r>" + opcionesRedes + "</datalist>"
+             "<input name=p type=password placeholder='Contraseña (vacía si es abierta)' maxlength=63>"
+             "<button>Guardar y conectar</button></form>";
+  if (redesLocal.length()) {
+    h += "<h3>Guardadas aquí</h3><ul>";
+    int pos = 0; String par;
+    while (siguiente(redesLocal, pos, ',', par)) {
+      int dp = par.indexOf(':');
+      if (dp > 0) h += "<li>" + htmlEsc(deHex(par.substring(0, dp))) + "</li>";
+    }
+    h += "</ul><form method=post action=/borrar><button>Borrar las guardadas aquí</button></form>";
+  }
+  portal.send(200, "text/html; charset=utf-8", h);
+}
+
+void guardarLocal(const String& r) {
+  prefs.begin("timbre", false);
+  prefs.putString("redesL", r);
+  prefs.end();
+  redesLocal = r;
+}
+
+void guardarDesdePortal() {
+  String s = portal.arg("s"), p = portal.arg("p");
+  s.trim();
+  if (!s.length() || s.length() > 32 || (p.length() && (p.length() < 8 || p.length() > 63))) {
+    portal.send(400, "text/html; charset=utf-8", "<meta charset=utf-8><p>Nombre de 1 a 32 caracteres y contraseña de 8 a 63 (o vacía). <a href=/>Volver</a>");
+    return;
+  }
+  String nueva = aHex(s) + ":" + aHex(p), resto = "", par;
+  int pos = 0;
+  while (siguiente(redesLocal, pos, ',', par)) if (par.length() && !par.startsWith(aHex(s) + ":")) resto += "," + par;
+  guardarLocal(nueva + resto);
+  portal.send(200, "text/html; charset=utf-8", "<meta charset=utf-8><meta name=viewport content='width=device-width'><h3>Guardada: " + htmlEsc(s) + "</h3><p>El timbre se va a conectar en unos segundos. Si no, vuelve a 192.168.4.1</p>");
+  Serial.printf("Red guardada desde el portal: %s\n", s.c_str());
+}
+
+void abrirPortal() {
+  int n = WiFi.scanNetworks();
+  opcionesRedes = "";
+  for (int i = 0; i < n; i++) opcionesRedes += "<option value=\"" + htmlEsc(WiFi.SSID(i)) + "\">";
+  WiFi.scanDelete();
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(AP_NOMBRE, AP_CLAVE);
+  static bool rutas = false;
+  if (!rutas) {
+    rutas = true;
+    portal.on("/", HTTP_GET, paginaPortal);
+    portal.on("/guardar", HTTP_POST, guardarDesdePortal);
+    portal.on("/borrar", HTTP_POST, []() { guardarLocal(""); portal.sendHeader("Location", "/"); portal.send(303); });
+    portal.onNotFound(paginaPortal);
+  }
+  portal.begin();
+  portalActivo = true;
+  Serial.printf("Sin WiFi: abrí la red \"%s\" (clave %s). Entra a http://192.168.4.1 para agregar una red\n", AP_NOMBRE, AP_CLAVE);
+}
+
+void cerrarPortal() {
+  portal.stop();
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_STA);
+  portalActivo = false;
+  Serial.println("WiFi conectado: cerré la red de configuración");
+}
+
 void tareaInternet(void*) {
   WiFiMulti* wifiMulti = nullptr;
   String usadas = "-";
+  unsigned long sinRedDesde = millis(), ultimoIntento = 0;
 
   for (;;) {
-    if (redesTexto != usadas) {
-      usadas = redesTexto;
+    String todas = redesTexto + "," + redesLocal;
+    if (todas != usadas) {
+      usadas = todas;
       delete wifiMulti;
       wifiMulti = new WiFiMulti();
       for (auto& red : REDES) wifiMulti->addAP(red[0], red[1]);
@@ -511,12 +606,22 @@ void tareaInternet(void*) {
       }
       Serial.printf("Redes WiFi: %d de secretos.h + %d de la página\n", (int)(sizeof(REDES) / sizeof(REDES[0])), total);
     }
-    if (wifiMulti->run(8000, true) == WL_CONNECTED) {   // true = también prueba redes ocultas
+    if (portalActivo) {
+      portal.handleClient();
+      bool cambio = (redesTexto + "," + redesLocal) != usadas;
+      if (!cambio && millis() - ultimoIntento < 30000UL) { vTaskDelay(10 / portTICK_PERIOD_MS); continue; }
+      ultimoIntento = millis();
+      if (wifiMulti->run(8000, true) == WL_CONNECTED) { cerrarPortal(); sinRedDesde = millis(); }
+      continue;
+    }
+    if (wifiMulti->run(8000, true) == WL_CONNECTED) {
+      sinRedDesde = millis();
       static bool avisado = false;
       if (!avisado) { avisado = true; Serial.print("WiFi conectado, IP: "); Serial.println(WiFi.localIP()); }
       consultarServidor();
     } else {
       Serial.println("Buscando WiFi...");
+      if (millis() - sinRedDesde > 60000UL) { abrirPortal(); ultimoIntento = millis(); continue; }
     }
     vTaskDelay(intervaloConsulta() / portTICK_PERIOD_MS);
   }
