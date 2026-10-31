@@ -113,8 +113,8 @@ export default async function handler(req, res) {
         if (!isDevice && !(await exigir(req, res, kv, 'timbre', 'ritmo', 'esp32'))) return;
 
         try {
-            const bell = await getBell();
-            const fw = await kv.get(FW_META_KEY);
+            const [saved, fw] = await kv.mget(BELL_KEY, FW_META_KEY);
+            const bell = { ...DEFAULT_BELL, ...(saved || {}) };
 
             if (isDevice) {
                 if (req.query.s) {
@@ -165,6 +165,7 @@ export default async function handler(req, res) {
             }
 
             if (body.action === 'wifi') {
+                if (!(await exigir(req, res, kv, 'esp32'))) return;
                 const nets = body.networks;
                 const viejas = Object.fromEntries((bell.wifi || []).map(w => [w.ssid, w.pass]));
                 const bytes = s => Buffer.byteLength(s, 'utf8');

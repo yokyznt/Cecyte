@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { kv } from '@vercel/kv';
 import { exigir } from '../lib/admins.js';
+import { cors } from '../lib/cors.js';
 
 const KEY = 'cecyte_changes';
 const MAX = 100;
@@ -20,6 +21,7 @@ export function hoyMX(ahora = new Date()) {
 }
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     const hoy = hoyMX();
 
     if (req.method === 'GET') {

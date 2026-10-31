@@ -9,4 +9,6 @@ assert.strictEqual(buildMessage(mate, { receso: true }, null), 'Receso');
 assert.strictEqual(buildMessage(mate, null, null), 'No hay más clases por hoy');
 assert.strictEqual(buildMessage(null, null, null), 'No hay más clases por hoy');
 assert(!/terminar|Comienza|profesor/i.test(buildMessage(mate, null, mate)));
+assert.strictEqual(buildMessage(null, {}, mate, { tipo: 'cancelada' }), `${mate.subject}: cancelada hoy`);
+assert.strictEqual(buildMessage(null, {}, mate, { tipo: 'ausente' }), `${mate.subject}: maestro ausente`);
 console.log('aviso.test.mjs: todo bien');

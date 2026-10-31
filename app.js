@@ -257,12 +257,18 @@ async function loadSchedule() {
 
 // Manda al servidor el arreglo completo actualizado (solo funciona con sesion activa)
 async function saveScheduleToServer() {
-    const res = await API.fetch('/api/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(scheduleDatabase)
-    });
+    let res;
+    try {
+        res = await API.fetch('/api/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(scheduleDatabase)
+        });
+    } catch (err) {
+        showNotificationToast('Sin conexión', 'No se pudo guardar. Revisa tu Internet e intenta de nuevo.', 'warning');
+        return false;
+    }
 
     if (res.status === 401) {
         isAdminLoggedIn = false;
@@ -270,6 +276,7 @@ async function saveScheduleToServer() {
         showNotificationToast('Sesión Expirada', 'Vuelve a iniciar sesión para guardar cambios.', 'warning');
         return false;
     }
+    if (!res.ok) showNotificationToast('No se guardó', 'El servidor no aceptó el cambio. Intenta de nuevo.', 'warning');
     return res.ok;
 }
 
@@ -315,9 +322,11 @@ function populateGroupSelectors() {
 
     const formGroup = document.getElementById('form-group');
     if (formGroup) {
+        const elegido = formGroup.value;
         formGroup.innerHTML = groupsList.length
             ? groupsList.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('')
             : '<option value="">Agrega un grupo primero</option>';
+        if (groupsList.includes(elegido)) formGroup.value = elegido;
     }
 }
 
@@ -637,7 +646,7 @@ function renderMobileSchedule() {
 }
 
 // Render Admin Table
-function renderAdminTable(filterQuery = '') {
+function renderAdminTable(filterQuery = (document.getElementById('admin-search') || {}).value || '') {
     const tbody = document.getElementById('admin-table-body');
     const groupFilter = document.getElementById('admin-group-filter')?.value || 'ALL';
     const query = filterQuery.toLowerCase();
@@ -966,8 +975,9 @@ function checkScheduleAndNotify() {
 // Mensaje que le llega al alumno: solo la materia que sigue y su maestro (o «Receso» / «No hay más clases por hoy»).
 // Lo usan el aviso en pantalla y las notificaciones locales del APK (js/avisos-nativos.js);
 // el cron del servidor arma el mismo texto (buildMessage en api/cron/check-schedule.js).
-function textoAviso(prevClass, nextSlot, nextClass) {
+function textoAviso(prevClass, nextSlot, nextClass, cambio) {
     if (nextSlot && nextSlot.receso) return 'Receso';
+    if (nextClass && cambio) return `${nextClass.subject}: ${cambio.tipo === 'cancelada' ? 'cancelada hoy' : 'maestro ausente'}`;
     if (nextClass) return nextClass.teacher ? `${nextClass.subject}, ${nextClass.teacher}` : nextClass.subject;
     return 'No hay más clases por hoy';
 }
@@ -1227,7 +1237,7 @@ async function importSchedule() {
 
     if (errors.length > 0) {
         statusEl.className = 'msg msg--err';
-        statusEl.innerHTML = errors.slice(0, 6).join('<br>');
+        statusEl.innerHTML = errors.slice(0, 6).map(esc).join('<br>');
         return;
     }
 

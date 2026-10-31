@@ -28,7 +28,7 @@ const claveBusca = (sala, id) => `tel:${sala}:busca:${id}`;
 const indice = sala => `telidx:${sala}`;
 const claveDueno = sala => `teldueno:${sala}`;
 const vetoId = (sala, id) => `telveto:${sala}:i:${id}`;
-const vetoNombre = (sala, nombre) => `telveto:${sala}:n:${nombre.toLowerCase().replace(/s+/g, ' ')}`;
+const vetoNombre = (sala, nombre) => `telveto:${sala}:n:${nombre.toLowerCase().replace(/\s+/g, ' ')}`;
 
 async function esDueno(sala, id) {
     const d = await kv.get(claveDueno(sala));
