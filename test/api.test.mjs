@@ -110,6 +110,7 @@ await call(bell, { query: { key: 'llave-de-prueba', ev: '1760000000:P,basura,176
 r = await call(bell, { headers: adminCookie });
 assert.strictEqual(r.body.espFw, 3);
 assert.strictEqual(r.body.espRssi, -61);
+assert.strictEqual(r.body.localKey.length, 32);
 assert(Math.abs(r.body.espClockDiffMs + 20000) < 2000, 'desfase de reloj ' + r.body.espClockDiffMs);
 assert.deepStrictEqual(r.body.log, ['1760000600:P', '1760000300:M', '1760000000:P']);
 assert.deepStrictEqual(r.body.rhythms, { '09:15': [300, 200, 300] });

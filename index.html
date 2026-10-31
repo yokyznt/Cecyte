@@ -704,6 +704,21 @@
 
                                 <hr class="divider">
 
+                                <div class="stack" id="local-timbre">
+                                    <h4 class="panel__sub">Control directo por WiFi (sin Internet)</h4>
+                                    <p class="hint">Si se cae el Internet, conecta el teléfono al mismo WiFi que el timbre. Desde la app puedes tocarlo, ver su estado y mandarle el horario y la hora.</p>
+                                    <div class="field"><label class="field__label" for="local-ip">IP del timbre</label>
+                                        <input type="text" id="local-ip" inputmode="decimal" autocomplete="off" class="input" placeholder="192.168.1.76"></div>
+                                    <div class="row-between">
+                                        <button type="button" onclick="localEstado()" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg> Ver estado</button>
+                                        <button type="button" onclick="localMandar()" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg> Mandar horario</button>
+                                        <button type="button" onclick="localTocar()" class="btn btn--bell"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Tocar</button>
+                                    </div>
+                                    <p id="local-msg" class="msg" role="status"></p>
+                                </div>
+
+                                <hr class="divider">
+
                                 <div class="stack">
                                     <h4 class="panel__sub">Redes WiFi del timbre</h4>
                                     <p class="hint">El ESP32 las guarda en su memoria y se conecta a la que encuentre con mejor señal. Si se cae una, prueba las demás.</p>

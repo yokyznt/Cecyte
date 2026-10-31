@@ -1393,11 +1393,12 @@ async function loadBell(fromPoll = false) {
         const res = await API.fetch('/api/bell', { credentials: 'same-origin', cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
+        try { localStorage.setItem('cecyte_bell_cfg', JSON.stringify(data)); } catch (e) { }
 
         // En el refresco automatico solo actualizamos el estado "en linea",
         // para no pisar lo que el admin esta editando y todavia no guarda.
         if (fromPoll) {
-            Object.assign(bellConfig, { lastSeen: data.lastSeen, serverNow: data.serverNow, espFw: data.espFw, espRssi: data.espRssi, espClockDiffMs: data.espClockDiffMs, log: data.log, fw: data.fw });
+            Object.assign(bellConfig, { espIp: data.espIp, localKey: data.localKey, lastSeen: data.lastSeen, serverNow: data.serverNow, espFw: data.espFw, espRssi: data.espRssi, espClockDiffMs: data.espClockDiffMs, log: data.log, fw: data.fw });
             if (typeof renderEstado === 'function') renderEstado();
         } else {
             bellConfig = data;
@@ -1405,7 +1406,13 @@ async function loadBell(fromPoll = false) {
         }
         renderBellStatus();
     } catch (err) {
-        console.error('No se pudo cargar el timbre:', err);
+        if (fromPoll && bellConfig && bellConfig.times) return;
+        let guardado = null;
+        try { guardado = JSON.parse(localStorage.getItem('cecyte_bell_cfg')); } catch (e) { }
+        if (!guardado) return;
+        bellConfig = guardado;
+        renderBell();
+        renderBellStatus();
     }
 }
 
@@ -1530,8 +1537,13 @@ async function ringBellNow() {
         msg.className = 'msg msg--ok';
         msg.innerText = 'Orden enviada. Suena en máximo ~5 segundos.';
     } catch (err) {
-        msg.className = 'msg msg--err';
-        msg.innerText = err.message;
+        if (typeof tocarDirecto === 'function' && await tocarDirecto()) {
+            msg.className = 'msg msg--ok';
+            msg.innerText = 'Sin Internet: le avisé directo al timbre por el WiFi de la escuela.';
+        } else {
+            msg.className = 'msg msg--err';
+            msg.innerText = err.name === 'AbortError' || err instanceof TypeError ? 'Sin conexión con la página ni con el timbre.' : err.message;
+        }
     } finally {
         setTimeout(() => {
             btn.disabled = false;
