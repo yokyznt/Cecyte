@@ -8,7 +8,7 @@ const { execFileSync } = require('child_process');
 const raiz = path.join(__dirname, '..');
 const APK = JSON.parse(fs.readFileSync(path.join(raiz, 'config', 'apk.json'), 'utf8'));
 const conRobot = APK.incluirRobot !== false;
-execFileSync(process.execPath, [path.join(raiz, 'scripts', 'build-www.js')], { stdio: 'pipe' });
+execFileSync(process.execPath, [path.join(raiz, 'scripts', 'build-www.js')], { stdio: 'pipe', env: { ...process.env, CECYTE_SIN_RED: '1' } });
 const www = rel => fs.readFileSync(path.join(raiz, 'www', rel), 'utf8');
 const existe = rel => fs.existsSync(path.join(raiz, 'www', rel));
 

@@ -136,6 +136,7 @@ input[type="checkbox"] { accent-color: var(--green-700); }
 .msg { font-size: var(--fs-sm); color: var(--ink-2); min-height: 1.4em; }
 .msg--ok { color: var(--green-800); font-weight: 600; }
 .msg--err { color: var(--rose-700); font-weight: 600; }
+.msg--warn { color: var(--orange-700, var(--rose-700)); font-weight: 600; }
 
 /* ==================== Encabezado de la vista ==================== */
 .intro { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px 28px; }

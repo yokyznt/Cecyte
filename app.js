@@ -225,8 +225,69 @@ function cachear(clave, datos) {
 function leerCache(clave) {
     try {
         const v = JSON.parse(localStorage.getItem('cecyte_cache_' + clave));
-        return v && Array.isArray(v.datos) ? v : null;
+        if (v && Array.isArray(v.datos)) return v;
+    } catch (e) { }
+    const ini = window.APP_CONFIG && APP_CONFIG.datosIniciales;
+    return ini && Array.isArray(ini[clave]) ? { t: ini.t, datos: ini[clave] } : null;
+}
+
+const CLAVE_PENDIENTE = 'cecyte_horario_pendiente';
+
+function horarioPendiente() {
+    try {
+        const v = JSON.parse(localStorage.getItem(CLAVE_PENDIENTE));
+        return Array.isArray(v) ? v : null;
     } catch (e) { return null; }
+}
+
+function guardarPendiente(datos) {
+    try {
+        if (datos) localStorage.setItem(CLAVE_PENDIENTE, JSON.stringify(datos));
+        else localStorage.removeItem(CLAVE_PENDIENTE);
+    } catch (e) { }
+    actualizarAvisoPendiente();
+}
+
+function actualizarAvisoPendiente() {
+    const el = document.getElementById('sync-pendiente');
+    if (el) el.hidden = !horarioPendiente();
+}
+
+let subiendoPendiente = false;
+async function subirPendiente() {
+    const pendiente = horarioPendiente();
+    if (!pendiente || subiendoPendiente || !navigator.onLine) return;
+    subiendoPendiente = true;
+    try {
+        const res = await API.fetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pendiente) });
+        if (res.ok) {
+            guardarPendiente(null);
+            showNotificationToast('Cambios sincronizados', 'Lo que editaste sin Internet ya se subió para todos.', 'success');
+        } else if (res.status === 401) {
+            showNotificationToast('Cambios sin subir', 'Inicia sesión de nuevo para subir lo que editaste sin Internet.', 'warning');
+        }
+    } catch (e) {
+    } finally {
+        subiendoPendiente = false;
+    }
+}
+
+function pintarDesdeCache() {
+    const g = leerCache('groups');
+    const h = horarioPendiente() || (leerCache('schedule') || {}).datos;
+    if (!g || !h) return;
+    groupsList = g.datos;
+    if (!groupsList.includes(currentStudentGroup)) currentStudentGroup = groupsList[0] || '';
+    scheduleDatabase = h;
+    scheduleLoaded = true;
+    const c = leerCache('changes');
+    if (c) cambiosDia = c.datos;
+    populateGroupSelectors();
+    renderGroupsList();
+    renderStudentSchedule();
+    const updatedEl = document.getElementById('schedule-updated');
+    if (updatedEl) updatedEl.innerText = 'Guardado ' + new Date(g.t).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    document.dispatchEvent(new CustomEvent('horario-actualizado'));
 }
 
 // Trae el horario guardado en el servidor y repinta ambas vistas.
@@ -235,18 +296,25 @@ async function loadSchedule() {
     try {
         const res = await API.fetch('/api/schedule');
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        scheduleDatabase = await res.json();
+        const recibido = await res.json();
+        if (!Array.isArray(recibido)) throw new Error('respuesta rara');
+        cachear('schedule', recibido);
+        if (horarioPendiente()) {
+            subirPendiente();
+            return;
+        }
+        scheduleDatabase = recibido;
         scheduleLoaded = true;
-        cachear('schedule', scheduleDatabase);
         if (updatedEl) updatedEl.innerText = 'Actualizado ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
         renderStudentSchedule();
         if (isAdminLoggedIn) renderAdminTable();
         document.dispatchEvent(new CustomEvent('horario-actualizado'));
     } catch (err) {
-        console.error('No se pudo cargar el horario:', err);
         const copia = leerCache('schedule');
+        if (copia && updatedEl) updatedEl.innerText = 'Sin conexión · guardado ' + new Date(copia.t).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        if (!copia && updatedEl && !scheduleLoaded) updatedEl.innerText = 'Sin conexión: abre la app una vez con Internet para descargar el horario';
         if (copia && !scheduleLoaded) {
-            scheduleDatabase = copia.datos;
+            scheduleDatabase = horarioPendiente() || copia.datos;
             scheduleLoaded = true;
             if (updatedEl) updatedEl.innerText = 'Sin conexión · guardado ' + new Date(copia.t).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
             renderStudentSchedule();
@@ -266,8 +334,10 @@ async function saveScheduleToServer() {
             body: JSON.stringify(scheduleDatabase)
         });
     } catch (err) {
-        showNotificationToast('Sin conexión', 'No se pudo guardar. Revisa tu Internet e intenta de nuevo.', 'warning');
-        return false;
+        guardarPendiente(scheduleDatabase);
+        cachear('schedule', scheduleDatabase);
+        showNotificationToast('Guardado en este dispositivo', 'No hay Internet: se subirá solo cuando vuelva la conexión.', 'warning');
+        return true;
     }
 
     if (res.status === 401) {
@@ -286,16 +356,18 @@ async function loadGroups() {
     try {
         const res = await API.fetch('/api/groups');
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        groupsList = await res.json();
+        const recibidos = await res.json();
+        if (!Array.isArray(recibidos)) throw new Error('respuesta rara');
+        groupsList = recibidos;
         cachear('groups', groupsList);
     } catch (err) {
-        console.error('No se pudieron cargar los grupos:', err);
         const copia = leerCache('groups');
-        groupsList = copia ? copia.datos : [];
+        if (copia) groupsList = copia.datos;
+        else if (!groupsList.length) sinRedSinGrupos = true;
     }
 
-    // Si el grupo guardado en este celular ya no existe, o no hay ninguno guardado, usa el primero disponible
-    if (!groupsList.includes(currentStudentGroup)) {
+    if (groupsList.length) sinRedSinGrupos = false;
+    if (groupsList.length && !groupsList.includes(currentStudentGroup)) {
         currentStudentGroup = groupsList[0] || '';
     }
 
@@ -309,7 +381,7 @@ function populateGroupSelectors() {
     if (studentSelect) {
         studentSelect.innerHTML = groupsList.length
             ? groupsList.map(g => `<option value="${esc(g)}" ${g === currentStudentGroup ? 'selected' : ''}>${esc(g)}</option>`).join('')
-            : '<option value="">Sin grupos todavía</option>';
+            : `<option value="">${sinRedSinGrupos ? 'Sin conexión: conéctate una vez' : 'Sin grupos todavía'}</option>`;
     }
 
     const adminFilter = document.getElementById('admin-group-filter');
@@ -458,6 +530,7 @@ function renderGroupsList() {
 
 // Switch between Student View and Admin View
 let isAdminLoggedIn = false;
+let sinRedSinGrupos = false;
 let adminSesion = null;
 
 const sesionAdmin = () => adminSesion;
@@ -488,9 +561,15 @@ async function checkAdminSession() {
         const data = await res.json();
         isAdminLoggedIn = !!data.loggedIn;
         adminSesion = isAdminLoggedIn ? data : null;
+        try {
+            if (isAdminLoggedIn && API.esNativo) localStorage.setItem('cecyte_sesion', JSON.stringify(data));
+            else localStorage.removeItem('cecyte_sesion');
+        } catch (e) { }
     } catch (err) {
-        isAdminLoggedIn = false;
-        adminSesion = null;
+        let guardada = null;
+        try { guardada = API.esNativo && API.tieneToken() ? JSON.parse(localStorage.getItem('cecyte_sesion')) : null; } catch (e) { }
+        isAdminLoggedIn = !!(guardada && guardada.loggedIn);
+        adminSesion = isAdminLoggedIn ? guardada : null;
     }
 
     if (isAdminLoggedIn) {
@@ -549,6 +628,7 @@ async function submitLogin(e) {
 async function logoutAdmin() {
     await API.fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => null);
     API.guardarToken(null);
+    try { localStorage.removeItem('cecyte_sesion'); } catch (e) { }
     isAdminLoggedIn = false;
     adminSesion = null;
     cerrarGestionAdmins();
@@ -1466,6 +1546,9 @@ window.onload = async function() {
     // Tocar fuera del formulario (el fondo del <dialog>) cierra el modal
     const scheduleModal = document.getElementById('schedule-modal');
     scheduleModal.addEventListener('click', e => { if (e.target === scheduleModal) scheduleModal.close(); });
+    pintarDesdeCache();
+    actualizarAvisoPendiente();
+    window.addEventListener('online', () => { subirPendiente(); loadSchedule(); loadGroups(); loadChanges(); });
     await loadGroups();   // trae la lista de grupos (necesaria para filtrar el horario)
     await loadSchedule(); // trae el horario real del servidor
     await registerServiceWorker();

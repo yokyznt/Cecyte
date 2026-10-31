@@ -30,7 +30,13 @@
         if (token) o.headers.Authorization = 'Bearer ' + token;
         if (nativo) o.credentials = 'omit';
         else if (!o.credentials) o.credentials = 'same-origin';
-        return fetch(url(ruta), o);
+        const espera = o.timeout !== undefined ? o.timeout : (!o.method || o.method === 'GET' ? 8000 : 30000);
+        delete o.timeout;
+        if (!espera || o.signal || typeof AbortController === 'undefined') return fetch(url(ruta), o);
+        const control = new AbortController();
+        const reloj = setTimeout(() => control.abort(), espera);
+        o.signal = control.signal;
+        return fetch(url(ruta), o).finally(() => clearTimeout(reloj));
     }
 
     raiz.API = { fetch: pedir, url, guardarToken, tieneToken: () => !!leerToken(), esNativo: nativo };
