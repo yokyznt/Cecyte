@@ -635,3 +635,11 @@ html[data-tema-modo="claro"] .theme-btn__sol, html[data-tema-modo="oscuro"] .the
 .icon-btn .icon { width: 1.35em; height: 1.35em; }
 .icon-btn:hover { background: var(--green-100); }
 .icon-btn:active { transform: scale(0.95); }
+
+.anuncios { display: grid; gap: 8px; margin-bottom: 12px; }
+.anuncio { border: 1px solid var(--line); border-left: 4px solid var(--green-800); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.anuncio__titulo { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.anuncio__texto { margin: 6px 0 0; color: var(--ink-2); white-space: pre-line; }
+.anuncio__fecha { display: block; margin-top: 6px; color: var(--ink-3); }
+.maestro-lista { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.maestro-dia--hoy .panel__sub { color: var(--green-800); }

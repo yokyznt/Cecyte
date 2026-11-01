@@ -110,6 +110,7 @@
         <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
         <symbol id="i-rayo" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
         <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></symbol>
         <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
     </svg>
 
@@ -157,6 +158,8 @@
         <div id="view-student" class="stack view">
             <h2 class="sr-only">Mi horario</h2>
 
+            <section id="anuncios" class="anuncios" aria-label="Anuncios de la escuela" hidden></section>
+
             <div class="today-grid">
                 <!-- Grupo: la primera decisión del alumno, antes de ver su día -->
                 <div class="group-bar">
@@ -166,6 +169,9 @@
                     </select>
                     <button type="button" id="ics-btn" class="icon-btn" onclick="descargarCalendario()" title="Agregar mi horario a mi calendario" aria-label="Agregar mi horario a mi calendario">
                         <svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>
+                    </button>
+                    <button type="button" id="pdf-btn" class="icon-btn" onclick="pdfGrupo()" title="Descargar el horario de mi grupo en PDF" aria-label="Descargar el horario de mi grupo en PDF">
+                        <svg class="icon" aria-hidden="true"><use href="#i-file"/></svg>
                     </button>
                 </div>
 
@@ -258,6 +264,20 @@
                 <div class="day">
                     <div id="mobile-day-tabs" class="day-tabs" role="tablist" aria-label="Día de la semana"></div>
                     <ol id="mobile-schedule-list" class="day-list"></ol>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="maestro-heading">
+                <div class="panel__head">
+                    <h3 id="maestro-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg> Horario por maestro</h3>
+                </div>
+                <div class="panel__body stack">
+                    <div class="row-between">
+                        <label for="maestro-selector" class="sr-only">Maestro</label>
+                        <select id="maestro-selector" class="select" onchange="renderMaestro()"><option value="">Elige un maestro</option></select>
+                        <button type="button" class="btn btn--secondary" onclick="pdfMaestro()"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg> PDF</button>
+                    </div>
+                    <div id="maestro-lista" class="maestro-lista"></div>
                 </div>
             </section>
 
@@ -465,6 +485,26 @@
                             <div class="panel__head">
                                 <h3 id="alerts-heading" class="panel__title"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg> Notificaciones Automáticas</h3>
                             </div>
+                            <div class="panel__body stack">
+                                <h4 class="panel__sub">Anuncios para toda la escuela</h4>
+                                <p class="hint">Aparecen arriba en la vista de alumnos y, si lo marcas, llega una notificación a todos los que tienen avisos activados.</p>
+                                <div class="field"><label class="field__label" for="anuncio-titulo">Título</label>
+                                    <input type="text" id="anuncio-titulo" maxlength="80" class="input" placeholder="Junta de padres de familia"></div>
+                                <div class="field"><label class="field__label" for="anuncio-texto">Mensaje</label>
+                                    <textarea id="anuncio-texto" maxlength="400" rows="3" class="input" placeholder="Viernes a las 10:00 en la explanada"></textarea></div>
+                                <div class="grid-2">
+                                    <div class="field"><label class="field__label" for="anuncio-dias">Días visible</label>
+                                        <input type="number" id="anuncio-dias" min="1" max="60" value="1" class="input"></div>
+                                    <label class="field" for="anuncio-avisar"><span class="field__label">Notificación</span>
+                                        <span><input type="checkbox" id="anuncio-avisar" checked> Avisar a todos</span></label>
+                                </div>
+                                <div class="row-between">
+                                    <p id="anuncio-msg" class="msg" role="status"></p>
+                                    <button type="button" onclick="publicarAnuncio()" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#i-megaphone"/></svg> Publicar</button>
+                                </div>
+                                <div id="anuncio-lista" class="chips"></div>
+                            </div>
+                            <hr class="divider">
                             <div class="panel__body" style="padding-bottom:0">
                                 <p class="hint">Al cambiar de bloque se manda una notificación con la materia que terminó y la que sigue. Cada alumno la activa en su dispositivo, en la vista de Alumnos.</p>
                                 <h4 class="panel__sub">Registro de Alertas</h4>
@@ -1616,6 +1656,7 @@
     <script src="js/admins.js"></script>
     <script src="admin-secciones.js"></script>
     <script src="app.js"></script>
+    <script src="extras.js"></script>
     <script>Plataforma.iniciar(); Actualizacion.buscar();</script>
 </body>
 </html>

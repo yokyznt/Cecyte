@@ -15,7 +15,7 @@ const APK = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'apk.json'), 'u
 
 // Lo único que viaja al APK. Todo lo demás se queda fuera.
 const ROBOT = APK.incluirRobot !== false;      // config/apk.json: false = el APK sale sin el robot
-const ARCHIVOS = ['index.html', 'app.js', 'admin-secciones.js', 'calendario.js', 'timbre.js', 'timbre-estado.js', 'logo-cecyte.png'].concat(ROBOT ? ['robot.js'] : []);
+const ARCHIVOS = ['index.html', 'app.js', 'admin-secciones.js', 'calendario.js', 'timbre.js', 'timbre-estado.js', 'extras.js', 'logo-cecyte.png'].concat(ROBOT ? ['robot.js'] : []);
 const CARPETAS = ['css', 'fonts', 'js'];
 
 // Frases que mencionan al robot dentro de textos que sí viajan
