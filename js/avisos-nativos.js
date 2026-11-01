@@ -80,7 +80,7 @@
                 lista.push({
                     id: 100000 + d * 100 + i,
                     title: 'CECyTE Plantel 18',
-                    body: textoAviso(claseAnterior, siguiente, claseSiguiente),
+                    body: textoAviso(claseAnterior, siguiente, claseSiguiente, d === 0 && siguiente && typeof cambioDe === 'function' ? cambioDe(grupo, siguiente.key) : null),
                     schedule: { at: cuando, allowWhileIdle: true },
                     channelId: CANAL,
                     smallIcon: 'ic_stat_cecyte',
@@ -190,7 +190,7 @@
     if (raiz.Plataforma && raiz.Plataforma.nativo) {
         document.addEventListener('horario-actualizado', () => { reprogramar(); actualizarWidget(); });
         document.addEventListener('grupo-cambiado', () => { reprogramar(); actualizarWidget(); });
-        document.addEventListener('cambios-actualizados', () => actualizarWidget());
+        document.addEventListener('cambios-actualizados', () => { reprogramar(); actualizarWidget(); });
         raiz.addEventListener('app-reanudada', () => reprogramar());
     }
 })(window);

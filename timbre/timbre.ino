@@ -39,10 +39,11 @@
 #include <time.h>
 #include <Preferences.h>
 #include <WebServer.h>
+#include <mbedtls/sha256.h>
 #include "secretos.h"   // REDES (WiFi) y DEVICE_KEY: están en su propio archivo para no subirlos a GitHub
 
 // ====== CONFIGURACIÓN ======
-const int FW_VERSION = 3;   // sube este número cada vez que publiques un firmware nuevo
+const int FW_VERSION = 4;   // sube este número cada vez que publiques un firmware nuevo
 
 // Tu página (la llave DEVICE_KEY y las redes WiFi están en secretos.h)
 const char* SERVER_URL   = "https://cecyteo.vercel.app/api/bell";
@@ -378,6 +379,8 @@ void actualizarFirmware(int version, const String& md5, long tam) {
 }
 
 String redesTexto = "";
+unsigned long ultimoOkServidor = 0;
+void guardarDesdePortal();
 
 String deHex(const String& h) {
   String s;
@@ -421,7 +424,7 @@ void consultarServidor() {
 
   // cada 6ta consulta avisa "aquí estoy" (versión, señal y hora) para el panel
   String url = String(SERVER_URL) + "?key=" + DEVICE_KEY;
-  if (vez++ % 6 == 0) url += "&s=1&v=" + String(FW_VERSION) + "&rs=" + String(WiFi.RSSI()) + "&t=" + String((unsigned long)time(NULL));
+  if (vez++ % 6 == 0) url += "&s=1&ip=" + WiFi.localIP().toString() + "&v=" + String(FW_VERSION) + "&rs=" + String(WiFi.RSSI()) + "&t=" + String((unsigned long)time(NULL));
 
   // toques que aún no se han avisado
   int enviados = 0;
@@ -441,6 +444,7 @@ void consultarServidor() {
     return;
   }
   String cuerpo = http.getString();
+  ultimoOkServidor = millis();
   http.end();
   cuerpo.replace("\r", "");
 
@@ -537,7 +541,91 @@ void guardarLocal(const String& r) {
   prefs.begin("timbre", false);
   prefs.putString("redesL", r);
   prefs.end();
+  xSemaphoreTake(candado, portMAX_DELAY);
   redesLocal = r;
+  xSemaphoreGive(candado);
+}
+
+bool servidorListo = false;
+String llaveLocal = "";
+
+void calcularLlaveLocal() {
+  String base = String(DEVICE_KEY) + ":local";
+  uint8_t h[32];
+  mbedtls_sha256((const unsigned char*)base.c_str(), base.length(), h, 0);
+  char hex[3];
+  llaveLocal = "";
+  for (int i = 0; i < 16; i++) { sprintf(hex, "%02x", h[i]); llaveLocal += hex; }
+}
+
+bool autorizado(bool libreEnPortal) {
+  portal.sendHeader("Access-Control-Allow-Origin", "*");
+  if (libreEnPortal && portalActivo) return true;
+  String k = portal.hasHeader("X-Key") ? portal.header("X-Key") : portal.arg("key");
+  if (k.length() && k == llaveLocal) return true;
+  portal.send(401, "text/plain", "llave incorrecta");
+  return false;
+}
+
+void localEstado() {
+  if (!autorizado(false)) return;
+  struct tm t;
+  bool hora = horaValida(&t);
+  String j = "{\"fw\":" + String(FW_VERSION) + ",\"hora\":" + String(hora ? (unsigned long)time(NULL) : 0UL) +
+             ",\"sonando\":" + String(sonando ? "true" : "false") + ",\"horas\":" + String(cfg.numHorarios) +
+             ",\"rssi\":" + String(WiFi.RSSI()) + ",\"internet\":" + String(ultimoOkServidor && millis() - ultimoOkServidor < 60000UL ? "true" : "false") + "}";
+  portal.send(200, "application/json", j);
+}
+
+void localTocar() {
+  if (!autorizado(false)) return;
+  pedirTimbre = true;
+  portal.send(200, "application/json", "{\"ok\":true}");
+  Serial.println("Orden directa por WiFi local: tocar timbre");
+}
+
+void ponerHora(unsigned long t) {
+  if (t < 1600000000UL) return;
+  struct tm ahora;
+  long dif = horaValida(&ahora) ? (long)t - (long)time(NULL) : 1000;
+  if (labs(dif) < 60) return;
+  struct timeval tv = { (time_t)t, 0 };
+  settimeofday(&tv, NULL);
+  Serial.println("Hora puesta desde el teléfono");
+}
+
+void localConfig() {
+  if (!autorizado(false)) return;
+  ponerHora(strtoul(portal.arg("t").c_str(), NULL, 10));
+  String cuerpo = portal.arg("plain");
+  cuerpo.replace("\r", "");
+  if (cuerpo.indexOf('\n') >= 0) {
+    static Config n;
+    memcpy(&n, &cfg, sizeof(Config));
+    interpretar(cuerpo, n);
+    xSemaphoreTake(candado, portMAX_DELAY);
+    memcpy(&nueva, &n, sizeof(Config));
+    hayNueva = true;
+    xSemaphoreGive(candado);
+    Serial.println("Config recibida directo por WiFi local");
+  }
+  portal.send(200, "application/json", "{\"ok\":true}");
+}
+
+void iniciarServidor() {
+  if (servidorListo) return;
+  const char* cabeceras[] = { "X-Key" };
+  portal.collectHeaders(cabeceras, 1);
+  portal.on("/", HTTP_GET, []() { if (autorizado(true)) paginaPortal(); });
+  portal.on("/guardar", HTTP_POST, []() { if (autorizado(true)) guardarDesdePortal(); });
+  portal.on("/borrar", HTTP_POST, []() { if (autorizado(true)) { guardarLocal(""); portal.sendHeader("Location", "/"); portal.send(303); } });
+  portal.on("/estado", HTTP_GET, localEstado);
+  portal.on("/tocar", HTTP_POST, localTocar);
+  portal.on("/config", HTTP_POST, localConfig);
+  portal.on("/estado", HTTP_OPTIONS, []() { portal.sendHeader("Access-Control-Allow-Origin", "*"); portal.sendHeader("Access-Control-Allow-Headers", "X-Key, Content-Type"); portal.send(204); });
+  portal.onNotFound([]() { portal.send(404, "text/plain", "no existe"); });
+  portal.begin();
+  servidorListo = true;
 }
 
 void guardarDesdePortal() {
@@ -562,21 +650,12 @@ void abrirPortal() {
   WiFi.scanDelete();
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(AP_NOMBRE, AP_CLAVE);
-  static bool rutas = false;
-  if (!rutas) {
-    rutas = true;
-    portal.on("/", HTTP_GET, paginaPortal);
-    portal.on("/guardar", HTTP_POST, guardarDesdePortal);
-    portal.on("/borrar", HTTP_POST, []() { guardarLocal(""); portal.sendHeader("Location", "/"); portal.send(303); });
-    portal.onNotFound(paginaPortal);
-  }
-  portal.begin();
   portalActivo = true;
+  iniciarServidor();
   Serial.printf("Sin WiFi: abrí la red \"%s\" (clave %s). Entra a http://192.168.4.1 para agregar una red\n", AP_NOMBRE, AP_CLAVE);
 }
 
 void cerrarPortal() {
-  portal.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   portalActivo = false;
@@ -589,7 +668,9 @@ void tareaInternet(void*) {
   unsigned long sinRedDesde = millis(), ultimoIntento = 0;
 
   for (;;) {
+    xSemaphoreTake(candado, portMAX_DELAY);
     String todas = redesTexto + "," + redesLocal;
+    xSemaphoreGive(candado);
     if (todas != usadas) {
       usadas = todas;
       delete wifiMulti;
@@ -607,9 +688,8 @@ void tareaInternet(void*) {
       Serial.printf("Redes WiFi: %d de secretos.h + %d de la página\n", (int)(sizeof(REDES) / sizeof(REDES[0])), total);
     }
     if (portalActivo) {
-      portal.handleClient();
-      bool cambio = (redesTexto + "," + redesLocal) != usadas;
-      if (!cambio && millis() - ultimoIntento < 30000UL) { vTaskDelay(10 / portTICK_PERIOD_MS); continue; }
+      bool cambio = todas != usadas;
+      if (!cambio && millis() - ultimoIntento < 30000UL) { vTaskDelay(500 / portTICK_PERIOD_MS); continue; }
       ultimoIntento = millis();
       if (wifiMulti->run(8000, true) == WL_CONNECTED) { cerrarPortal(); sinRedDesde = millis(); }
       continue;
@@ -618,6 +698,7 @@ void tareaInternet(void*) {
       sinRedDesde = millis();
       static bool avisado = false;
       if (!avisado) { avisado = true; Serial.print("WiFi conectado, IP: "); Serial.println(WiFi.localIP()); }
+      iniciarServidor();
       consultarServidor();
     } else {
       Serial.println("Buscando WiFi...");
@@ -678,6 +759,7 @@ void setup() {
 
   cargarConfig();                          // usa lo último guardado, aunque no haya Internet
   cargarRedes();
+  calcularLlaveLocal();
   memcpy(&recibida, &cfg, sizeof(Config));
 
   WiFi.mode(WIFI_STA);
@@ -707,6 +789,7 @@ void loop() {
     if (!sonando) iniciarRitmo(cfg.ritmo, cfg.numPasos, 'M');
   }
 
+  if (servidorListo) portal.handleClient();
   manejarRitmo();
   revisarHorarios();
 

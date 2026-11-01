@@ -126,6 +126,7 @@ function renderBellExtras() {
 
 function renderEstado() {
     renderWifi();
+    renderLocal();
     const info = $r('esp-info');
     if (!info) return;
     const edad = bellConfig.lastSeen ? (bellConfig.serverNow - bellConfig.lastSeen) / 1000 : null;
@@ -258,4 +259,106 @@ async function addWifi() {
 function removeWifi(ssid) {
     if (!confirm(`¿Quitar la red "${ssid}" del timbre?`)) return;
     enviarWifi((bellConfig.wifi || []).filter(w => w.ssid !== ssid).map(w => ({ ssid: w.ssid })), `Red "${ssid}" quitada.`);
+}
+
+function ipTimbre() {
+    const campo = $r('local-ip');
+    const escrita = campo && campo.value.trim();
+    if (escrita) { try { localStorage.setItem('cecyte_timbre_ip', escrita); } catch (e) { } return escrita; }
+    try { return localStorage.getItem('cecyte_timbre_ip') || bellConfig.espIp || ''; } catch (e) { return bellConfig.espIp || ''; }
+}
+
+async function pedirAlTimbre(ruta, metodo = 'GET', cuerpo = '') {
+    const ip = ipTimbre();
+    if (!ip || !bellConfig.localKey) throw new Error('Falta la IP del timbre o abrir el panel una vez con Internet.');
+    const url = `http://${ip}${ruta}`;
+    const headers = { 'X-Key': bellConfig.localKey, 'Content-Type': 'text/plain' };
+    const http = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.CapacitorHttp;
+    if (http) {
+        const r = await http.request({ url, method: metodo, headers, data: cuerpo || undefined, connectTimeout: 4000, readTimeout: 4000 });
+        if (r.status === 401) throw new Error('El timbre no reconoce la llave (actualiza su firmware).');
+        if (r.status !== 200) throw new Error('El timbre respondió ' + r.status);
+        return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+    }
+    const control = new AbortController();
+    const reloj = setTimeout(() => control.abort(), 4000);
+    try {
+        const r = await fetch(url, { method: metodo, headers, body: cuerpo || undefined, signal: control.signal });
+        if (!r.ok) throw new Error('El timbre respondió ' + r.status);
+        return await r.json();
+    } finally { clearTimeout(reloj); }
+}
+
+function textoParaTimbre(b) {
+    const compacta = d => d.replace(/-/g, '');
+    return [
+        '',
+        Math.max(1, Math.ceil((b.rhythm || []).reduce((a, x) => a + x, 0) / 1000)),
+        (b.days || []).join(''),
+        (b.times || []).join(','),
+        (b.rhythm || []).join(','),
+        Object.entries(b.rhythms || {}).map(([t, r]) => `${t}=${r.join(',')}`).join(';'),
+        (b.offDates || []).map(compacta).join(','),
+        Object.entries(b.specials || {}).map(([d, ts]) => `${compacta(d)}=${ts.join(',')}`).join(';'),
+        ''
+    ].join('\n');
+}
+
+function lMsg(texto, tipo = '') {
+    const m = $r('local-msg');
+    if (!m) return;
+    m.className = 'msg' + (tipo ? ' msg--' + tipo : '');
+    m.innerText = texto;
+}
+
+async function tocarDirecto() {
+    try {
+        await pedirAlTimbre('/tocar', 'POST');
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function localTocar() {
+    lMsg('Enviando...');
+    try { await pedirAlTimbre('/tocar', 'POST'); lMsg('Listo: el timbre está sonando.', 'ok'); }
+    catch (e) { lMsg(errorLocal(e), 'err'); }
+}
+
+async function localMandar() {
+    lMsg('Mandando horario y hora...');
+    try {
+        const t = Math.floor(Date.now() / 1000);
+        await pedirAlTimbre('/config?t=' + t, 'POST', textoParaTimbre(bellConfig));
+        lMsg('El timbre ya tiene este horario y la hora del teléfono. Cuando vuelva el Internet usará lo guardado en la página.', 'ok');
+    } catch (e) { lMsg(errorLocal(e), 'err'); }
+}
+
+async function localEstado() {
+    lMsg('Preguntando al timbre...');
+    try {
+        const e = await pedirAlTimbre('/estado');
+        const hora = e.hora ? new Date(e.hora * 1000).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : 'sin hora';
+        lMsg(`Conectado · firmware v${e.fw} · hora ${hora} · ${e.horas} horas programadas · señal ${e.rssi} dBm · Internet: ${e.internet ? 'sí' : 'no'}`, 'ok');
+    } catch (e) { lMsg(errorLocal(e), 'err'); }
+}
+
+function errorLocal(e) {
+    if (e && /Falta|llave|respondió/.test(e.message)) return e.message;
+    return 'No encuentro el timbre. Revisa que el teléfono esté en el mismo WiFi que el timbre y la IP.';
+}
+
+function renderLocal() {
+    const caja = $r('local-timbre');
+    if (caja) {
+        caja.hidden = !API.esNativo;
+        if (caja.nextElementSibling && caja.nextElementSibling.tagName === 'HR') caja.nextElementSibling.hidden = !API.esNativo;
+    }
+    const campo = $r('local-ip');
+    if (campo && !campo.value) {
+        let ip = '';
+        try { ip = localStorage.getItem('cecyte_timbre_ip') || ''; } catch (e) { }
+        campo.value = ip || bellConfig.espIp || '';
+    }
 }

@@ -4,6 +4,7 @@
 //   POST unsubscribe { group, endpoint }                     -> la quita de la lista de su grupo
 
 import { kv } from '@vercel/kv';
+import { cors } from '../lib/cors.js';
 import { limpiarGrupo, suscripcionValida, GRUPOS_POR_DEFECTO, MAX_SUSCRIPCIONES } from '../lib/validar.js';
 
 async function suscribir(req, res) {
@@ -60,6 +61,7 @@ async function desuscribir(req, res) {
 }
 
 export default async function handler(req, res) {
+    if (cors(req, res)) return;
     const accion = req.query && req.query.accion;
 
     if (accion === 'public-key') {

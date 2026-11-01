@@ -18,14 +18,14 @@ const { default: changes, hoyMX } = await import(root + 'api/changes.js');
 const { signToken } = await import(root + 'lib/auth.js');
 
 const adminCookie = { cookie: `admin_token=${signToken()}` };
-async function call({ method = 'GET', body, headers = {} } = {}) {
+async function call({ method = 'GET', body, headers = {}, query = {} } = {}) {
     const out = { status: 200, headers: {}, body: null };
     const res = {
         status(c) { out.status = c; return this; },
         setHeader(k, v) { out.headers[k.toLowerCase()] = v; },
         json(o) { out.body = o; return this; },
     };
-    await changes({ method, query: {}, body, headers }, res);
+    await changes({ method, query, body, headers }, res);
     return out;
 }
 const agregar = (extra = {}) => call({ method: 'POST', headers: adminCookie, body: { action: 'add', group: '501 Programación', time: '08:00 - 08:45', tipo: 'cancelada', ...extra } });
@@ -87,5 +87,19 @@ assert.strictEqual((await agregar({ group: 'otro' })).status, 400);
 
 // 9) otros métodos
 assert.strictEqual((await call({ method: 'DELETE', headers: adminCookie })).status, 405);
+
+r = await call({ query: { anuncios: '1' } });
+assert.deepStrictEqual(r.body, []);
+assert.strictEqual((await call({ method: 'POST', body: { action: 'anuncio-add', titulo: 'x' } })).status, 401);
+assert.strictEqual((await call({ method: 'POST', headers: adminCookie, body: { action: 'anuncio-add', titulo: '' } })).status, 400);
+r = await call({ method: 'POST', headers: adminCookie, body: { action: 'anuncio-add', titulo: 'Junta de padres', texto: 'Viernes 10:00', dias: 3 } });
+assert.strictEqual(r.status, 200);
+assert.strictEqual(r.body.anuncios.length, 1);
+assert.strictEqual(r.body.anuncios[0].desde, hoyMX());
+r = await call({ query: { anuncios: '1' } });
+assert.strictEqual(r.body[0].titulo, 'Junta de padres');
+assert.ok(Array.isArray((await call()).body));
+r = await call({ method: 'POST', headers: adminCookie, body: { action: 'anuncio-remove', id: r.body[0].id } });
+assert.deepStrictEqual(r.body.anuncios, []);
 
 console.log('api-cambios.test.mjs OK');

@@ -20,6 +20,7 @@
 // El ESP32 no puede recibir órdenes desde Internet (está detrás del router),
 // así que él le pregunta a esta API cada ~5 segundos si hay algo nuevo.
 
+import { createHash } from 'node:crypto';
 import { kv } from '@vercel/kv';
 import { exigir } from '../lib/admins.js';
 import { cors } from '../lib/cors.js';
@@ -113,8 +114,8 @@ export default async function handler(req, res) {
         if (!isDevice && !(await exigir(req, res, kv, 'timbre', 'ritmo', 'esp32'))) return;
 
         try {
-            const bell = await getBell();
-            const fw = await kv.get(FW_META_KEY);
+            const [saved, fw] = await kv.mget(BELL_KEY, FW_META_KEY);
+            const bell = { ...DEFAULT_BELL, ...(saved || {}) };
 
             if (isDevice) {
                 if (req.query.s) {
@@ -123,6 +124,7 @@ export default async function handler(req, res) {
                         t: Date.now(),
                         fw: Number(req.query.v) || 0,
                         rssi: Number(req.query.rs) || 0,
+                        ip: /^\d{1,3}(\.\d{1,3}){3}$/.test(String(req.query.ip || '')) ? String(req.query.ip) : '',
                         clockDiffMs: clock > 1.6e9 ? clock * 1000 - Date.now() : null
                     });
                 }
@@ -140,6 +142,8 @@ export default async function handler(req, res) {
                 lastSeen: seen.t || null,
                 espFw: seen.fw || 0,
                 espRssi: seen.rssi || 0,
+                espIp: seen.ip || '',
+                localKey: createHash('sha256').update(process.env.BELL_DEVICE_KEY + ':local').digest('hex').slice(0, 32),
                 espClockDiffMs: seen.clockDiffMs ?? null,
                 log: log.map(String),
                 fw: fw ? { version: fw.version, size: fw.size, ts: fw.ts } : null,
@@ -165,6 +169,7 @@ export default async function handler(req, res) {
             }
 
             if (body.action === 'wifi') {
+                if (!(await exigir(req, res, kv, 'esp32'))) return;
                 const nets = body.networks;
                 const viejas = Object.fromEntries((bell.wifi || []).map(w => [w.ssid, w.pass]));
                 const bytes = s => Buffer.byteLength(s, 'utf8');

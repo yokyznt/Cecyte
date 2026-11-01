@@ -15,7 +15,7 @@ const APK = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'apk.json'), 'u
 
 // Lo único que viaja al APK. Todo lo demás se queda fuera.
 const ROBOT = APK.incluirRobot !== false;      // config/apk.json: false = el APK sale sin el robot
-const ARCHIVOS = ['index.html', 'app.js', 'admin-secciones.js', 'calendario.js', 'timbre.js', 'timbre-estado.js', 'logo-cecyte.png'].concat(ROBOT ? ['robot.js'] : []);
+const ARCHIVOS = ['index.html', 'app.js', 'admin-secciones.js', 'calendario.js', 'timbre.js', 'timbre-estado.js', 'extras.js', 'logo-cecyte.png'].concat(ROBOT ? ['robot.js'] : []);
 const CARPETAS = ['css', 'fonts', 'js'];
 
 // Frases que mencionan al robot dentro de textos que sí viajan
@@ -90,6 +90,27 @@ const sobre = {
     versionUrl: APK.versionUrl,
     descargaUrl: APK.descargaUrl,
 };
+async function datosIniciales() {
+    if (process.env.CECYTE_SIN_RED === '1' || typeof fetch !== 'function') return null;
+    const traer = async ruta => {
+        const r = await fetch(APK.apiBase + ruta, { signal: AbortSignal.timeout(8000) });
+        if (!r.ok) throw new Error(ruta + ' ' + r.status);
+        const d = await r.json();
+        if (!Array.isArray(d)) throw new Error(ruta + ' no es lista');
+        return d;
+    };
+    try {
+        const [schedule, groups] = await Promise.all([traer('/api/schedule'), traer('/api/groups')]);
+        return { t: Date.now(), schedule, groups };
+    } catch (e) {
+        console.warn('Sin copia del horario dentro del APK (' + e.message + '): la app la bajará la primera vez que tenga red');
+        return null;
+    }
+}
+
+async function terminar() {
+const iniciales = await datosIniciales();
+if (iniciales) sobre.datosIniciales = iniciales;
 fs.mkdirSync(path.join(DESTINO, 'config'), { recursive: true });
 fs.writeFileSync(path.join(DESTINO, 'config', 'app.config.js'),
     base + '\n// --- generado por scripts/build-www.js (APK) ---\nObject.assign(window.APP_CONFIG, ' + JSON.stringify(sobre, null, 4) + ');\n');
@@ -108,3 +129,6 @@ if (fallos.length) {
     process.exit(1);
 }
 console.log('www/ listo (' + todos(DESTINO).length + ' archivos, v' + APK.versionName + (ROBOT ? ', con robot' : ', sin robot') + ')');
+}
+
+terminar();

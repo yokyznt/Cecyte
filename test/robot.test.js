@@ -1317,5 +1317,5 @@ console.log('robot.test.js: todo bien');
     assert(/accion: 'expulsar'/.test(tels) && /crear: T\.salaNueva === sala/.test(tels) && /r\.estado === 403 && r\.datos\.expulsado/.test(tels) && /T\.dueno/.test(tels), 'la sala permite expulsar solo al dueño y el expulsado se sale');
     const bt = fs.readFileSync(path.join(__dirname, '..', 'js', 'robot-bluetooth.js'), 'utf8');
     assert(/nombre: 'Hevy'/.test(bt) && /Conectando con Hevy/.test(fs.readFileSync(path.join(__dirname, '..', 'robot.js'), 'utf8')), 'el robot se llama Hevy dentro de la app');
-    assert(/"versionName": "1\.2\.0"/.test(fs.readFileSync(path.join(__dirname, '..', 'config', 'apk.json'), 'utf8')), 'versión 1.2.0');
+    assert(/"versionName": "1\.3\.1"/.test(fs.readFileSync(path.join(__dirname, '..', 'config', 'apk.json'), 'utf8')), 'versión 1.3.1');
 }

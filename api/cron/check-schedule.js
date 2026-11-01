@@ -80,12 +80,14 @@ export default async function handler(req, res) {
 
     const groups = (await kv.get(GROUPS_KEY)) || [];
     const schedule = (await kv.get(SCHEDULE_KEY)) || [];
+    const hoyMx = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const cambios = ((await kv.get('cecyte_changes')) || []).filter(c => c.date === hoyMx);
 
     const resumen = [];
 
     for (const group of groups) {
         const stateKey = `push_last_slot:${group}`;
-        const lastKeyRaw = await kv.get(stateKey);
+        const lastKeyRaw = await kv.getset(stateKey, currentKey);
         const isFirstRun = lastKeyRaw === undefined || lastKeyRaw === null;
         const lastKey = isFirstRun ? null : lastKeyRaw;
 
@@ -103,34 +105,31 @@ export default async function handler(req, res) {
             const shouldNotify = prevClass || nextClass || (slot && slot.receso);
 
             if (shouldNotify) {
-                const body = buildMessage(prevClass, slot, nextClass);
+                const cambio = slot ? cambios.find(c => c.group === group && c.time === slot.key) || null : null;
+                const body = buildMessage(prevClass, slot, nextClass, cambio);
                 const subsKey = `push_subs:${group}`;
                 const subs = (await kv.get(subsKey)) || [];
                 let notified = 0;
-                const stillValid = [];
+                const muertas = new Set();
 
                 for (const sub of subs) {
                     try {
                         await webpush.sendNotification(sub, JSON.stringify({ title: 'CECyTE Plantel 18', body }));
-                        stillValid.push(sub);
                         notified++;
                     } catch (err) {
-                        // 410/404 = la suscripcion ya no existe (desinstalaron, revocaron permiso, etc.)
-                        if (err.statusCode !== 410 && err.statusCode !== 404) {
-                            stillValid.push(sub); // error temporal, no la borramos todavia
-                        }
+                        if (err.statusCode === 410 || err.statusCode === 404) muertas.add(sub.endpoint);
                     }
                 }
 
-                if (stillValid.length !== subs.length) {
-                    await kv.set(subsKey, stillValid);
+                if (muertas.size) {
+                    const actuales = (await kv.get(subsKey)) || [];
+                    await kv.set(subsKey, actuales.filter(s => !muertas.has(s.endpoint)));
                 }
 
                 resumen.push({ group, notified, total: subs.length });
             }
         }
 
-        await kv.set(stateKey, currentKey);
     }
 
     return res.status(200).json({ ok: true, day, hour, minute, currentKey, resumen });
